@@ -1,0 +1,3336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monopoly HTML</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#0b6623;
+    --board-bg:#c8e6c9;
+    --center-bg:#e8f5e9;
+    --panel-bg:#ffffff;
+    --logo-color:#0b6623;
+    --accent:#0b6623;
+    --text:#1a1a1a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+    transition:background .4s;
+  }
+
+  /* ---------- SETUP SCREEN ---------- */
+  #setup{
+    background:var(--panel-bg);
+    border-radius:12px;
+    padding:28px 32px;
+    max-width:520px;
+    width:100%;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  #setup h1{margin-top:0;text-align:center;}
+  .player-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .player-row input[type=text]{
+    flex:1;
+    padding:8px;
+    border-radius:6px;
+    border:1px solid #ccc;
+    font-size:14px;
+  }
+  .swatch{
+    width:24px;height:24px;border-radius:50%;
+    border:2px solid #333;
+    flex-shrink:0;
+  }
+  .player-row input[type=color]{
+    width:34px;height:32px;
+    padding:0;border:none;
+    background:none;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .player-row select.psymbol{
+    font-size:17px;
+    padding:3px 4px;
+    border-radius:6px;
+    border:1px solid #ccc;
+    flex-shrink:0;
+    cursor:pointer;
+  }
+  .player-row select.ptype{
+    font-size:12px;
+    padding:4px 3px;
+    border-radius:6px;
+    border:1px solid #ccc;
+    flex-shrink:0;
+    cursor:pointer;
+    max-width:120px;
+  }
+  #setup .row{display:flex;gap:10px;margin:14px 0;align-items:center;flex-wrap:wrap;}
+  #setup button, .btn{
+    cursor:pointer;
+    border:none;
+    border-radius:8px;
+    padding:10px 16px;
+    font-size:15px;
+    font-weight:600;
+    background:var(--accent);
+    color:#fff;
+    transition:filter .15s, transform .1s;
+  }
+  #setup button:hover, .btn:hover{filter:brightness(1.15);}
+  .btn:active{transform:scale(.96);}
+  #setup .hint{font-size:12px;color:#666;margin-top:-6px;margin-bottom:10px;}
+  .rules-box{
+    border:1px solid #ddd;
+    border-radius:8px;
+    padding:10px 12px;
+    margin:14px 0;
+  }
+  .rules-box legend{font-weight:700;font-size:14px;padding:0 6px;}
+  .rules-box label{
+    display:block;
+    font-size:12.5px;
+    margin:7px 0;
+    line-height:1.35;
+    cursor:pointer;
+  }
+  #versionDesc{font-style:italic;}
+
+  /* ---------- GAME SCREEN ---------- */
+  #game{
+    display:none;
+    width:100%;
+    max-width:1400px;
+    gap:14px;
+    align-items:flex-start;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  #game.active{display:flex;}
+
+  #board{
+    position:relative;
+    display:grid;
+    grid-template-columns:repeat(11,1fr);
+    grid-template-rows:repeat(11,1fr);
+    width:min(88vmin,760px);
+    height:min(88vmin,760px);
+    background:var(--board-bg);
+    border:3px solid #222;
+    border-radius:8px;
+    overflow:hidden;
+    flex-shrink:0;
+    transition:background .4s;
+  }
+  .cell{
+    position:relative;
+    border:1px solid rgba(0,0,0,.35);
+    background:#fff;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-end;
+    font-size:9px;
+    line-height:1.05;
+    padding:2px;
+    text-align:center;
+    overflow:hidden;
+    cursor:default;
+  }
+  .cell.corner{
+    font-size:10px;
+    justify-content:center;
+    font-weight:700;
+    background:#eee;
+  }
+  .cell .colorbar{
+    width:100%;
+    height:14px;
+    flex-shrink:0;
+  }
+  .cell .name{padding:2px 1px;font-weight:600;}
+  .cell .price{color:#333;font-size:8px;}
+  .cell.mortgaged{background:#e2e2e2;}
+  .cell.mortgaged .name{opacity:.55;text-decoration:line-through;}
+  .cell .mortgage-mark{
+    position:absolute;
+    bottom:1px;right:1px;
+    font-size:9px;
+    line-height:1;
+  }
+  .cell .owner-mark{
+    position:absolute;
+    top:2px;left:2px;
+    width:8px;height:8px;
+    border-radius:50%;
+    border:1px solid #222;
+  }
+  .cell .houses-indicator{
+    position:absolute;
+    top:1px;right:1px;
+    font-size:7px;
+    line-height:1;
+    max-width:70%;
+    text-align:right;
+  }
+  .cell.landed{animation:cellFlash 1s ease;}
+  @keyframes cellFlash{
+    0%,55%{box-shadow:inset 0 0 0 3px #ffb300;background:#fff8e1;}
+    100%{box-shadow:none;}
+  }
+  .center-area{
+    grid-column:2/11;
+    grid-row:2/11;
+    background:var(--center-bg);
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    align-items:center;
+    justify-content:center;
+    border:1px solid rgba(0,0,0,.2);
+    transition:background .4s;
+  }
+  #logo{
+    font-size:clamp(20px,4vw,42px);
+    font-weight:800;
+    color:var(--logo-color);
+    letter-spacing:2px;
+    transform:rotate(-14deg);
+    text-align:center;
+    text-shadow:2px 2px 0 #fff;
+  }
+  #logo small{
+    display:block;
+    font-size:.34em;
+    letter-spacing:4px;
+    font-weight:700;
+  }
+  #pot{
+    font-size:clamp(12px,1.8vw,18px);
+    font-weight:700;
+    background:#fff;
+    border:2px dashed var(--logo-color);
+    color:var(--logo-color);
+    border-radius:10px;
+    padding:6px 14px;
+    transform:rotate(-14deg);
+  }
+  .token{
+    position:absolute;
+    width:17px;height:17px;
+    border-radius:50%;
+    border:1.5px solid #fff;
+    box-shadow:0 0 3px rgba(0,0,0,.7);
+    z-index:6;
+    transition:left .15s ease, top .15s ease;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    line-height:1;
+  }
+
+  /* ---------- SIDE PANEL ---------- */
+  #side{
+    width:340px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .panel{
+    background:var(--panel-bg);
+    border-radius:10px;
+    padding:12px 14px;
+    box-shadow:0 4px 16px rgba(0,0,0,.25);
+  }
+  #players-panel .p-entry{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 4px;
+    border-radius:6px;
+    margin-bottom:4px;
+  }
+  .p-entry.current{background:#fff3cd;}
+  .p-entry.bankrupt{opacity:.4;text-decoration:line-through;}
+  .p-dot{width:14px;height:14px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  .p-name{flex:1;font-weight:600;font-size:14px;}
+  .p-money{font-size:13px;font-weight:700;}
+  .p-money.up{animation:moneyUp .9s ease;}
+  .p-money.down{animation:moneyDown .9s ease;}
+  @keyframes moneyUp{
+    0%{color:#1e9e45;transform:scale(1.35);}
+    100%{color:inherit;transform:scale(1);}
+  }
+  @keyframes moneyDown{
+    0%{color:#c62828;transform:scale(1.35);}
+    100%{color:inherit;transform:scale(1);}
+  }
+
+  #dice-area{text-align:center;}
+  #dice{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin:8px 0;
+  }
+  .die{
+    width:44px;height:44px;
+    background:#fff;
+    border:2px solid #222;
+    border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:24px;font-weight:800;
+  }
+  .die.rolling{animation:diceShake .22s infinite;}
+  @keyframes diceShake{
+    0%{transform:rotate(-10deg) translateY(-2px);}
+    50%{transform:rotate(10deg) translateY(2px) scale(1.08);}
+    100%{transform:rotate(-10deg) translateY(-2px);}
+  }
+  #controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px;}
+  #controls .btn:disabled{background:#aaa;cursor:not-allowed;filter:none;}
+  .btn.secondary{background:#555;}
+  .btn.danger{background:#b02a2a;}
+  .btn.tiny{padding:4px 8px;font-size:11.5px;border-radius:5px;}
+
+  #log{
+    max-height:220px;
+    overflow-y:auto;
+    font-size:12.5px;
+    display:flex;
+    flex-direction:column-reverse;
+  }
+  #log div{padding:3px 2px;border-bottom:1px solid #eee;}
+
+  #current-space-info{font-size:13px;margin-top:6px;min-height:18px;}
+
+  /* modal */
+  #modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.55);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:50;
+    padding:16px;
+  }
+  #modal-overlay.active{display:flex;}
+  #modal{
+    background:#fff;
+    border-radius:12px;
+    padding:22px 26px;
+    max-width:460px;
+    max-height:86vh;
+    overflow-y:auto;
+    text-align:center;
+    box-shadow:0 10px 40px rgba(0,0,0,.4);
+    animation:modalPop .22s ease;
+  }
+  @keyframes modalPop{
+    from{transform:scale(.85) translateY(10px);opacity:0;}
+    to{transform:scale(1) translateY(0);opacity:1;}
+  }
+  #modal h2{margin-top:0;}
+  #modal .row{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;align-items:center;}
+
+  /* deed / title card */
+  .deed-card{
+    border:2px solid #222;
+    border-radius:8px;
+    overflow:hidden;
+    margin-bottom:10px;
+    text-align:left;
+  }
+  .deed-colorbar{height:24px;}
+  .deed-card h2{margin:8px 10px 2px;font-size:17px;text-align:center;}
+  .deed-price{text-align:center;font-size:13px;margin-bottom:6px;color:#333;}
+  .deed-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .deed-table td{padding:3px 10px;border-top:1px solid #ddd;}
+  .deed-table td:last-child{text-align:right;font-weight:700;white-space:nowrap;}
+  .deed-table tr.active-rent{background:#fff3cd;}
+  .deed-note{font-size:11.5px;color:#b8860b;text-align:center;margin:6px 8px 2px;font-weight:600;}
+  .deed-mortgaged{font-size:12px;color:#b02a2a;text-align:center;margin:4px 8px;font-weight:700;}
+
+  /* manage properties panel */
+  .manage-group{margin-bottom:12px;text-align:left;}
+  .manage-group-title{padding:3px 8px;font-weight:700;font-size:13px;margin-bottom:4px;}
+  .manage-row{display:flex;align-items:center;gap:5px;padding:3px 2px;font-size:12px;}
+  .manage-name{flex:1;}
+  .manage-name.mortgaged{opacity:.55;text-decoration:line-through;}
+  .manage-houses{width:60px;font-size:12px;text-align:center;}
+
+  /* auction */
+  .bid-input{width:90px;padding:6px;border-radius:6px;border:1px solid #ccc;font-size:14px;text-align:center;}
+
+  /* trade */
+  .trade-columns{display:flex;gap:16px;text-align:left;margin-top:10px;}
+  .trade-col{flex:1;min-width:0;}
+  .trade-col b{font-size:13px;}
+  .trade-prop-list{max-height:150px;overflow-y:auto;margin:4px 0;}
+  .trade-prop-list label{display:block;font-size:12px;padding:1px 0;}
+  .trade-money-row{display:block;margin-top:6px;font-size:12px;}
+  .trade-money-row input{width:70px;padding:4px;border-radius:5px;border:1px solid #ccc;}
+  .trade-empty{font-size:11.5px;color:#777;}
+  .prop-chip{
+    display:inline-block;
+    width:10px;height:10px;
+    border-radius:3px;
+    border:1px solid rgba(0,0,0,.35);
+    margin-right:5px;
+    vertical-align:middle;
+    flex-shrink:0;
+  }
+  .modal-error{color:#b02a2a;font-size:12px;min-height:14px;margin-top:6px;}
+
+  /* debt / dette */
+  .debt-list{
+    max-height:190px;
+    overflow-y:auto;
+    text-align:left;
+    font-size:12.5px;
+    margin:8px 0;
+    border:1px solid #eee;
+    border-radius:8px;
+    padding:6px 8px;
+  }
+  .debt-row{display:flex;align-items:center;gap:6px;padding:3px 0;}
+  .debt-row .manage-name{flex:1;}
+  .debt-gift{
+    margin-top:10px;
+    padding:8px;
+    background:#f6f6f6;
+    border-radius:8px;
+    font-size:13px;
+    display:flex;
+    gap:6px;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .debt-amount{font-size:20px;font-weight:800;color:#b02a2a;}
+
+  /* gift */
+  .gift-form{display:flex;flex-direction:column;gap:10px;margin-top:10px;font-size:14px;text-align:left;}
+  .gift-form select,.gift-form input{padding:6px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
+
+  /* écran de victoire */
+  #victory-overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.78);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:100;
+    padding:16px;
+    overflow:hidden;
+  }
+  #victory-overlay.active{display:flex;}
+  #victory-box{
+    position:relative;
+    z-index:2;
+    background:#fff;
+    border-radius:18px;
+    padding:34px 46px;
+    text-align:center;
+    max-width:min(92vw,520px);
+    box-shadow:0 14px 60px rgba(0,0,0,.5);
+    animation:victoryPop .55s cubic-bezier(.18,1.4,.4,1);
+  }
+  #victory-box h1{font-size:clamp(22px,5vw,34px);margin:10px 0 6px;}
+  .victory-trophy{
+    font-size:64px;
+    display:inline-block;
+    animation:trophyBounce 1.3s ease infinite;
+  }
+  .victory-token{
+    display:inline-flex;
+    width:46px;height:46px;
+    border-radius:50%;
+    align-items:center;justify-content:center;
+    font-size:24px;
+    border:3px solid #fff;
+    box-shadow:0 0 10px rgba(0,0,0,.45);
+    vertical-align:middle;
+    margin-right:8px;
+  }
+  .victory-stats{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    margin:20px 0;
+    flex-wrap:wrap;
+  }
+  .victory-stat{
+    background:#f6f6f6;
+    border-radius:10px;
+    padding:10px 16px;
+    min-width:88px;
+  }
+  .victory-stat b{display:block;font-size:22px;}
+  .victory-stat span{font-size:11.5px;color:#666;}
+  .confetti{
+    position:absolute;
+    top:-24px;
+    z-index:1;
+    border-radius:2px;
+    animation:confettiFall linear infinite;
+  }
+  @keyframes confettiFall{
+    to{transform:translateY(110vh) rotate(720deg);}
+  }
+  @keyframes victoryPop{
+    from{transform:scale(.4) translateY(40px);opacity:0;}
+    to{transform:scale(1) translateY(0);opacity:1;}
+  }
+  @keyframes trophyBounce{
+    0%,100%{transform:translateY(0) rotate(-4deg);}
+    50%{transform:translateY(-12px) rotate(4deg);}
+  }
+
+  /* ---------- MODE EN LIGNE ---------- */
+  #netHome{
+    background:var(--panel-bg);
+    border-radius:12px;
+    padding:28px 32px;
+    max-width:520px;
+    width:100%;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  #netHome h1{margin-top:0;text-align:center;}
+  .net-big-btn{display:block;width:100%;margin:10px 0;font-size:16px;padding:14px;}
+  #netCode{
+    font-size:38px;font-weight:800;letter-spacing:8px;
+    text-align:center;margin:10px 0;color:var(--accent);
+    user-select:all;
+  }
+  .net-status{font-size:13px;color:#555;min-height:18px;text-align:center;}
+  #netSetupInfo{
+    display:none;
+    background:#e3f2fd;border:1px solid #90caf9;color:#0d47a1;
+    border-radius:8px;padding:8px 10px;font-size:13px;
+    margin-bottom:12px;font-weight:600;
+  }
+  #modal.net-locked #modal-body{pointer-events:none;opacity:.8;}
+  .net-wait-note{
+    background:#fff3cd;border:1px solid #ffe08a;color:#7a5c00;
+    font-size:12.5px;font-weight:600;border-radius:8px;
+    padding:6px 10px;margin-bottom:10px;
+  }
+  #controls.net-not-you .btn{opacity:.45;}
+
+  .net-reconnect-banner{
+    position:fixed;top:0;left:0;right:0;z-index:300;
+    background:#7a1f1f;color:#fff;text-align:center;
+    padding:10px 14px;font-size:13.5px;font-weight:600;
+    box-shadow:0 2px 10px rgba(0,0,0,.3);
+  }
+  .net-reconnect-banner button{
+    margin-left:10px;background:#fff;color:#7a1f1f;border:none;border-radius:6px;
+    padding:4px 10px;font-weight:700;cursor:pointer;font-size:12.5px;
+  }
+  #netJoinReadyPanel .player-row{justify-content:center;margin-top:10px;}
+  #netJoinReadyPanel .player-row input[type=text]{flex:0 1 160px;}
+  .cross-link{position:fixed;top:10px;right:12px;font-size:12px;z-index:10;}
+  .cross-link a{color:#fff;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;text-decoration:none;font-weight:600;}
+
+  @media(max-width:820px){
+    #side{width:100%;max-width:760px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="cross-link"><a href="index.html">🏠 Menu des jeux</a></div>
+
+<!-- ===================== ACCUEIL / RÉSEAU ===================== -->
+<div id="netHome">
+  <h1>🎩 Monopoly HTML</h1>
+  <div id="netChoice">
+    <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer sur cet ordinateur</button>
+    <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
+    <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
+    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code à l'autre.</p>
+  </div>
+  <div id="netHostPanel" style="display:none;text-align:center;">
+    <p style="margin-bottom:0;">Code de la partie :</p>
+    <div id="netCode">·····</div>
+    <p class="net-status" id="netHostStatus"></p>
+  </div>
+  <div id="netJoinPanel" style="display:none;">
+    <div class="gift-form">
+      <label>Ton prénom : <input type="text" id="netNameInput" placeholder="Joueur 2" maxlength="20"></label>
+      <label>Code de la partie : <input type="text" id="netCodeInput" placeholder="ABCDE" maxlength="8" style="text-transform:uppercase;"></label>
+    </div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn" id="netConnectBtn">Rejoindre</button>
+    </div>
+    <p class="net-status" id="netJoinStatus"></p>
+    <div id="netJoinReadyPanel" style="display:none;">
+      <p class="net-status" id="netGuestVersionDesc" style="font-weight:600;color:var(--accent);"></p>
+      <div class="player-row">
+        <input type="color" id="netGuestColor" value="#2980b9" title="Couleur de ton pion">
+        <select id="netGuestSymbol" title="Symbole de ton pion"></select>
+        <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
+      </div>
+      <p class="net-status">✅ Connecté(e) ! Personnalise ton pion, l'autre joueur lancera la partie.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" style="display:none;">
+  <h1>🎩 Monopoly HTML</h1>
+  <div id="netSetupInfo"></div>
+
+  <div class="row">
+    <label for="versionSel"><b>Édition :</b></label>
+    <select id="versionSel"></select>
+  </div>
+  <div class="hint" id="versionDesc"></div>
+
+  <div class="row">
+    <label for="numPlayers"><b>Nombre de joueurs :</b></label>
+    <select id="numPlayers">
+      <option value="2">2</option>
+      <option value="3" selected>3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+  <div id="playerInputs"></div>
+  <div class="hint">Choisissez la couleur et le symbole de chaque pion (symboles liés à l'édition).</div>
+
+  <div class="row">
+    <label><input type="checkbox" id="randomOrder" checked> <b>🎲 Ordre de jeu aléatoire</b></label>
+  </div>
+
+  <div class="row">
+    <label for="startMoneySel"><b>Argent de départ :</b></label>
+    <select id="startMoneySel">
+      <option value="1000">1000€</option>
+      <option value="1500" selected>1500€</option>
+      <option value="2000">2000€</option>
+      <option value="2500">2500€</option>
+    </select>
+  </div>
+
+  <fieldset class="rules-box">
+    <legend>⚙ Règles alternatives</legend>
+    <label><input type="checkbox" id="ruleGoDouble"> <b>Départ double</b> — s'arrêter pile sur la case Départ rapporte 400€ au lieu de 200€.</label>
+    <label><input type="checkbox" id="ruleParkingPot"> <b>Cagnotte du Parc Gratuit</b> — les impôts, taxes et amendes payés à la banque s'accumulent au centre du plateau et sont remportés par le joueur qui s'arrête sur le Parc Gratuit.</label>
+    <label><input type="checkbox" id="ruleAuctions" checked> <b>Enchères</b> — une propriété refusée par un joueur est mise aux enchères entre tous les joueurs.</label>
+    <label><input type="checkbox" id="ruleNoRentJail"> <b>Pas de loyer en prison</b> — un joueur en prison ne perçoit pas les loyers de ses propriétés.</label>
+  </fieldset>
+
+  <div style="text-align:center;">
+    <button id="startBtn">Démarrer la partie</button>
+  </div>
+</div>
+
+<!-- ===================== GAME ===================== -->
+<div id="game">
+  <div id="board"></div>
+
+  <div id="side">
+    <div class="panel" id="players-panel">
+      <h3 style="margin-top:0;">Joueurs</h3>
+      <div id="playersList"></div>
+    </div>
+
+    <div class="panel" id="dice-area">
+      <div id="turn-title" style="font-weight:700;"></div>
+      <div id="dice">
+        <div class="die" id="die1">-</div>
+        <div class="die" id="die2">-</div>
+      </div>
+      <div id="current-space-info"></div>
+      <div id="controls">
+        <button class="btn" id="rollBtn">🎲 Lancer les dés</button>
+        <button class="btn secondary" id="manageBtn">🏠 Propriétés</button>
+        <button class="btn secondary" id="tradeBtn">🔄 Échanger</button>
+        <button class="btn secondary" id="giftBtn">💶 Donner</button>
+        <button class="btn secondary" id="endTurnBtn" disabled>Terminer le tour</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0;">Journal</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL ===================== -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ===================== VICTOIRE ===================== -->
+<div id="victory-overlay">
+  <div id="victory-box"></div>
+</div>
+
+<script>
+/* ============================================================
+   ÉDITIONS DU PLATEAU
+   props : 22 noms (du moins cher au plus cher, par groupe)
+   rails : 4 « gares », utils : 2 compagnies
+   ============================================================ */
+
+const COLORS = {
+  brown:"#8B4513", lightblue:"#87CEEB", pink:"#e91e8c",
+  orange:"#f39c12", red:"#e74c3c", yellow:"#f1c40f",
+  green:"#27ae60", darkblue:"#1a5cbf"
+};
+
+const GROUP_NAMES = {
+  brown:"Marron", lightblue:"Bleu clair", pink:"Rose",
+  orange:"Orange", red:"Rouge", yellow:"Jaune",
+  green:"Vert", darkblue:"Bleu foncé"
+};
+
+/* pastille de couleur du groupe (gris foncé = gare, gris clair = compagnie) */
+function propChip(sp){
+  const c = sp.group ? COLORS[sp.group] : (sp.type==="railroad" ? "#444" : "#999");
+  return `<span class="prop-chip" style="background:${c}"></span>`;
+}
+
+const VERSIONS = {
+  paris:{
+    label:"Paris (classique)",
+    desc:"Le plateau français classique, de Belleville à la Rue de la Paix.",
+    logoText:"MONOPOLY", logoSub:"ÉDITION PARIS",
+    theme:{bg:"#0b6623", boardBg:"#c8e6c9", centerBg:"#e8f5e9", logo:"#0b6623", accent:"#0b6623"},
+    props:["Boulevard de Belleville","Rue Lecourbe","Rue de Vaugirard","Rue de Courcelles","Avenue de la République",
+      "Boulevard de la Villette","Avenue de Neuilly","Rue de Paradis","Avenue Mozart","Boulevard Saint-Michel",
+      "Place Pigalle","Avenue Matignon","Boulevard Malesherbes","Avenue Henri-Martin","Faubourg Saint-Honoré",
+      "Place de la Bourse","Rue La Fayette","Avenue de Breteuil","Avenue Foch","Boulevard des Capucines",
+      "Avenue des Champs-Élysées","Rue de la Paix"],
+    rails:["Gare Montparnasse","Gare de Lyon","Gare du Nord","Gare Saint-Lazare"],
+    utils:["Électricité","Compagnie des eaux"],
+    tax1:"Impôts sur le revenu", tax2:"Taxe de luxe",
+    tokens:["🎩","🚗","🐕","⛵","🗼","🥐","☂️","🚲"]
+  },
+  marseille:{
+    label:"Marseille",
+    desc:"De la Belle de Mai au Vieux-Port, en passant par les Calanques. ⛵",
+    logoText:"MONOPOLY", logoSub:"MARSEILLE",
+    theme:{bg:"#01579b", boardBg:"#cfe9f7", centerBg:"#e1f5fe", logo:"#0277bd", accent:"#0277bd"},
+    props:["La Belle de Mai","Boulevard National","Cours Belsunce","Boulevard Chave","Rue d'Endoume",
+      "Place Castellane","Cours Julien","La Plaine","Rue de la République","Boulevard Longchamp",
+      "Palais Longchamp","Avenue du Prado","Plages du Prado","Stade Vélodrome","Corniche Kennedy",
+      "Vallon des Auffes","Les Goudes","Calanque de Sormiou","Calanque de Morgiou","Notre-Dame de la Garde",
+      "La Canebière","Le Vieux-Port"],
+    rails:["Gare Saint-Charles","Gare de la Blancarde","Métro Castellane","Navette du Frioul"],
+    utils:["Électricité de Provence","Eaux de Marseille"],
+    tax1:"Impôts sur le revenu", tax2:"Taxe de luxe",
+    tokens:["⚓","⛵","🐟","☀️","🧼","⚽","🦐","🏖"]
+  },
+  noirmoutier:{
+    label:"Noirmoutier",
+    desc:"L'île, ses plages, ses marais salants et le Passage du Gois. 🏝",
+    logoText:"MONOPOLY", logoSub:"NOIRMOUTIER",
+    theme:{bg:"#00695c", boardBg:"#f2e8cf", centerBg:"#faf3e0", logo:"#00796b", accent:"#00796b"},
+    props:["La Fosse","Barbâtre","La Guérinière","L'Épine","La Madeleine",
+      "Plage de Luzéronde","Plage de l'Anse Rouge","Plage des Sableaux","Le Vieil","Rue du Grand Four",
+      "Place d'Armes","Les Salorges","Moulin de la Bosse","Réserve du Mullembourg","Port de Noirmoutier",
+      "Quai Jean Bart","Château de Noirmoutier","Bois de la Chaise","L'Estacade","Plage des Dames",
+      "Port de l'Herbaudière","Passage du Gois"],
+    rails:["Pont de Noirmoutier","Embarcadère de Fromentine","Navette de l'Île","Petit Train de Noirmoutier"],
+    utils:["Coopérative de Sel","Château d'eau de l'Île"],
+    tax1:"Impôts sur le revenu", tax2:"Taxe de séjour",
+    tokens:["🦞","⛵","🧂","🚲","🐚","🌊","🏰","🦪"]
+  },
+  volcanique:{
+    label:"Volcanique",
+    desc:"Des puys d'Auvergne aux volcans légendaires du monde entier. 🌋",
+    logoText:"MONOPOLY", logoSub:"🌋 VOLCANIQUE",
+    theme:{bg:"#2d0b06", boardBg:"#fbe0c8", centerBg:"#ffd9b3", logo:"#c1440e", accent:"#c1440e"},
+    props:["Puy de Pariou","Puy de Dôme","Soufrière de Guadeloupe","Montagne Pelée","Piton de la Fournaise",
+      "Stromboli","Vulcano","Etna","Vésuve","Santorin",
+      "Teide","Eyjafjallajökull","Hekla","Katla","Mont St Helens",
+      "Yellowstone","Mauna Loa","Krakatoa","Mont Merapi","Pinatubo",
+      "Kilauea","Mont Fuji"],
+    rails:["Panoramique des Dômes","Funiculaire du Vésuve","Téléphérique de l'Etna","Train du Mont Fuji"],
+    utils:["Centrale Géothermique","Sources Chaudes"],
+    tax1:"Taxe sur les cendres", tax2:"Taxe de fumerolles",
+    tokens:["🌋","🔥","🪨","💎","🐉","⛏","🧯","🌡"]
+  },
+  trail:{
+    label:"Trail",
+    desc:"De la course du village à l'UTMB et la mythique Barkley. 🏔",
+    logoText:"MONOPOLY", logoSub:"🏔 TRAIL",
+    theme:{bg:"#1b4332", boardBg:"#d8f3dc", centerBg:"#e9fcef", logo:"#2d6a4f", accent:"#2d6a4f"},
+    props:["Course du Village","Trail des Collines","EcoTrail de Paris","Trail du Ventoux","Trail des Calanques",
+      "SaintéLyon","Grand Trail des Templiers","Marathon du Mont-Blanc","La 6000D","MaXi-Race d'Annecy",
+      "L'Échappée Belle","Grand Raid des Pyrénées","Le GR20","Lavaredo Ultra Trail","OCC",
+      "CCC","TDS","Western States 100","Hardrock 100","Barkley Marathons",
+      "Diagonale des Fous","UTMB"],
+    rails:["Base Vie de Chamonix","Ravito de Champex-Lac","Base Vie de Courmayeur","Ravito de Cilaos"],
+    utils:["Magasin de Trail","Stand de Ravitaillement"],
+    tax1:"Frais d'inscription", tax2:"Taxe matériel obligatoire",
+    tokens:["🏃","🥾","🎒","⛰","🧭","⏱","🦌","🥤"]
+  },
+  nantes:{
+    label:"Nantes",
+    desc:"De Chantenay au Château des Ducs, avec le Grand Éléphant. 🐘",
+    logoText:"MONOPOLY", logoSub:"🐘 NANTES",
+    theme:{bg:"#006466", boardBg:"#d8eee7", centerBg:"#eafaf4", logo:"#0b525b", accent:"#0b7285"},
+    props:["Doulon","Chantenay","Place Viarme","Quartier Zola","Rue de la Marne",
+      "Butte Sainte-Anne","Trentemoult","Quai de la Fosse","Place du Bouffay","Rue Kervégan",
+      "Le Lieu Unique","Jardin des Plantes","Île de Versailles","Parc de Procé","Place Royale",
+      "Rue Crébillon","Place Graslin","Tour Bretagne","Cathédrale de Nantes","Les Machines de l'Île",
+      "Passage Pommeraye","Château des Ducs de Bretagne"],
+    rails:["Gare de Nantes","Tramway Ligne 1","Navibus Loire","Aéroport Nantes Atlantique"],
+    utils:["Eau de la Loire","Électricité de Nantes"],
+    tax1:"Impôts sur le revenu", tax2:"Taxe de luxe",
+    tokens:["🐘","🍪","⚓","🚋","🏰","⛵","🍇","🌊"]
+  },
+  passemiroir:{
+    label:"La Passe-Miroir",
+    desc:"D'Anima à Babel : les arches et lieux de la saga de Christelle Dabos. 🪞",
+    logoText:"MONOPOLY", logoSub:"🪞 LA PASSE-MIROIR",
+    theme:{bg:"#463868", boardBg:"#e8e4f0", centerBg:"#f4f1f9", logo:"#6c4f9e", accent:"#5e4a8a"},
+    props:["Totem","Cyclope","Zéphyr","Flore","Al-Andaloose",
+      "LandmArk","Le Musée d'Histoire Primitive","Anima","Les Sables-d'Opale","La Jetée-Promenade",
+      "Le Clairdelune","La Tour de Farouk","Le Pôle","La Bonne Famille","L'Observatoire des Déviations",
+      "Le Secretarium","Le LUX","Babel","L'Envers","La Corne d'Abondance",
+      "La Citacielle","Le Mémorial"],
+    rails:["Les Roses des Vents","Le Birdtrain","Les Dirigeables Interfamiliaux","Le Passage de Miroir"],
+    utils:["Les Sabliers d'Hildegarde","La Toile"],
+    tax1:"Impôts de l'Intendance", tax2:"Taxe des Mirages",
+    tokens:["🪞","🧣","🧤","📖","⌛","❄️","🕸","🗝"]
+  },
+  xmen:{
+    label:"X-Men",
+    desc:"Du Crapaud au Professeur X et Wolverine. 🧬",
+    logoText:"MONOPOLY", logoSub:"❌ X-MEN",
+    theme:{bg:"#1a237e", boardBg:"#fff3c4", centerBg:"#fffbe6", logo:"#f9a825", accent:"#283593"},
+    props:["Le Crapaud","Jubilé","Banshee","Havok","Polaris",
+      "Angel","Iceberg","Kitty Pryde","Colossus","Diablo",
+      "Le Fauve","Psylocke","Gambit","Malicia","Mystique",
+      "Tornade","Cyclope","Jean Grey","Apocalypse","Magnéto",
+      "Professeur X","Wolverine"],
+    rails:["Le Blackbird","La Moto de Wolverine","Les Tunnels Morlocks","Les Disques de Magik"],
+    utils:["Cerebro","La Salle des Dangers"],
+    tax1:"Taxe anti-mutants", tax2:"Réparations du Manoir",
+    tokens:["❌","🧬","🐺","🔥","❄️","🌪","🧲","⚡"]
+  },
+  jeuvideo:{
+    label:"Jeu vidéo",
+    desc:"De Pong à Minecraft : les jeux qui ont marqué l'histoire. 🎮",
+    logoText:"MONOPOLY", logoSub:"🎮 JEU VIDÉO",
+    theme:{bg:"#151226", boardBg:"#e7e3f5", centerBg:"#f3f0fb", logo:"#8e44ad", accent:"#6c3483"},
+    props:["Pong","Space Invaders","Pac-Man","Tetris","Donkey Kong",
+      "Street Fighter II","Sonic the Hedgehog","Doom","Final Fantasy VII","Les Sims",
+      "World of Warcraft","GTA V","Skyrim","The Witcher 3","Fortnite",
+      "League of Legends","Elden Ring","God of War","Red Dead Redemption 2","The Legend of Zelda",
+      "Super Mario Bros","Minecraft"],
+    rails:["La Game Boy","La NES","La PlayStation","Le PC Gamer"],
+    utils:["Le Wi-Fi","Les Serveurs de Jeu"],
+    tax1:"Microtransactions", tax2:"DLC Day One",
+    tokens:["🎮","🕹","👾","👻","🍄","🧱","⚔️","🏎️"]
+  },
+  cac40:{
+    label:"Entreprises du CAC 40",
+    desc:"De Carrefour à LVMH : bâtissez votre empire boursier. 📈",
+    logoText:"MONOPOLY", logoSub:"📈 CAC 40",
+    theme:{bg:"#101d33", boardBg:"#e2e6ee", centerBg:"#f1f3f8", logo:"#b8860b", accent:"#1d4e89"},
+    props:["Carrefour","Renault","Michelin","Pernod Ricard","Capgemini",
+      "Thales","Kering","Danone","AXA","Vinci",
+      "Dassault Systèmes","Safran","EssilorLuxottica","BNP Paribas","Air Liquide",
+      "Schneider Electric","Sanofi","Airbus","TotalEnergies","L'Oréal",
+      "Hermès","LVMH"],
+    rails:["Euronext Paris","Palais Brongniart","Quartier de La Défense","Salle des Marchés"],
+    utils:["Engie","Veolia"],
+    tax1:"Impôt sur les sociétés", tax2:"Flat tax",
+    tokens:["💼","📈","💶","🏦","👜","✈️","💄","🛢"]
+  },
+  got:{
+    label:"Game of Thrones",
+    desc:"De Culpucier au Trône de Fer — Westeros et Essos. ⚔",
+    logoText:"MONOPOLY", logoSub:"⚔ WESTEROS",
+    theme:{bg:"#14181f", boardBg:"#dce1e8", centerBg:"#eceff4", logo:"#7a1f1f", accent:"#7a1f1f"},
+    props:["Culpucier","Les Jumeaux","Fort-Terreur","Pyk","Vivesaigues",
+      "Villevieille","Lancehélion","Les Jardins d'Eau","Accalmie","Castral Roc",
+      "Hautjardin","Châteaunoir","Le Mur","Winterfell","Braavos",
+      "Meereen","Peyredragon","Qarth","Volantis","Le Donjon Rouge",
+      "Port-Réal","Le Trône de Fer"],
+    rails:["La Route Royale","La Mer Étroite","Le Khalasar Dothraki","Les Dragons de Daenerys"],
+    utils:["Feu Grégeois","Corbeaux Messagers"],
+    tax1:"Impôt de la Couronne", tax2:"Dîme de la Foi",
+    tokens:["🐺","🦁","🐉","🦌","🐙","🌹","☀️","🐟"]
+  },
+  lotr:{
+    label:"Seigneur des Anneaux",
+    desc:"De Hobbitebourg à la Montagne du Destin. 💍",
+    logoText:"MONOPOLY", logoSub:"💍 TERRE DU MILIEU",
+    theme:{bg:"#344e41", boardBg:"#e9edc9", centerBg:"#fefae0", logo:"#588157", accent:"#588157"},
+    props:["Hobbitebourg","Bree","Le Poney Fringant","La Vieille Forêt","Les Havres Gris",
+      "Fondcombe","La Moria","Le Caradhras","La Lothlórien","Fangorn",
+      "L'Argonath","Edoras","Le Gouffre de Helm","Isengard","Osgiliath",
+      "L'Ithilien","Minas Morgul","La Porte Noire","Cirith Ungol","Barad-dûr",
+      "Minas Tirith","La Montagne du Destin"],
+    rails:["Le Bac de Bucklebury","Les Chevaux du Rohan","Les Aigles","Les Navires de Círdan"],
+    utils:["Le Palantír","La Lumière d'Eärendil"],
+    tax1:"Tribut du Gondor", tax2:"Part du Dragon",
+    tokens:["💍","🧙","🗡","🏹","🪓","🐎","🦅","🌳"]
+  }
+};
+
+/* ============================================================
+   GÉNÉRATION DU PLATEAU
+   rentTable = [terrain seul, 1 maison, 2, 3, 4, hôtel]
+   houses : 0-4 = maisons, 5 = hôtel
+   ============================================================ */
+function prop(i, name, price, group, houseCost, rentTable){
+  return {i, type:"property", name, price, group, houseCost, houses:0, mortgaged:false, rentTable};
+}
+
+function buildBoardData(v){
+  const P=v.props, R=v.rails, U=v.utils;
+  return [
+    {i:0, type:"go", name:"Départ"},
+    prop(1, P[0], 60, "brown", 50, [2,10,30,90,160,250]),
+    {i:2, type:"chest", name:"Caisse de Communauté"},
+    prop(3, P[1], 60, "brown", 50, [4,20,60,180,320,450]),
+    {i:4, type:"tax", name:v.tax1, amount:200},
+    {i:5, type:"railroad", name:R[0], price:200, mortgaged:false},
+    prop(6, P[2], 100, "lightblue", 50, [6,30,90,270,400,550]),
+    {i:7, type:"chance", name:"Chance"},
+    prop(8, P[3], 100, "lightblue", 50, [6,30,90,270,400,550]),
+    prop(9, P[4], 120, "lightblue", 50, [8,40,100,300,450,600]),
+    {i:10, type:"jail", name:"Prison / Simple visite"},
+    prop(11, P[5], 140, "pink", 100, [10,50,150,450,625,750]),
+    {i:12, type:"utility", name:U[0], price:150, mortgaged:false},
+    prop(13, P[6], 140, "pink", 100, [10,50,150,450,625,750]),
+    prop(14, P[7], 160, "pink", 100, [12,60,180,500,700,900]),
+    {i:15, type:"railroad", name:R[1], price:200, mortgaged:false},
+    prop(16, P[8], 180, "orange", 100, [14,70,200,550,750,950]),
+    {i:17, type:"chest", name:"Caisse de Communauté"},
+    prop(18, P[9], 180, "orange", 100, [14,70,200,550,750,950]),
+    prop(19, P[10], 200, "orange", 100, [16,80,220,600,800,1000]),
+    {i:20, type:"parking", name:"Parc Gratuit"},
+    prop(21, P[11], 220, "red", 150, [18,90,250,700,875,1050]),
+    {i:22, type:"chance", name:"Chance"},
+    prop(23, P[12], 220, "red", 150, [18,90,250,700,875,1050]),
+    prop(24, P[13], 240, "red", 150, [20,100,300,750,925,1100]),
+    {i:25, type:"railroad", name:R[2], price:200, mortgaged:false},
+    prop(26, P[14], 260, "yellow", 150, [22,110,330,800,975,1150]),
+    prop(27, P[15], 260, "yellow", 150, [22,110,330,800,975,1150]),
+    {i:28, type:"utility", name:U[1], price:150, mortgaged:false},
+    prop(29, P[16], 280, "yellow", 150, [24,120,360,850,1025,1200]),
+    {i:30, type:"gotojail", name:"Allez en Prison"},
+    prop(31, P[17], 300, "green", 200, [26,130,390,900,1100,1275]),
+    prop(32, P[18], 300, "green", 200, [26,130,390,900,1100,1275]),
+    {i:33, type:"chest", name:"Caisse de Communauté"},
+    prop(34, P[19], 320, "green", 200, [28,150,450,1000,1200,1400]),
+    {i:35, type:"railroad", name:R[3], price:200, mortgaged:false},
+    {i:36, type:"chance", name:"Chance"},
+    prop(37, P[20], 350, "darkblue", 200, [35,175,500,1100,1300,1500]),
+    {i:38, type:"tax", name:v.tax2, amount:100},
+    prop(39, P[21], 400, "darkblue", 200, [50,200,600,1400,1700,2000]),
+  ];
+}
+
+/* ============================================================
+   CARTES CHANCE / CAISSE DE COMMUNAUTÉ
+   Retour de fn :
+     - undefined -> effet simple, la case continue normalement
+     - 'landed'  -> la carte a déjà fait atterrir le joueur ailleurs
+     - 'jail'    -> le joueur est envoyé en prison
+     - 'async'   -> la carte gère elle-même la suite (paiement/dette)
+   ============================================================ */
+function nextIndexOfType(pos, indices){
+  for(let k=1;k<=40;k++){
+    const idx=(pos+k)%40;
+    if(indices.includes(idx)) return idx;
+  }
+  return pos;
+}
+function cardAdvanceTo(p, idx, isDouble, passGo){
+  if(passGo===undefined) passGo = true;
+  movePlayerTo(p, idx, passGo);
+  resolveSpace(p, isDouble);
+}
+function afterCardPayment(p, isDouble){
+  if(p.bankrupt){
+    if(activePlayers().length>1) nextTurn();
+  } else {
+    finishLanding(p, isDouble);
+  }
+}
+
+let CHANCE_CARDS = [];
+let CHEST_CARDS = [];
+
+function buildDecks(){
+  CHANCE_CARDS = [
+    {text:"Avancez jusqu'à la case Départ. Collectez votre salaire.", fn:(p,d)=>{cardAdvanceTo(p,0,d,true); return 'landed';}},
+    {text:`Avancez jusqu'à ${board[23].name}. Si vous passez par la case Départ, collectez 200€.`, fn:(p,d)=>{cardAdvanceTo(p,23,d,true); return 'landed';}},
+    {text:`Avancez jusqu'à ${board[11].name}. Si vous passez par la case Départ, collectez 200€.`, fn:(p,d)=>{cardAdvanceTo(p,11,d,true); return 'landed';}},
+    {text:`Avancez jusqu'à la « gare » la plus proche. Vous pouvez l'acheter, ou payer un loyer à son propriétaire.`, fn:(p,d)=>{const idx=nextIndexOfType(p.position,[5,15,25,35]); cardAdvanceTo(p,idx,d,true); return 'landed';}},
+    {text:"Avancez jusqu'à la compagnie la plus proche.", fn:(p,d)=>{const idx=nextIndexOfType(p.position,[12,28]); cardAdvanceTo(p,idx,d,true); return 'landed';}},
+    {text:"Reculez de 3 cases.", fn:(p,d)=>{const idx=(p.position-3+40)%40; cardAdvanceTo(p,idx,d,false); return 'landed';}},
+    {text:"Allez en prison. Ne passez pas par la case Départ, ne collectez pas 200€.", fn:(p)=>{sendToJail(p); return 'jail';}},
+    {text:"Faites des réparations générales : payez 25€ par maison et 100€ par hôtel que vous possédez.", fn:(p,d)=>{
+        let cost=0;
+        p.properties.forEach(i=>{const s=board[i]; if(s.houses===5) cost+=100; else if(s.houses>0) cost+=25*s.houses;});
+        if(cost<=0) return;
+        requirePay(p, null, cost, ()=>afterCardPayment(p,d));
+        return 'async';
+    }},
+    {text:"Payez une amende de 15€ pour excès de vitesse.", fn:(p,d)=>{requirePay(p,null,15,()=>afterCardPayment(p,d)); return 'async';}},
+    {text:"La banque vous verse un dividende de 50€.", fn:(p)=>{p.money+=50; log(`${p.name} reçoit 50€ de la banque.`);}},
+    {text:"Vous êtes élu président du conseil : payez 50€ à chaque joueur.", fn:(p,d)=>{
+        const others = players.filter(o=>o!==p && !o.bankrupt);
+        (function next(k){
+          if(k>=others.length || p.bankrupt){ afterCardPayment(p,d); return; }
+          requirePay(p, others[k], 50, ()=>next(k+1));
+        })(0);
+        return 'async';
+    }},
+    {text:"Votre prêt immobilier est remboursé. Collectez 150€.", fn:(p)=>{p.money+=150; log(`${p.name} reçoit 150€.`);}},
+    {text:"Vous avez gagné le prix de mots croisés : 100€.", fn:(p)=>{p.money+=100; log(`${p.name} gagne 100€.`);}},
+    {text:"Carte « Sortie de Prison Gratuite » : conservez cette carte jusqu'à utilisation.", fn:(p)=>{p.jailFreeCards=(p.jailFreeCards||0)+1; log(`${p.name} reçoit une carte Sortie de Prison Gratuite.`);}},
+    {text:`Avancez jusqu'à ${board[39].name}.`, fn:(p,d)=>{cardAdvanceTo(p,39,d,true); return 'landed';}},
+    {text:"Erreur de la banque en votre faveur. Collectez 75€.", fn:(p)=>{p.money+=75; log(`${p.name} reçoit 75€.`);}},
+  ];
+
+  CHEST_CARDS = [
+    {text:"Erreur de la banque en votre faveur. Collectez 200€.", fn:(p)=>{p.money+=200; log(`${p.name} reçoit 200€.`);}},
+    {text:"Frais de médecin. Payez 50€.", fn:(p,d)=>{requirePay(p,null,50,()=>afterCardPayment(p,d)); return 'async';}},
+    {text:"Vous héritez de 100€.", fn:(p)=>{p.money+=100; log(`${p.name} hérite de 100€.`);}},
+    {text:"Allez à la case Départ. Collectez votre salaire.", fn:(p,d)=>{cardAdvanceTo(p,0,d,true); return 'landed';}},
+    {text:"Allez en prison. Ne passez pas par la case Départ, ne collectez pas 200€.", fn:(p)=>{sendToJail(p); return 'jail';}},
+    {text:"C'est votre anniversaire : chaque joueur vous donne 10€.", fn:(p,d)=>{
+        const others = players.filter(o=>o!==p && !o.bankrupt);
+        (function next(k){
+          if(k>=others.length){ afterCardPayment(p,d); return; }
+          requirePay(others[k], p, 10, ()=>next(k+1));
+        })(0);
+        return 'async';
+    }},
+    {text:"Vous gagnez un concours de beauté. Collectez 25€.", fn:(p)=>{p.money+=25; log(`${p.name} reçoit 25€.`);}},
+    {text:"Payez les frais de scolarité : 75€.", fn:(p,d)=>{requirePay(p,null,75,()=>afterCardPayment(p,d)); return 'async';}},
+    {text:"Vous vendez un brevet d'invention. Collectez 30€.", fn:(p)=>{p.money+=30; log(`${p.name} reçoit 30€.`);}},
+    {text:"Remboursement d'impôts : la banque vous verse 20€.", fn:(p)=>{p.money+=20; log(`${p.name} reçoit 20€.`);}},
+    {text:"Vous héritez d'une maison de campagne : payez 40€ de réparations.", fn:(p,d)=>{requirePay(p,null,40,()=>afterCardPayment(p,d)); return 'async';}},
+    {text:"Vous recevez 100€ d'intérêts sur un emprunt.", fn:(p)=>{p.money+=100; log(`${p.name} reçoit 100€.`);}},
+    {text:"Deuxième prix d'un concours de beauté : collectez 10€.", fn:(p)=>{p.money+=10; log(`${p.name} reçoit 10€.`);}},
+    {text:"Vous héritez de 100€ d'un vieil oncle.", fn:(p)=>{p.money+=100; log(`${p.name} hérite de 100€.`);}},
+    {text:"Carte « Sortie de Prison Gratuite » : conservez cette carte jusqu'à utilisation.", fn:(p)=>{p.jailFreeCards=(p.jailFreeCards||0)+1; log(`${p.name} reçoit une carte Sortie de Prison Gratuite.`);}},
+    {text:"Faites des réparations sur toutes vos propriétés : payez 40€ par maison et 115€ par hôtel.", fn:(p,d)=>{
+        let cost=0;
+        p.properties.forEach(i=>{const s=board[i]; if(s.houses===5) cost+=115; else if(s.houses>0) cost+=40*s.houses;});
+        if(cost<=0) return;
+        requirePay(p, null, cost, ()=>afterCardPayment(p,d));
+        return 'async';
+    }},
+  ];
+}
+
+const TOKEN_COLORS = ["#e74c3c","#2980b9","#27ae60","#f39c12"];
+
+/* ============================================================
+   JOUEURS IA — niveaux de difficulté
+   buyBuffer : argent à garder après un achat
+   maxBidFactor : enchère max en % du prix (bonus si complète un groupe)
+   buildBuffer : argent à garder après construction (Infinity = ne construit pas)
+   unmortgageBuffer : marge avant de lever une hypothèque (Infinity = jamais)
+   jailPay : au-dessus de cette fortune, paie 50€ pour sortir de prison
+   tradeGreed : accepte un échange si valeur reçue >= valeur donnée x ce facteur
+   ============================================================ */
+const AI_LEVELS = {
+  easy:  {label:"IA facile",    icon:"🙂", buyChance:0.55, buyBuffer:0,   maxBidFactor:0.6,  groupBidBonus:0,    buildBuffer:Infinity, unmortgageBuffer:Infinity, jailPay:500, tradeGreed:0.75, tradeChance:0.2, offerFactor:0.85},
+  medium:{label:"IA moyenne",   icon:"🤖", buyChance:1,    buyBuffer:250, maxBidFactor:0.9,  groupBidBonus:0.2,  buildBuffer:300,      unmortgageBuffer:600,      jailPay:300, tradeGreed:1,    tradeChance:0.4, offerFactor:1.15},
+  hard:  {label:"IA difficile", icon:"😈", buyChance:1,    buyBuffer:80,  maxBidFactor:1.05, groupBidBonus:0.35, buildBuffer:150,      unmortgageBuffer:400,      jailPay:200, tradeGreed:1.15, tradeChance:0.6, offerFactor:1.35},
+};
+
+function isAiTurn(){
+  const p = players[currentPlayerIndex];
+  return !!(p && p.ai && !p.bankrupt);
+}
+
+function aiDelay(fn, ms){
+  setTimeout(fn, ms || (650+Math.random()*450));
+}
+
+/* valeur d'une propriété du point de vue du joueur pIdx (échanges) */
+function aiTradeValue(i, pIdx){
+  const sp = board[i];
+  let v = sp.mortgaged ? sp.price*0.45 : sp.price;
+  if(sp.group){
+    const gp = board.filter(s=>s.group===sp.group);
+    if(gp.every(s=>s.i===sp.i || s.owner===pIdx)) v *= 1.8; // complète (ou casse) un groupe
+  }
+  return v;
+}
+
+function aiWantsToBuy(p, sp){
+  const lvl = AI_LEVELS[p.ai];
+  if(p.money < sp.price) return false;
+  const pIdx = players.indexOf(p);
+  if(sp.group){
+    const gp = board.filter(s=>s.group===sp.group);
+    if(gp.every(s=>s.i===sp.i || s.owner===pIdx)) return true; // complète un groupe : toujours
+  }
+  if(p.money < sp.price + lvl.buyBuffer) return false;
+  return Math.random() <= lvl.buyChance;
+}
+
+/* avant de finir son tour : lever des hypothèques puis construire */
+function aiManageAssets(p){
+  const lvl = AI_LEVELS[p.ai];
+  if(!lvl) return;
+  const pIdx = players.indexOf(p);
+  let guard = 20;
+  while(guard-->0 && lvl.unmortgageBuffer!==Infinity){
+    const m = p.properties.map(i=>board[i])
+      .filter(s=>s.mortgaged && p.money >= unmortgageCost(s)+lvl.unmortgageBuffer)
+      .sort((a,b)=>unmortgageCost(a)-unmortgageCost(b))[0];
+    if(!m) break;
+    doUnmortgage(p, m);
+  }
+  guard = 40;
+  while(guard-->0 && lvl.buildBuffer!==Infinity){
+    let built = false;
+    const groups = [...new Set(board.filter(s=>s.group).map(s=>s.group))];
+    for(const g of groups){
+      const gp = board.filter(s=>s.group===g);
+      if(!gp.every(s=>s.owner===pIdx) || gp.some(s=>s.mortgaged)) continue;
+      const minH = Math.min(...gp.map(s=>s.houses||0));
+      const target = gp.find(s=>(s.houses||0)===minH && (s.houses||0)<5);
+      if(target && p.money >= target.houseCost + lvl.buildBuffer){
+        buildHouse(p, target);
+        built = true;
+        break;
+      }
+    }
+    if(!built) break;
+  }
+  renderAll();
+}
+
+/* cherche un échange intéressant : une propriété qui complèterait un groupe de l'IA */
+function aiFindTradeProposal(p){
+  const pIdx = players.indexOf(p);
+  const lvl = AI_LEVELS[p.ai];
+  const refused = p._refusedAsks || new Set();
+  const candidates = board.filter(sp=>{
+    if(!sp.group || sp.owner===undefined || sp.owner===pIdx || sp.houses) return false;
+    if(refused.has(sp.i)) return false;
+    const gp = board.filter(s=>s.group===sp.group);
+    return gp.every(s=>s.i===sp.i || s.owner===pIdx); // l'IA possède tout le reste du groupe
+  });
+  if(!candidates.length) return null;
+  const want = candidates[Math.floor(Math.random()*candidates.length)];
+  const targetIdx = want.owner;
+
+  // valeur offerte selon la générosité du niveau (moins si hypothéquée)
+  let remaining = Math.floor((want.mortgaged ? want.price*0.55 : want.price) * lvl.offerFactor);
+  const offerProps = [];
+  const available = Math.max(0, p.money - lvl.buyBuffer);
+  if(remaining > available){
+    // ajoute une propriété « sucrette » qui intéresse la cible, sans casser un groupe complet
+    const sweetener = p.properties.map(i=>board[i]).filter(s=>{
+      if(s.houses || !s.group) return false;
+      const gp = board.filter(x=>x.group===s.group);
+      if(gp.every(x=>x.owner===pIdx)) return false;
+      return gp.some(x=>x.owner===targetIdx);
+    }).sort((a,b)=>b.price-a.price)[0];
+    if(sweetener){
+      offerProps.push(sweetener.i);
+      remaining -= sweetener.price;
+    }
+    if(Math.max(0, remaining) > available) return null; // pas les moyens de faire une offre correcte
+  }
+  return {targetIdx, offerProps, offerMoney:Math.max(0, remaining), wantIdx:want.i};
+}
+
+function aiMaybeProposeTrade(p, onDone){
+  const lvl = AI_LEVELS[p.ai];
+  if(!lvl || Math.random() > lvl.tradeChance){ onDone(); return; }
+  const prop = aiFindTradeProposal(p);
+  if(!prop){ onDone(); return; }
+  log(`🔄 ${p.name} propose un échange à ${players[prop.targetIdx].name}.`);
+  showTradeConfirmation(players.indexOf(p), prop.targetIdx, prop.offerProps, prop.offerMoney, [prop.wantIdx], 0, (accepted)=>{
+    if(!accepted){
+      (p._refusedAsks = p._refusedAsks || new Set()).add(prop.wantIdx); // ne redemande pas la même
+    }
+    aiDelay(onDone, 400);
+  });
+}
+
+/* ============================================================
+   ÉTAT DU JEU
+   ============================================================ */
+let board = [];
+let players = [];
+let currentPlayerIndex = 0;
+let awaitingDecision = false; // décision en cours (achat, carte, dette...)
+let animating = false;        // animation de dés ou de déplacement en cours
+let doublesStreak = 0;
+let auctionState = null;
+let parkingPot = 0;
+let lastRoll = {d1:1, d2:1};
+let rules = {goDouble:false, parkingPot:false, auctions:true, noRentInJail:false};
+
+/* --- état du mode en ligne --- */
+let logHistory = [];
+let modalActor = null;  // index du joueur qui peut interagir avec la modale
+let modalRev = 0;       // compteur de version de la modale (sync réseau)
+const NET = {
+  mode:null,            // null = local, 'host' = hôte, 'guest' = invité
+  mySide:null,
+  peer:null, conn:null,
+  guestName:"Joueur 2",
+  started:false, ended:false,
+  versionId:null,
+  syncTimer:null,
+  lastModalRevSent:-1, lastModalRevApplied:-1,
+  guestDiceAnim:false,
+  logKey:""
+};
+
+/* ============================================================
+   SETUP UI
+   ============================================================ */
+const numPlayersSel = document.getElementById("numPlayers");
+const playerInputsDiv = document.getElementById("playerInputs");
+const versionSel = document.getElementById("versionSel");
+
+Object.keys(VERSIONS).forEach(id=>{
+  const opt = document.createElement("option");
+  opt.value = id;
+  opt.textContent = VERSIONS[id].label;
+  versionSel.appendChild(opt);
+});
+
+function applyTheme(v){
+  const r = document.documentElement.style;
+  r.setProperty("--bg", v.theme.bg);
+  r.setProperty("--board-bg", v.theme.boardBg);
+  r.setProperty("--center-bg", v.theme.centerBg);
+  r.setProperty("--logo-color", v.theme.logo);
+  r.setProperty("--accent", v.theme.accent);
+}
+
+function updateVersionDesc(){
+  const v = VERSIONS[versionSel.value];
+  document.getElementById("versionDesc").textContent = v.desc;
+  applyTheme(v);
+}
+versionSel.addEventListener("change", ()=>{
+  updateVersionDesc();
+  updateSymbolSelects();
+  if(NET.mode==="host") netBroadcastSetup();
+});
+updateVersionDesc();
+
+function symbolOptionsHtml(selectedIdx){
+  const tokens = VERSIONS[versionSel.value].tokens;
+  return tokens.map((t,k)=>`<option value="${t}" ${k===selectedIdx%tokens.length?"selected":""}>${t}</option>`).join("");
+}
+
+function renderPlayerInputs(){
+  const n = parseInt(numPlayersSel.value);
+  playerInputsDiv.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const row = document.createElement("div");
+    row.className = "player-row";
+    row.innerHTML = `
+      <input type="color" class="pcolor" id="pcolor${i}" value="${TOKEN_COLORS[i]}" title="Couleur du pion">
+      <select class="psymbol" id="psymbol${i}" title="Symbole du pion">${symbolOptionsHtml(i)}</select>
+      <input type="text" id="pname${i}" placeholder="Nom du joueur ${i+1}" value="Joueur ${i+1}">
+      <select class="ptype" id="ptype${i}" title="Humain ou IA">
+        <option value="">👤 Humain</option>
+        <option value="easy">🙂 IA facile</option>
+        <option value="medium">🤖 IA moyenne</option>
+        <option value="hard">😈 IA difficile</option>
+      </select>
+    `;
+    playerInputsDiv.appendChild(row);
+  }
+
+  /* partie en ligne : joueur 1 = hôte, joueur 2 = invité, le reste = IA */
+  if(NET.mode==="host"){
+    for(let i=0;i<n;i++){
+      const typeSel = document.getElementById("ptype"+i);
+      const nameInput = document.getElementById("pname"+i);
+      if(i===0){
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#555;flex-shrink:0;font-weight:600;";
+        tag.textContent = "👤 vous";
+        typeSel.parentNode.appendChild(tag);
+      } else if(i===1){
+        nameInput.value = NET.guestName;
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#0d47a1;flex-shrink:0;font-weight:600;";
+        tag.textContent = "🌐 en ligne";
+        typeSel.parentNode.appendChild(tag);
+      } else {
+        const humanOpt = typeSel.querySelector('option[value=""]');
+        if(humanOpt) humanOpt.remove();
+        typeSel.value = "medium";
+      }
+    }
+    ["pname1","pcolor1","psymbol1"].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.addEventListener("input", netBroadcastSetup);
+    });
+    netBroadcastSetup();
+  }
+}
+numPlayersSel.addEventListener("change", renderPlayerInputs);
+renderPlayerInputs();
+
+/* changer d'édition met à jour les symboles proposés sans toucher aux noms/couleurs */
+function updateSymbolSelects(){
+  document.querySelectorAll(".psymbol").forEach((sel,i)=>{
+    sel.innerHTML = symbolOptionsHtml(i);
+  });
+}
+
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  const version = VERSIONS[versionSel.value];
+  board = buildBoardData(version);
+  buildDecks();
+  applyTheme(version);
+
+  rules = {
+    goDouble: document.getElementById("ruleGoDouble").checked,
+    parkingPot: document.getElementById("ruleParkingPot").checked,
+    auctions: document.getElementById("ruleAuctions").checked,
+    noRentInJail: document.getElementById("ruleNoRentJail").checked,
+  };
+  parkingPot = 0;
+
+  const startMoney = parseInt(document.getElementById("startMoneySel").value);
+  const n = parseInt(numPlayersSel.value);
+  players = [];
+  for(let i=0;i<n;i++){
+    const nameInput = document.getElementById("pname"+i);
+    const name = (nameInput.value || `Joueur ${i+1}`).trim();
+    const color = document.getElementById("pcolor"+i).value || TOKEN_COLORS[i];
+    const symbol = document.getElementById("psymbol"+i).value || version.tokens[i%version.tokens.length];
+    const ai = document.getElementById("ptype"+i).value || null;
+    players.push({
+      name, color, symbol, ai, side:null, money:startMoney, position:0,
+      properties:[], inJail:false, jailTurns:0, bankrupt:false, jailFreeCards:0
+    });
+  }
+  if(NET.mode==="host"){
+    players[0].side = "host";  players[0].ai = null;
+    players[1].side = "guest"; players[1].ai = null;
+    NET.versionId = versionSel.value;
+  }
+  if(document.getElementById("randomOrder").checked){
+    for(let i=players.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [players[i], players[j]] = [players[j], players[i]];
+    }
+  }
+  currentPlayerIndex = 0;
+  document.getElementById("setup").style.display="none";
+  document.getElementById("game").classList.add("active");
+  buildBoard(version);
+  renderAll();
+  const activeRules = [];
+  if(rules.goDouble) activeRules.push("Départ double");
+  if(rules.parkingPot) activeRules.push("Cagnotte du Parc Gratuit");
+  if(!rules.auctions) activeRules.push("Sans enchères");
+  if(rules.noRentInJail) activeRules.push("Pas de loyer en prison");
+  log(`Partie lancée — édition ${version.label}${activeRules.length?" · Règles : "+activeRules.join(", "):""}.`);
+  log(`${document.getElementById("randomOrder").checked?"🎲 Ordre tiré au sort : ":"Ordre de jeu : "}${players.map(p=>p.symbol+" "+p.name).join(" → ")}.`);
+  if(NET.mode==="host"){ NET.started = true; }
+  startTurn();
+  if(NET.mode==="host"){ netSendState(); }
+});
+
+/* ============================================================
+   PLATEAU
+   ============================================================ */
+function gridPos(i){
+  let col,row;
+  if(i<=10){ col = 11-i; row = 11; }
+  else if(i<=20){ col=1; row=11-(i-10); }
+  else if(i<=30){ col=1+(i-20); row=1; }
+  else { col=11; row=1+(i-30); }
+  return {col,row};
+}
+
+function buildBoard(version){
+  const boardEl = document.getElementById("board");
+  boardEl.innerHTML = "";
+
+  board.forEach(sp=>{
+    const {col,row} = gridPos(sp.i);
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.id = "cell-"+sp.i;
+    cell.style.gridColumn = col;
+    cell.style.gridRow = row;
+
+    const isCorner = [0,10,20,30].includes(sp.i);
+    if(isCorner) cell.classList.add("corner");
+
+    let inner = "";
+    if(sp.group){
+      inner += `<div class="colorbar" style="background:${COLORS[sp.group]}"></div>`;
+    }
+    let label = sp.name;
+    if(sp.i===0) label = "⬅ DÉPART";
+    if(sp.i===10) label = "🔒 PRISON";
+    if(sp.i===20) label = "🅿 PARKING";
+    if(sp.i===30) label = "🚓 PRISON !";
+    inner += `<div class="name">${label}</div>`;
+    if(sp.type==="property" || sp.type==="railroad" || sp.type==="utility"){
+      inner += `<div class="price">${sp.price}€</div>`;
+    }
+    if(sp.type==="tax"){
+      inner += `<div class="price">${sp.amount}€</div>`;
+    }
+    if(sp.type==="property"){
+      inner += `<div class="houses-indicator" id="houses-${sp.i}"></div>`;
+    }
+    cell.innerHTML = inner;
+    boardEl.appendChild(cell);
+  });
+
+  const center = document.createElement("div");
+  center.className = "center-area";
+  center.innerHTML = `
+    <div id="logo">${version.logoText}<small>${version.logoSub}</small></div>
+    <div id="pot" style="display:none;"></div>
+  `;
+  boardEl.appendChild(center);
+  updatePotDisplay();
+}
+
+function updatePotDisplay(){
+  const el = document.getElementById("pot");
+  if(!el) return;
+  if(rules.parkingPot){
+    el.style.display = "block";
+    el.textContent = `🅿 Cagnotte : ${parkingPot}€`;
+  } else {
+    el.style.display = "none";
+  }
+  netScheduleSync();
+}
+
+function flashCell(i){
+  const cell = document.getElementById("cell-"+i);
+  if(!cell) return;
+  cell.classList.remove("landed");
+  void cell.offsetWidth; // relance l'animation CSS
+  cell.classList.add("landed");
+  setTimeout(()=>cell.classList.remove("landed"), 1000);
+}
+
+/* pions positionnés en absolu sur le plateau : le déplacement
+   case par case est fluidifié par la transition CSS */
+function renderTokens(){
+  const boardEl = document.getElementById("board");
+  players.forEach((p,idx)=>{
+    let tok = document.getElementById("token-"+idx);
+    if(!tok){
+      tok = document.createElement("div");
+      tok.id = "token-"+idx;
+      tok.className = "token";
+      tok.style.background = p.color;
+      tok.textContent = p.symbol || "";
+      boardEl.appendChild(tok);
+    }
+    if(p.bankrupt){ tok.style.display="none"; return; }
+    tok.style.display = "flex";
+    const cell = document.getElementById("cell-"+p.position);
+    if(!cell) return;
+    const offsets = [[3,3],[22,3],[3,22],[22,22]];
+    const [ox,oy] = offsets[idx%4];
+    tok.style.left = (cell.offsetLeft + ox) + "px";
+    tok.style.top = (cell.offsetTop + oy) + "px";
+  });
+  netScheduleSync();
+}
+window.addEventListener("resize", ()=>{ if(players.length) renderTokens(); });
+
+function renderBoardState(){
+  document.querySelectorAll(".owner-mark").forEach(m=>m.remove());
+  document.querySelectorAll(".mortgage-mark").forEach(m=>m.remove());
+  board.forEach(sp=>{
+    const cell = document.getElementById("cell-"+sp.i);
+    if(!cell) return;
+    if(sp.owner!==undefined){
+      const mark = document.createElement("div");
+      mark.className="owner-mark";
+      mark.style.background = players[sp.owner].color;
+      cell.appendChild(mark);
+    }
+    cell.classList.toggle("mortgaged", !!sp.mortgaged);
+    if(sp.mortgaged){
+      const mm = document.createElement("div");
+      mm.className="mortgage-mark";
+      mm.textContent="🏦";
+      cell.appendChild(mm);
+    }
+  });
+  renderHouses();
+}
+
+function renderHouses(){
+  board.forEach(sp=>{
+    if(sp.type!=="property") return;
+    const el = document.getElementById("houses-"+sp.i);
+    if(!el) return;
+    const h = sp.houses||0;
+    el.textContent = h===5 ? "🏨" : (h>0 ? "🏠".repeat(h) : "");
+  });
+}
+
+function renderAll(){
+  renderPlayers();
+  renderBoardState();
+  renderTokens();
+}
+
+/* ============================================================
+   JOUEURS / UI LATÉRALE
+   ============================================================ */
+function renderPlayers(){
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+  players.forEach((p,idx)=>{
+    if(p._prevMoney===undefined) p._prevMoney = p.money;
+    const diff = p.money - p._prevMoney;
+    const flashClass = diff>0 ? " up" : (diff<0 ? " down" : "");
+    p._prevMoney = p.money;
+    const row = document.createElement("div");
+    row.className = "p-entry" + (idx===currentPlayerIndex?" current":"") + (p.bankrupt?" bankrupt":"");
+    row.innerHTML = `
+      <div class="p-dot" style="background:${p.color}"></div>
+      <div class="p-name">${p.symbol?p.symbol+" ":""}${p.name}${p.ai?" <span title='"+AI_LEVELS[p.ai].label+"'>"+AI_LEVELS[p.ai].icon+"</span>":""}${p.inJail?" 🔒":""}${p.jailFreeCards?" 🎫x"+p.jailFreeCards:""}</div>
+      <div class="p-money${flashClass}">${p.money}€</div>
+    `;
+    list.appendChild(row);
+  });
+  netScheduleSync();
+}
+
+function log(msg){
+  logHistory.push(msg);
+  if(logHistory.length>300) logHistory.splice(0, logHistory.length-300);
+  const logEl = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = msg;
+  logEl.appendChild(div);
+  logEl.scrollTop = 0;
+  netScheduleSync();
+}
+
+/* ============================================================
+   TOUR DE JEU
+   ============================================================ */
+function activePlayers(){ return players.filter(p=>!p.bankrupt); }
+
+function startTurn(){
+  awaitingDecision = false;
+  doublesStreak = 0;
+  const p = players[currentPlayerIndex];
+  document.getElementById("turn-title").textContent = `Tour de ${p.name}${p.ai?" "+AI_LEVELS[p.ai].icon:""}`;
+  document.getElementById("current-space-info").textContent = "";
+  document.getElementById("endTurnBtn").disabled = true;
+  document.getElementById("rollBtn").disabled = false;
+  document.getElementById("die1").textContent="-";
+  document.getElementById("die2").textContent="-";
+  renderPlayers();
+
+  if(p.inJail){
+    showJailOptions(p);
+  } else if(p.ai){
+    aiDelay(()=>{
+      if(isAiTurn() && players[currentPlayerIndex]===p && !awaitingDecision && !animating) rollDice(false);
+    });
+  }
+}
+
+function showJailOptions(p){
+  document.getElementById("rollBtn").disabled = true;
+  const hasCard = (p.jailFreeCards||0) > 0;
+  openModal(`
+    <h2>${p.name} est en prison</h2>
+    <p>Payez 50€ pour sortir, tentez un double avec les dés${hasCard?", ou utilisez une carte Sortie de Prison Gratuite":""}.</p>
+    <div class="row">
+      <button class="btn" id="jailPayBtn" ${p.money<50?"disabled":""}>Payer 50€</button>
+      <button class="btn secondary" id="jailRollBtn">Lancer les dés</button>
+      ${hasCard?'<button class="btn secondary" id="jailCardBtn">Utiliser ma carte</button>':''}
+    </div>
+  `);
+  document.getElementById("jailPayBtn").onclick = ()=>{
+    p.money -= 50;
+    creditBank(50);
+    p.inJail = false;
+    p.jailTurns = 0;
+    log(`${p.name} paie 50€ et sort de prison.`);
+    closeModal();
+    document.getElementById("rollBtn").disabled = false;
+    renderPlayers();
+  };
+  document.getElementById("jailRollBtn").onclick = ()=>{
+    closeModal();
+    document.getElementById("rollBtn").disabled = false;
+    rollDice(true);
+  };
+  if(hasCard){
+    document.getElementById("jailCardBtn").onclick = ()=>{
+      p.jailFreeCards -= 1;
+      p.inJail = false;
+      p.jailTurns = 0;
+      log(`${p.name} utilise une carte Sortie de Prison Gratuite.`);
+      closeModal();
+      document.getElementById("rollBtn").disabled = false;
+      renderPlayers();
+    };
+  }
+
+  if(p.ai){
+    const lvl = AI_LEVELS[p.ai];
+    aiDelay(()=>{
+      if(players[currentPlayerIndex]!==p || !p.inJail) return;
+      const rollAfter = ()=>aiDelay(()=>{
+        if(isAiTurn() && players[currentPlayerIndex]===p && !p.inJail) rollDice(false);
+      });
+      if(hasCard){
+        document.getElementById("jailCardBtn").click();
+        rollAfter();
+      } else if(p.money >= 50 && p.money > lvl.jailPay){
+        document.getElementById("jailPayBtn").click();
+        rollAfter();
+      } else {
+        document.getElementById("jailRollBtn").click();
+      }
+    });
+  }
+}
+
+/* en ligne : chacun ne contrôle que son propre joueur */
+function netCanControlCurrent(){
+  if(!NET.mode) return true;
+  const p = players[currentPlayerIndex];
+  return !!(p && p.side===NET.mySide);
+}
+
+document.getElementById("rollBtn").addEventListener("click", ()=>{
+  if(NET.mode==="guest"){ if(netCanControlCurrent()) netSend({t:"main", id:"rollBtn"}); return; }
+  if(!isAiTurn() && netCanControlCurrent()) rollDice(false);
+});
+document.getElementById("endTurnBtn").addEventListener("click", ()=>{
+  if(NET.mode==="guest"){ if(netCanControlCurrent()) netSend({t:"main", id:"endTurnBtn"}); return; }
+  if(!animating && !isAiTurn() && netCanControlCurrent()) nextTurn();
+});
+["manageBtn","tradeBtn","giftBtn"].forEach(id=>{
+  document.getElementById(id).addEventListener("click", ()=>{
+    if(NET.mode==="guest"){ if(netCanControlCurrent()) netSend({t:"main", id}); return; }
+    if(animating || isAiTurn() || document.getElementById("modal-overlay").classList.contains("active")) return;
+    if(!netCanControlCurrent()) return;
+    if(id==="manageBtn") openManageModal();
+    else if(id==="tradeBtn") openTradeModal();
+    else openGiftModal();
+  });
+});
+
+function animateDice(d1, d2, done){
+  if(NET.mode==="host") netSend({t:"dice", d1, d2});
+  animating = true;
+  const e1 = document.getElementById("die1");
+  const e2 = document.getElementById("die2");
+  e1.classList.add("rolling");
+  e2.classList.add("rolling");
+  let ticks = 0;
+  const iv = setInterval(()=>{
+    e1.textContent = 1+Math.floor(Math.random()*6);
+    e2.textContent = 1+Math.floor(Math.random()*6);
+    ticks++;
+    if(ticks>=8){
+      clearInterval(iv);
+      e1.textContent = d1;
+      e2.textContent = d2;
+      e1.classList.remove("rolling");
+      e2.classList.remove("rolling");
+      animating = false;
+      done();
+    }
+  }, 70);
+}
+
+function rollDice(fromJail){
+  if(awaitingDecision || animating) return;
+  const p = players[currentPlayerIndex];
+  const d1 = 1+Math.floor(Math.random()*6);
+  const d2 = 1+Math.floor(Math.random()*6);
+  document.getElementById("rollBtn").disabled = true;
+
+  animateDice(d1, d2, ()=>{
+    lastRoll = {d1, d2};
+    const isDouble = d1===d2;
+
+    if(fromJail){
+      if(isDouble){
+        p.inJail = false;
+        p.jailTurns = 0;
+        log(`${p.name} fait un double (${d1}-${d2}) et sort de prison !`);
+        movePlayer(p, d1+d2);
+      } else {
+        p.jailTurns++;
+        log(`${p.name} ne fait pas de double (${d1}-${d2}). Reste en prison.`);
+        if(p.jailTurns>=3){
+          log(`${p.name} a purgé 3 tours et doit payer 50€ pour sortir.`);
+          requirePay(p, null, 50, (ok)=>{
+            if(ok){
+              p.inJail=false; p.jailTurns=0;
+              log(`${p.name} sort de prison.`);
+            }
+            document.getElementById("endTurnBtn").disabled = false;
+            renderPlayers();
+            if(p.bankrupt && activePlayers().length>1){ nextTurn(); return; }
+            if(p.ai) aiDelay(()=>{ if(isAiTurn() && players[currentPlayerIndex]===p) nextTurn(); });
+          });
+          return;
+        }
+        document.getElementById("endTurnBtn").disabled = false;
+        renderPlayers();
+        if(p.ai) aiDelay(()=>{ if(isAiTurn() && players[currentPlayerIndex]===p) nextTurn(); });
+      }
+      return;
+    }
+
+    if(isDouble){
+      doublesStreak++;
+      if(doublesStreak>=3){
+        log(`${p.name} fait 3 doubles d'affilée ! Direction la prison.`);
+        sendToJail(p);
+        document.getElementById("endTurnBtn").disabled = false;
+        renderPlayers();
+        if(p.ai) aiDelay(()=>{ if(isAiTurn() && players[currentPlayerIndex]===p) nextTurn(); });
+        return;
+      }
+    }
+
+    movePlayer(p, d1+d2, isDouble);
+  });
+}
+
+/* déplacement animé case par case */
+function movePlayer(p, steps, isDouble){
+  animating = true;
+  const startPos = p.position;
+  const path = [];
+  for(let k=1;k<=steps;k++) path.push((startPos+k)%40);
+  let k = 0;
+  const iv = setInterval(()=>{
+    p.position = path[k];
+    if(p.position===0 && k<path.length-1){
+      p.money += 200;
+      log(`${p.name} passe par la case Départ et reçoit 200€.`);
+      renderPlayers();
+    }
+    renderTokens();
+    k++;
+    if(k>=path.length){
+      clearInterval(iv);
+      animating = false;
+      if(p.position===0){
+        const gain = rules.goDouble ? 400 : 200;
+        p.money += gain;
+        log(`${p.name} s'arrête pile sur la case Départ et reçoit ${gain}€${rules.goDouble?" (salaire doublé !)":""}.`);
+      }
+      flashCell(p.position);
+      renderPlayers();
+      log(`${p.name} arrive sur ${board[p.position].name}.`);
+      resolveSpace(p, isDouble);
+    }
+  }, 160);
+}
+
+/* téléportation (cartes) : le pion glisse directement grâce à la transition CSS */
+function movePlayerTo(p, target, passGoBonus){
+  const oldPos = p.position;
+  const passed = passGoBonus && target <= oldPos;
+  p.position = target;
+  if(target===0 && passGoBonus){
+    const gain = rules.goDouble ? 400 : 200;
+    p.money += gain;
+    log(`${p.name} arrive sur la case Départ et reçoit ${gain}€${rules.goDouble?" (salaire doublé !)":""}.`);
+  } else if(passed){
+    p.money += 200;
+    log(`${p.name} passe par Départ, +200€.`);
+  }
+  renderTokens();
+  renderPlayers();
+  flashCell(target);
+}
+
+function sendToJail(p){
+  p.position = 10;
+  p.inJail = true;
+  p.jailTurns = 0;
+  renderTokens();
+  renderPlayers();
+  flashCell(10);
+  log(`${p.name} est envoyé en prison.`);
+}
+
+/* ============================================================
+   RÉSOLUTION DE CASE
+   ============================================================ */
+function resolveSpace(p, isDouble){
+  const sp = board[p.position];
+  const infoEl = document.getElementById("current-space-info");
+  infoEl.textContent = `Case : ${sp.name}`;
+
+  switch(sp.type){
+    case "go":
+    case "jail":
+      finishLanding(p, isDouble);
+      break;
+
+    case "parking":
+      if(rules.parkingPot && parkingPot>0){
+        p.money += parkingPot;
+        log(`🅿 ${p.name} remporte la cagnotte du Parc Gratuit : ${parkingPot}€ !`);
+        parkingPot = 0;
+        updatePotDisplay();
+        renderPlayers();
+      }
+      finishLanding(p, isDouble);
+      break;
+
+    case "gotojail":
+      sendToJail(p);
+      finishLanding(p, false, true);
+      break;
+
+    case "tax":
+      requirePay(p, null, sp.amount, ()=>{
+        if(p.bankrupt){ if(activePlayers().length>1) nextTurn(); }
+        else finishLanding(p, isDouble);
+      });
+      break;
+
+    case "chance":
+      drawCard(CHANCE_CARDS, "Chance", "🎴", p, isDouble);
+      break;
+
+    case "chest":
+      drawCard(CHEST_CARDS, "Caisse de Communauté", "📦", p, isDouble);
+      break;
+
+    case "property":
+    case "railroad":
+    case "utility":
+      handlePurchasable(p, sp, isDouble);
+      break;
+  }
+}
+
+function drawCard(deck, title, icon, p, isDouble){
+  const card = deck[Math.floor(Math.random()*deck.length)];
+  openModal(`<h2>${icon} ${title}</h2><p>${card.text}</p><div class="row"><button class="btn" id="cardOkBtn">OK</button></div>`);
+  if(p.ai){
+    aiDelay(()=>{ const b=document.getElementById("cardOkBtn"); if(b) b.click(); });
+  }
+  document.getElementById("cardOkBtn").onclick = ()=>{
+    closeModal();
+    const action = card.fn(p, isDouble);
+    renderAll();
+    if(action==="landed") return;  // resolveSpace a déjà géré la suite
+    if(action==="async") return;   // la carte gère elle-même la suite (paiement)
+    if(action==="jail"){ finishLanding(p, false, true); return; }
+    finishLanding(p, isDouble);
+  };
+}
+
+/* ============================================================
+   HYPOTHÈQUES
+   ============================================================ */
+function mortgageValue(sp){ return Math.floor(sp.price/2); }
+function unmortgageCost(sp){ const v = mortgageValue(sp); return v + Math.ceil(v/10); }
+
+function canMortgage(sp){
+  if(sp.mortgaged) return false;
+  if(sp.type==="property"){
+    const groupProps = board.filter(s=>s.group===sp.group);
+    if(groupProps.some(s=>s.houses>0)) return false; // vendre les maisons du groupe d'abord
+  }
+  return true;
+}
+
+function doMortgage(p, sp){
+  if(!canMortgage(sp) || sp.owner!==players.indexOf(p)) return;
+  sp.mortgaged = true;
+  const v = mortgageValue(sp);
+  p.money += v;
+  log(`🏦 ${p.name} hypothèque ${sp.name} et reçoit ${v}€.`);
+  renderAll();
+}
+
+function doUnmortgage(p, sp){
+  const cost = unmortgageCost(sp);
+  if(!sp.mortgaged || p.money<cost || sp.owner!==players.indexOf(p)) return;
+  sp.mortgaged = false;
+  p.money -= cost;
+  log(`🏦 ${p.name} lève l'hypothèque de ${sp.name} pour ${cost}€.`);
+  renderAll();
+}
+
+/* ============================================================
+   ACHAT / LOYER — carte de propriété façon « titre de propriété »
+   ============================================================ */
+function currentRent(sp){
+  if(sp.mortgaged) return 0;
+  if(sp.type==="property"){
+    const houses = sp.houses||0;
+    if(houses===0){
+      const groupProps = board.filter(s=>s.group===sp.group);
+      const ownsAll = sp.owner!==undefined && groupProps.every(s=>s.owner===sp.owner);
+      return ownsAll ? sp.rentTable[0]*2 : sp.rentTable[0];
+    }
+    return sp.rentTable[houses];
+  } else if(sp.type==="railroad"){
+    const owned = board.filter(s=>s.type==="railroad" && s.owner===sp.owner).length;
+    return 25 * Math.pow(2, owned-1);
+  } else if(sp.type==="utility"){
+    const owned = board.filter(s=>s.type==="utility" && s.owner===sp.owner).length;
+    return (lastRoll.d1+lastRoll.d2) * (owned===2 ? 10 : 4);
+  }
+  return 0;
+}
+
+function propertyCardHtml(sp){
+  let rows = "";
+  const houses = sp.houses||0;
+  if(sp.type==="property"){
+    const labels = ["Loyer (terrain seul)","Loyer avec 1 maison","Loyer avec 2 maisons","Loyer avec 3 maisons","Loyer avec 4 maisons","Loyer avec Hôtel"];
+    rows = sp.rentTable.map((r,idx)=>`<tr class="${sp.owner!==undefined && houses===idx?"active-rent":""}"><td>${labels[idx]}</td><td>${r}€</td></tr>`).join("");
+    rows += `<tr><td>Prix par maison / hôtel</td><td>${sp.houseCost}€</td></tr>`;
+  } else if(sp.type==="railroad"){
+    const owned = sp.owner!==undefined ? board.filter(s=>s.type==="railroad" && s.owner===sp.owner).length : 0;
+    [25,50,100,200].forEach((r,idx)=>{
+      rows += `<tr class="${sp.owner!==undefined && owned===idx+1?"active-rent":""}"><td>${idx+1} gare${idx>0?"s":""} possédée${idx>0?"s":""}</td><td>${r}€</td></tr>`;
+    });
+  } else if(sp.type==="utility"){
+    const owned = sp.owner!==undefined ? board.filter(s=>s.type==="utility" && s.owner===sp.owner).length : 0;
+    rows += `<tr class="${sp.owner!==undefined && owned===1?"active-rent":""}"><td>1 compagnie possédée</td><td>4x le total des dés</td></tr>`;
+    rows += `<tr class="${sp.owner!==undefined && owned===2?"active-rent":""}"><td>2 compagnies possédées</td><td>10x le total des dés</td></tr>`;
+  }
+  rows += `<tr><td>Valeur hypothécaire</td><td>${mortgageValue(sp)}€</td></tr>`;
+  const groupColor = sp.group ? COLORS[sp.group] : "#333";
+  let note = "";
+  if(sp.type==="property" && houses===0 && sp.owner!==undefined){
+    const groupProps = board.filter(s=>s.group===sp.group);
+    const ownsAll = groupProps.every(s=>s.owner===sp.owner);
+    if(ownsAll) note = `<div class="deed-note">🎉 Groupe complet : loyer doublé !</div>`;
+  }
+  const mortgagedNote = sp.mortgaged ? `<div class="deed-mortgaged">🏦 Hypothéquée — aucun loyer perçu</div>` : "";
+  return `
+    <div class="deed-card">
+      <div class="deed-colorbar" style="background:${groupColor}"></div>
+      <h2>${sp.name}</h2>
+      <div class="deed-price">Prix d'achat : <b>${sp.price}€</b></div>
+      <table class="deed-table">${rows}</table>
+      ${note}
+      ${mortgagedNote}
+    </div>
+  `;
+}
+
+function handlePurchasable(p, sp, isDouble){
+  const pIdx = players.indexOf(p);
+  awaitingDecision = true;
+
+  if(sp.owner===undefined){
+    const canLiquidate = liquidationRowsHtml(p) !== "";
+    const actionHtml = `
+      <div class="row">
+        <button class="btn" id="buyBtn" ${p.money<sp.price?"disabled":""}>Acheter (${sp.price}€)</button>
+        ${canLiquidate?'<button class="btn secondary" id="liquidateBtn">🏦 Libérer des fonds</button>':""}
+        <button class="btn secondary" id="skipBtn">Passer</button>
+      </div>
+      ${p.money<sp.price?"<p style='color:#b02a2a;font-size:12px;'>Fonds insuffisants — vendez des maisons ou hypothéquez pour financer l'achat.</p>":""}
+    `;
+    openModal(propertyCardHtml(sp) + actionHtml);
+    const liqBtn = document.getElementById("liquidateBtn");
+    if(liqBtn){
+      liqBtn.onclick = ()=>openLiquidationModal(p, ()=>handlePurchasable(p, sp, isDouble));
+    }
+    document.getElementById("buyBtn").onclick = ()=>{
+      p.money -= sp.price;
+      sp.owner = pIdx;
+      p.properties.push(sp.i);
+      log(`${p.name} achète ${sp.name} pour ${sp.price}€.`);
+      closeModal();
+      awaitingDecision = false;
+      renderAll();
+      finishLanding(p, isDouble);
+    };
+    document.getElementById("skipBtn").onclick = ()=>{
+      closeModal();
+      if(rules.auctions){
+        log(`${p.name} n'achète pas ${sp.name}. Mise aux enchères !`);
+        startAuction(sp, isDouble);
+      } else {
+        log(`${p.name} n'achète pas ${sp.name}.`);
+        awaitingDecision = false;
+        finishLanding(p, isDouble);
+      }
+    };
+    if(p.ai){
+      aiDelay(()=>{
+        const buy = document.getElementById("buyBtn");
+        if(!buy) return;
+        if(!buy.disabled && aiWantsToBuy(p, sp)) buy.click();
+        else document.getElementById("skipBtn").click();
+      });
+    }
+  } else if(sp.owner !== pIdx){
+    const owner = players[sp.owner];
+    if(sp.mortgaged){
+      const actionHtml = `
+        <p><b>${owner.name}</b> possède cette case, mais elle est hypothéquée : pas de loyer !</p>
+        <div class="row"><button class="btn secondary" id="okBtn">OK</button></div>
+      `;
+      openModal(propertyCardHtml(sp) + actionHtml);
+      document.getElementById("okBtn").onclick = ()=>{
+        closeModal();
+        awaitingDecision = false;
+        finishLanding(p, isDouble);
+      };
+      if(p.ai){ aiDelay(()=>{ const b=document.getElementById("okBtn"); if(b) b.click(); }); }
+      return;
+    }
+    if(rules.noRentInJail && owner.inJail){
+      const actionHtml = `
+        <p><b>${owner.name}</b> possède cette case, mais est en prison : pas de loyer !</p>
+        <div class="row"><button class="btn secondary" id="okBtn">OK</button></div>
+      `;
+      openModal(propertyCardHtml(sp) + actionHtml);
+      document.getElementById("okBtn").onclick = ()=>{
+        closeModal();
+        awaitingDecision = false;
+        finishLanding(p, isDouble);
+      };
+      if(p.ai){ aiDelay(()=>{ const b=document.getElementById("okBtn"); if(b) b.click(); }); }
+      return;
+    }
+    const rentDue = currentRent(sp);
+    const actionHtml = `
+      <p><b>${owner.name}</b> possède cette case.</p>
+      <div class="row"><button class="btn" id="payRentBtn">Payer ${rentDue}€ de loyer</button></div>
+    `;
+    openModal(propertyCardHtml(sp) + actionHtml);
+    document.getElementById("payRentBtn").onclick = ()=>{
+      closeModal();
+      requirePay(p, owner, rentDue, ()=>{
+        awaitingDecision = false;
+        renderAll();
+        if(p.bankrupt){ if(activePlayers().length>1) nextTurn(); }
+        else finishLanding(p, isDouble);
+      });
+    };
+    if(p.ai){ aiDelay(()=>{ const b=document.getElementById("payRentBtn"); if(b) b.click(); }); }
+  } else {
+    const actionHtml = `<p>Vous possédez déjà cette case.</p><div class="row"><button class="btn secondary" id="okBtn">OK</button></div>`;
+    openModal(propertyCardHtml(sp) + actionHtml);
+    document.getElementById("okBtn").onclick = ()=>{
+      closeModal();
+      awaitingDecision = false;
+      finishLanding(p, isDouble);
+    };
+    if(p.ai){ aiDelay(()=>{ const b=document.getElementById("okBtn"); if(b) b.click(); }); }
+  }
+}
+
+/* ============================================================
+   ENCHÈRES — déclenchées quand un joueur refuse d'acheter
+   ============================================================ */
+function startAuction(sp, isDouble){
+  const order = players.map((pl,i)=>i).filter(i=>!players[i].bankrupt);
+  auctionState = {
+    sp, order, turnPointer:0,
+    passed:new Set(), highestBid:0, highestBidder:null, isDouble
+  };
+  advanceAuction();
+}
+
+function nextAuctionBidder(){
+  const st = auctionState;
+  let safety = 0;
+  while(safety < st.order.length*3){
+    const idx = st.order[st.turnPointer % st.order.length];
+    st.turnPointer++;
+    safety++;
+    if(st.passed.has(idx)) continue;
+    if(idx === st.highestBidder) continue;
+    return idx;
+  }
+  return null;
+}
+
+function advanceAuction(){
+  const st = auctionState;
+  const remaining = st.order.filter(i=>!st.passed.has(i));
+  if(remaining.length<=1){ finishAuction(); return; }
+  const idx = nextAuctionBidder();
+  if(idx===null){ finishAuction(); return; }
+  showAuctionModal(idx);
+}
+
+function showAuctionModal(idx){
+  const st = auctionState;
+  const bidder = players[idx];
+  const sp = st.sp;
+  const minBid = st.highestBid + 10;
+  openModal(`
+    <h2>🔨 Enchère : ${sp.name}</h2>
+    <p>Prix catalogue : ${sp.price}€</p>
+    <p>Enchère actuelle : <b>${st.highestBid}€</b> ${st.highestBidder!==null?"(par "+players[st.highestBidder].name+")":"(aucune offre)"}</p>
+    <p>Au tour de <b>${bidder.name}</b> (${bidder.money}€ disponibles)</p>
+    <div class="row">
+      <input type="number" id="bidInput" class="bid-input" value="${minBid}" min="${minBid}" max="${bidder.money}">
+      <button class="btn" id="bidBtn" ${bidder.money<minBid?"disabled":""}>Enchérir</button>
+      <button class="btn secondary" id="passBidBtn">Passer</button>
+      ${liquidationRowsHtml(bidder)!==""?'<button class="btn secondary" id="auctionLiquidateBtn">🏦 Libérer des fonds</button>':""}
+    </div>
+  `, idx);
+  const auctionLiqBtn = document.getElementById("auctionLiquidateBtn");
+  if(auctionLiqBtn){
+    auctionLiqBtn.onclick = ()=>openLiquidationModal(bidder, ()=>showAuctionModal(idx));
+  }
+  if(bidder.ai){
+    const lvl = AI_LEVELS[bidder.ai];
+    let maxBid = sp.price * lvl.maxBidFactor;
+    if(sp.group){
+      const gp = board.filter(s=>s.group===sp.group);
+      if(gp.every(s=>s.i===sp.i || s.owner===idx)) maxBid = sp.price * (lvl.maxBidFactor + lvl.groupBidBonus);
+    }
+    maxBid = Math.min(Math.floor(maxBid), bidder.money);
+    aiDelay(()=>{
+      const bidBtn = document.getElementById("bidBtn");
+      if(!bidBtn || !auctionState) return;
+      if(minBid <= maxBid && !bidBtn.disabled){
+        document.getElementById("bidInput").value = minBid;
+        bidBtn.click();
+      } else {
+        document.getElementById("passBidBtn").click();
+      }
+    });
+  }
+  document.getElementById("bidBtn").onclick = ()=>{
+    const val = parseInt(document.getElementById("bidInput").value);
+    if(isNaN(val) || val < minBid || val > bidder.money) return;
+    st.highestBid = val;
+    st.highestBidder = idx;
+    log(`${bidder.name} enchérit ${val}€ pour ${sp.name}.`);
+    advanceAuction();
+  };
+  document.getElementById("passBidBtn").onclick = ()=>{
+    st.passed.add(idx);
+    log(`${bidder.name} se retire de l'enchère pour ${sp.name}.`);
+    advanceAuction();
+  };
+}
+
+function finishAuction(){
+  const st = auctionState;
+  closeModal();
+  if(st.highestBidder!==null){
+    const winner = players[st.highestBidder];
+    winner.money -= st.highestBid;
+    st.sp.owner = st.highestBidder;
+    winner.properties.push(st.sp.i);
+    log(`${winner.name} remporte l'enchère et achète ${st.sp.name} pour ${st.highestBid}€.`);
+  } else {
+    log(`Personne n'a enchéri sur ${st.sp.name}, elle reste à la banque.`);
+  }
+  renderAll();
+  const isDouble = st.isDouble;
+  auctionState = null;
+  awaitingDecision = false;
+  finishLanding(players[currentPlayerIndex], isDouble);
+}
+
+/* ============================================================
+   ÉCHANGES ENTRE JOUEURS
+   ============================================================ */
+function openTradeModal(){
+  const others = players.map((pl,i)=>i).filter(i=>i!==currentPlayerIndex && !players[i].bankrupt);
+  if(others.length===0) return;
+  renderTradeModal(others[0]);
+}
+
+function tradePropLabel(i){
+  return board[i].name + (board[i].mortgaged ? " 🏦" : "");
+}
+
+function renderTradeModal(targetIdx){
+  const p = players[currentPlayerIndex];
+  const t = players[targetIdx];
+  const myProps = p.properties.filter(i=>!board[i].houses).sort((a,b)=>a-b);
+  const theirProps = t.properties.filter(i=>!board[i].houses).sort((a,b)=>a-b);
+  const others = players.map((pl,i)=>i).filter(i=>i!==currentPlayerIndex && !players[i].bankrupt);
+  const options = others.map(i=>`<option value="${i}" ${i===targetIdx?"selected":""}>${players[i].name}</option>`).join("");
+
+  const myPropsHtml = myProps.length
+    ? `<div class="trade-prop-list">${myProps.map(i=>`<label><input type="checkbox" class="offerPropChk" value="${i}"> ${propChip(board[i])}${tradePropLabel(i)}</label>`).join("")}</div>`
+    : `<p class="trade-empty">Aucune propriété échangeable (vendez d'abord les maisons/hôtels).</p>`;
+  const theirPropsHtml = theirProps.length
+    ? `<div class="trade-prop-list">${theirProps.map(i=>`<label><input type="checkbox" class="requestPropChk" value="${i}"> ${propChip(board[i])}${tradePropLabel(i)}</label>`).join("")}</div>`
+    : `<p class="trade-empty">Aucune propriété échangeable.</p>`;
+
+  openModal(`
+    <h2>🔄 Proposer un échange</h2>
+    <div class="row" style="margin-top:0;">
+      <label>Avec : <select id="tradeTargetSel">${options}</select></label>
+    </div>
+    <div class="trade-columns">
+      <div class="trade-col">
+        <b>${p.name} offre</b>
+        ${myPropsHtml}
+        <label class="trade-money-row">Argent : <input type="number" id="offerMoneyInput" value="0" min="0" max="${p.money}"></label>
+      </div>
+      <div class="trade-col">
+        <b>${p.name} demande</b>
+        ${theirPropsHtml}
+        <label class="trade-money-row">Argent : <input type="number" id="requestMoneyInput" value="0" min="0" max="${t.money}"></label>
+      </div>
+    </div>
+    <p class="modal-error" id="tradeErrorMsg"></p>
+    <div class="row">
+      <button class="btn" id="proposeTradeBtn">Proposer</button>
+      <button class="btn secondary" id="cancelTradeBtn">Annuler</button>
+    </div>
+  `);
+  document.getElementById("tradeTargetSel").onchange = (e)=>{
+    renderTradeModal(parseInt(e.target.value));
+  };
+  document.getElementById("cancelTradeBtn").onclick = closeModal;
+  document.getElementById("proposeTradeBtn").onclick = ()=>{
+    const newTargetIdx = parseInt(document.getElementById("tradeTargetSel").value);
+    const offerProps = Array.from(document.querySelectorAll(".offerPropChk:checked")).map(c=>parseInt(c.value));
+    const requestProps = Array.from(document.querySelectorAll(".requestPropChk:checked")).map(c=>parseInt(c.value));
+    const offerMoney = parseInt(document.getElementById("offerMoneyInput").value)||0;
+    const requestMoney = parseInt(document.getElementById("requestMoneyInput").value)||0;
+    const errEl = document.getElementById("tradeErrorMsg");
+    if(offerMoney>p.money){ errEl.textContent = `${p.name} n'a pas assez d'argent.`; return; }
+    if(requestMoney>players[newTargetIdx].money){ errEl.textContent = `${players[newTargetIdx].name} n'a pas assez d'argent.`; return; }
+    if(offerProps.length===0 && requestProps.length===0 && offerMoney===0 && requestMoney===0){ errEl.textContent = "Sélectionnez au moins un élément à échanger."; return; }
+    showTradeConfirmation(currentPlayerIndex, newTargetIdx, offerProps, offerMoney, requestProps, requestMoney);
+  };
+}
+
+function showTradeConfirmation(proposerIdx, targetIdx, offerProps, offerMoney, requestProps, requestMoney, onDone){
+  const proposer = players[proposerIdx], target = players[targetIdx];
+  const offerText = [
+    offerProps.slice().sort((a,b)=>a-b).map(i=>propChip(board[i])+tradePropLabel(i)).join(", ") || null,
+    offerMoney>0 ? offerMoney+"€" : null
+  ].filter(Boolean).join(" + ") || "rien";
+  const requestText = [
+    requestProps.slice().sort((a,b)=>a-b).map(i=>propChip(board[i])+tradePropLabel(i)).join(", ") || null,
+    requestMoney>0 ? requestMoney+"€" : null
+  ].filter(Boolean).join(" + ") || "rien";
+
+  openModal(`
+    <h2>Proposition d'échange</h2>
+    <p><b>${proposer.name}</b> propose à <b>${target.name}</b> :</p>
+    <p>🔁 Offre : ${offerText}<br>⬅ Contre : ${requestText}</p>
+    <div class="row">
+      <button class="btn" id="acceptTradeBtn">${target.name} accepte</button>
+      <button class="btn secondary" id="rejectTradeBtn">${target.name} refuse</button>
+    </div>
+  `, targetIdx);
+  document.getElementById("acceptTradeBtn").onclick = ()=>{
+    offerProps.forEach(i=>{
+      board[i].owner = targetIdx;
+      proposer.properties = proposer.properties.filter(x=>x!==i);
+      target.properties.push(i);
+    });
+    requestProps.forEach(i=>{
+      board[i].owner = proposerIdx;
+      target.properties = target.properties.filter(x=>x!==i);
+      proposer.properties.push(i);
+    });
+    proposer.money -= offerMoney; target.money += offerMoney;
+    target.money -= requestMoney; proposer.money += requestMoney;
+    log(`${proposer.name} et ${target.name} concluent un échange.`);
+    closeModal();
+    renderAll();
+    if(onDone) onDone(true);
+  };
+  document.getElementById("rejectTradeBtn").onclick = ()=>{
+    log(`${target.name} refuse l'échange proposé par ${proposer.name}.`);
+    closeModal();
+    if(onDone) onDone(false);
+  };
+
+  // cible IA : elle évalue l'échange elle-même
+  if(target.ai){
+    const lvl = AI_LEVELS[target.ai];
+    const received = offerProps.reduce((a,i)=>a+aiTradeValue(i,targetIdx),0) + offerMoney;
+    const given = requestProps.reduce((a,i)=>a+aiTradeValue(i,targetIdx),0) + requestMoney;
+    const accept = received >= given * lvl.tradeGreed && requestMoney <= target.money;
+    aiDelay(()=>{
+      const b = document.getElementById(accept ? "acceptTradeBtn" : "rejectTradeBtn");
+      if(b) b.click();
+    }, 1100);
+  }
+}
+
+/* ============================================================
+   DON D'ARGENT ENTRE JOUEURS
+   ============================================================ */
+function openGiftModal(){
+  const active = players.map((pl,i)=>i).filter(i=>!players[i].bankrupt);
+  if(active.length<2) return;
+  const humanDonors = active.filter(i=>!players[i].ai); // une IA ne donne pas son argent
+  if(humanDonors.length===0) return;
+  const defaultDonor = humanDonors.includes(currentPlayerIndex) ? currentPlayerIndex : humanDonors[0];
+  const donorOptions = humanDonors.map(i=>`<option value="${i}" ${i===defaultDonor?"selected":""}>${players[i].name} (${players[i].money}€)</option>`).join("");
+  const defaultRecipient = active.find(i=>i!==defaultDonor);
+  const recipientOptions = active.map(i=>`<option value="${i}" ${i===defaultRecipient?"selected":""}>${players[i].name}</option>`).join("");
+  openModal(`
+    <h2>💶 Donner de l'argent</h2>
+    <div class="gift-form">
+      <label>De : <select id="giftDonorSel">${donorOptions}</select></label>
+      <label>À : <select id="giftRecipientSel">${recipientOptions}</select></label>
+      <label>Montant : <input type="number" id="giftAmountInput" value="100" min="1"></label>
+    </div>
+    <p class="modal-error" id="giftErrorMsg"></p>
+    <div class="row">
+      <button class="btn" id="giftConfirmBtn">Donner</button>
+      <button class="btn secondary" id="giftCancelBtn">Annuler</button>
+    </div>
+  `);
+  document.getElementById("giftCancelBtn").onclick = closeModal;
+  document.getElementById("giftConfirmBtn").onclick = ()=>{
+    const donorIdx = parseInt(document.getElementById("giftDonorSel").value);
+    const recipientIdx = parseInt(document.getElementById("giftRecipientSel").value);
+    const amount = parseInt(document.getElementById("giftAmountInput").value)||0;
+    const errEl = document.getElementById("giftErrorMsg");
+    if(donorIdx===recipientIdx){ errEl.textContent = "Le donneur et le receveur doivent être différents."; return; }
+    if(amount<=0){ errEl.textContent = "Montant invalide."; return; }
+    const donor = players[donorIdx], recipient = players[recipientIdx];
+    if(amount>donor.money){ errEl.textContent = `${donor.name} n'a que ${donor.money}€.`; return; }
+    donor.money -= amount;
+    recipient.money += amount;
+    log(`💶 ${donor.name} donne ${amount}€ à ${recipient.name}.`);
+    closeModal();
+    renderPlayers();
+  };
+}
+
+/* ============================================================
+   CONSTRUCTION / VENTE / HYPOTHÈQUES — gestion des propriétés
+   ============================================================ */
+function openManageModal(){
+  const p = players[currentPlayerIndex];
+  const pIdx = currentPlayerIndex;
+  let html = `<h2>🏠 Propriétés de ${p.name}</h2>`;
+
+  if(p.properties.length===0){
+    html += `<p>Vous ne possédez encore aucune propriété.</p>`;
+  } else {
+    const groups = [...new Set(board.filter(s=>s.group).map(s=>s.group))];
+    groups.forEach(g=>{
+      const groupProps = board.filter(s=>s.group===g);
+      const owned = groupProps.filter(s=>s.owner===pIdx);
+      if(!owned.length) return;
+      const ownsAll = groupProps.every(s=>s.owner===pIdx);
+      const groupMortgaged = groupProps.some(s=>s.mortgaged);
+      const minH = Math.min(...groupProps.map(s=>s.houses||0));
+      const maxH = Math.max(...groupProps.map(s=>s.houses||0));
+      const allAt4 = groupProps.every(s=>(s.houses||0)>=4);
+      html += `<div class="manage-group"><div class="manage-group-title" style="border-left:8px solid ${COLORS[g]};background:${COLORS[g]}22;">Groupe ${GROUP_NAMES[g]||g}${ownsAll?" ✅ complet":""}</div>`;
+      owned.forEach(sp=>{
+        const houses = sp.houses||0;
+        const canBuild = ownsAll && !groupMortgaged && houses<5 && (houses<4 ? houses===minH : allAt4) && p.money>=sp.houseCost;
+        const canSell = houses>0 && houses===maxH;
+        const icon = houses===5 ? "🏨" : (houses>0 ? "🏠".repeat(houses) : "—");
+        let mortBtn = "";
+        if(sp.mortgaged){
+          mortBtn = `<button class="btn tiny secondary" data-action="unmort" data-idx="${sp.i}" ${p.money<unmortgageCost(sp)?"disabled":""}>Lever (${unmortgageCost(sp)}€)</button>`;
+        } else {
+          mortBtn = `<button class="btn tiny secondary" data-action="mort" data-idx="${sp.i}" ${canMortgage(sp)?"":"disabled"}>🏦 Hyp. (+${mortgageValue(sp)}€)</button>`;
+        }
+        html += `<div class="manage-row">
+          <span class="manage-name${sp.mortgaged?" mortgaged":""}">${sp.name}</span>
+          <span class="manage-houses">${sp.mortgaged?"🏦":icon}</span>
+          <button class="btn tiny" data-action="build" data-idx="${sp.i}" ${canBuild?"":"disabled"}>+ (${sp.houseCost}€)</button>
+          <button class="btn tiny secondary" data-action="sell" data-idx="${sp.i}" ${canSell?"":"disabled"}>− (${Math.floor(sp.houseCost/2)}€)</button>
+          ${mortBtn}
+        </div>`;
+      });
+      html += `</div>`;
+    });
+
+    const other = p.properties.map(i=>board[i]).filter(s=>s.type!=="property").sort((a,b)=>a.i-b.i);
+    if(other.length){
+      html += `<div class="manage-group"><div class="manage-group-title" style="border-left:8px solid #333;background:#3333;">Gares & Compagnies</div>`;
+      other.forEach(sp=>{
+        let mortBtn = "";
+        if(sp.mortgaged){
+          mortBtn = `<button class="btn tiny secondary" data-action="unmort" data-idx="${sp.i}" ${p.money<unmortgageCost(sp)?"disabled":""}>Lever (${unmortgageCost(sp)}€)</button>`;
+        } else {
+          mortBtn = `<button class="btn tiny secondary" data-action="mort" data-idx="${sp.i}">🏦 Hyp. (+${mortgageValue(sp)}€)</button>`;
+        }
+        html += `<div class="manage-row">
+          <span class="manage-name${sp.mortgaged?" mortgaged":""}">${sp.name}</span>
+          <span class="manage-houses">${sp.mortgaged?"🏦":""}</span>
+          ${mortBtn}
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  }
+
+  html += `<div class="row"><button class="btn secondary" id="closeManageBtn">Fermer</button></div>`;
+  openModal(html);
+
+  document.querySelectorAll('#modal-body [data-action]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const idx = parseInt(btn.dataset.idx);
+      const sp = board[idx];
+      switch(btn.dataset.action){
+        case "build": buildHouse(p, sp); break;
+        case "sell": sellHouse(p, sp); break;
+        case "mort": doMortgage(p, sp); break;
+        case "unmort": doUnmortgage(p, sp); break;
+      }
+      renderAll();
+      openManageModal();
+    });
+  });
+  document.getElementById("closeManageBtn").addEventListener("click", closeModal);
+}
+
+function buildHouse(p, sp){
+  if(p.money < sp.houseCost) return;
+  p.money -= sp.houseCost;
+  sp.houses = (sp.houses||0)+1;
+  log(`${p.name} construit ${sp.houses===5?"un hôtel":"une maison"} sur ${sp.name}.`);
+}
+
+function sellHouse(p, sp){
+  if(!sp.houses) return;
+  const wasHotel = sp.houses===5;
+  sp.houses -= 1;
+  const refund = Math.floor(sp.houseCost/2);
+  p.money += refund;
+  log(`${p.name} vend ${wasHotel?"un hôtel":"une maison"} sur ${sp.name} pour ${refund}€.`);
+}
+
+/* ============================================================
+   LIQUIDATION — vendre des maisons / hypothéquer pour libérer
+   des fonds. Utilisé par l'écran de dette, l'achat et les enchères.
+   ============================================================ */
+function liquidationRowsHtml(p){
+  const props = p.properties.slice().sort((a,b)=>a-b); // ordre du plateau = groupé par couleur
+  let liq = "";
+  props.forEach(i=>{
+    const sp = board[i];
+    if(sp.type==="property" && sp.houses>0){
+      const groupProps = board.filter(s=>s.group===sp.group);
+      const maxH = Math.max(...groupProps.map(s=>s.houses||0));
+      if(sp.houses===maxH){
+        liq += `<div class="debt-row">
+          <span class="manage-name">${propChip(sp)}${sp.name} ${sp.houses===5?"🏨":"🏠".repeat(sp.houses)}</span>
+          <button class="btn tiny secondary" data-action="dsell" data-idx="${sp.i}">Vendre 1 (+${Math.floor(sp.houseCost/2)}€)</button>
+        </div>`;
+      }
+    }
+  });
+  props.forEach(i=>{
+    const sp = board[i];
+    if(canMortgage(sp)){
+      liq += `<div class="debt-row">
+        <span class="manage-name">${propChip(sp)}${sp.name}</span>
+        <button class="btn tiny secondary" data-action="dmort" data-idx="${sp.i}">🏦 Hypothéquer (+${mortgageValue(sp)}€)</button>
+      </div>`;
+    }
+  });
+  return liq;
+}
+
+function bindLiquidationActions(p, rerender){
+  document.querySelectorAll('#modal-body [data-action="dsell"], #modal-body [data-action="dmort"]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const sp = board[parseInt(btn.dataset.idx)];
+      if(btn.dataset.action==="dsell"){ sellHouse(p, sp); }
+      else { doMortgage(p, sp); }
+      renderAll();
+      rerender();
+    });
+  });
+}
+
+/* fenêtre « libérer des fonds » avec retour vers l'écran précédent */
+function openLiquidationModal(p, onBack){
+  const render = ()=>{
+    let html = `<h2>🏦 Libérer des fonds</h2>
+      <p>Argent de ${p.name} : <b>${p.money}€</b></p>`;
+    const liq = liquidationRowsHtml(p);
+    if(liq){
+      html += `<div class="debt-list">${liq}</div>`;
+    } else {
+      html += `<p class="trade-empty">Aucune maison à vendre ni propriété à hypothéquer.</p>`;
+    }
+    html += `<div class="row"><button class="btn secondary" id="liqBackBtn">↩ Retour</button></div>`;
+    openModal(html, players.indexOf(p));
+    bindLiquidationActions(p, render);
+    document.getElementById("liqBackBtn").onclick = onBack;
+  };
+  render();
+}
+
+/* ============================================================
+   PAIEMENTS & DETTES
+   Si le joueur ne peut pas payer, un écran de dette s'ouvre :
+   il peut vendre des maisons, hypothéquer, recevoir un don,
+   ou déclarer faillite.
+   ============================================================ */
+function creditBank(amount){
+  if(rules.parkingPot && amount>0){
+    parkingPot += amount;
+    updatePotDisplay();
+  }
+}
+
+function requirePay(payer, receiver, amount, onDone){
+  if(amount<=0){ if(onDone) onDone(true); return; }
+  if(payer.money >= amount){
+    payer.money -= amount;
+    if(receiver){
+      receiver.money += amount;
+      log(`${payer.name} paie ${amount}€ à ${receiver.name}.`);
+    } else {
+      creditBank(amount);
+      log(`${payer.name} paie ${amount}€ à la banque.`);
+    }
+    renderPlayers();
+    if(onDone) onDone(true);
+  } else {
+    openDebtModal(payer, receiver, amount, onDone);
+  }
+}
+
+function openDebtModal(payer, receiver, amount, onDone){
+  awaitingDecision = true;
+  const recvName = receiver ? receiver.name : "la banque";
+
+  const render = ()=>{
+    const missing = amount - payer.money;
+    let html = `<h2>💸 Dette de ${payer.name}</h2>
+      <div class="debt-amount">${amount}€ à ${recvName}</div>
+      <p>Argent disponible : <b>${payer.money}€</b>${missing>0?` — il manque <b style="color:#b02a2a;">${missing}€</b>`:" ✅"}</p>`;
+
+    const liq = liquidationRowsHtml(payer);
+    if(liq){
+      html += `<div class="debt-list">${liq}</div>`;
+    } else {
+      html += `<p class="trade-empty">Aucune maison à vendre ni propriété à hypothéquer.</p>`;
+    }
+
+    const donors = players.map((pl,i)=>i).filter(i=>players[i]!==payer && !players[i].bankrupt && !players[i].ai);
+    if(donors.length){
+      const donorOptions = donors.map(i=>`<option value="${i}">${players[i].name} (${players[i].money}€)</option>`).join("");
+      const suggested = Math.max(missing, 1);
+      html += `<div class="debt-gift">
+        <b>💝 Recevoir un don :</b>
+        <select id="debtDonorSel">${donorOptions}</select>
+        <input type="number" id="debtGiftAmount" class="bid-input" value="${suggested}" min="1">
+        <button class="btn tiny" id="debtGiftBtn">Donner</button>
+      </div>
+      <p class="modal-error" id="debtGiftError"></p>`;
+    }
+
+    html += `<div class="row">
+      <button class="btn" id="debtPayBtn" ${payer.money<amount?"disabled":""}>Payer ${amount}€</button>
+      <button class="btn danger" id="debtBankruptBtn">💀 Déclarer faillite</button>
+    </div>`;
+    openModal(html, players.indexOf(payer));
+
+    bindLiquidationActions(payer, render);
+    const giftBtn = document.getElementById("debtGiftBtn");
+    if(giftBtn){
+      giftBtn.onclick = ()=>{
+        const donor = players[parseInt(document.getElementById("debtDonorSel").value)];
+        const amt = parseInt(document.getElementById("debtGiftAmount").value)||0;
+        const errEl = document.getElementById("debtGiftError");
+        if(amt<=0){ errEl.textContent = "Montant invalide."; return; }
+        if(amt>donor.money){ errEl.textContent = `${donor.name} n'a que ${donor.money}€.`; return; }
+        donor.money -= amt;
+        payer.money += amt;
+        log(`💝 ${donor.name} donne ${amt}€ à ${payer.name} pour l'aider à payer sa dette.`);
+        renderPlayers();
+        render();
+      };
+    }
+    document.getElementById("debtPayBtn").onclick = ()=>{
+      if(payer.money < amount) return;
+      payer.money -= amount;
+      if(receiver){
+        receiver.money += amount;
+        log(`${payer.name} paie ${amount}€ à ${receiver.name}.`);
+      } else {
+        creditBank(amount);
+        log(`${payer.name} paie ${amount}€ à la banque.`);
+      }
+      closeModal();
+      awaitingDecision = false;
+      renderPlayers();
+      if(onDone) onDone(true);
+    };
+    document.getElementById("debtBankruptBtn").onclick = ()=>{
+      goBankrupt(payer, receiver);
+      closeModal();
+      awaitingDecision = false;
+      if(onDone) onDone(false);
+    };
+
+    if(payer.ai){
+      aiDelay(()=>{
+        const payBtn = document.getElementById("debtPayBtn");
+        if(!payBtn) return; // la fenêtre a changé
+        if(payer.money >= amount){ payBtn.click(); return; }
+        const liqBtn = document.querySelector('#modal-body [data-action="dsell"], #modal-body [data-action="dmort"]');
+        if(liqBtn){ liqBtn.click(); } // re-render -> le hook se relance
+        else document.getElementById("debtBankruptBtn").click();
+      }, 550);
+    }
+  };
+  render();
+}
+
+function goBankrupt(p, creditor){
+  p.bankrupt = true;
+  let housesValue = 0;
+  p.properties.forEach(i=>{
+    const s = board[i];
+    if(s.houses){
+      housesValue += Math.floor(s.houseCost/2) * s.houses;
+      s.houses = 0;
+    }
+  });
+  if(creditor && !creditor.bankrupt){
+    creditor.money += Math.max(p.money,0) + housesValue;
+    const cIdx = players.indexOf(creditor);
+    p.properties.forEach(i=>{
+      board[i].owner = cIdx;
+      creditor.properties.push(i);
+    });
+    log(`💀 ${p.name} fait faillite ! ${creditor.name} récupère son argent et ses propriétés.`);
+  } else {
+    p.properties.forEach(i=>{
+      delete board[i].owner;
+      board[i].mortgaged = false;
+    });
+    log(`💀 ${p.name} fait faillite ! Ses propriétés retournent à la banque.`);
+  }
+  p.properties = [];
+  p.money = 0;
+  renderAll();
+  checkWin();
+}
+
+function checkWin(){
+  const alive = activePlayers();
+  if(alive.length<=1){
+    showVictoryScreen(alive[0]);
+    return true;
+  }
+  return false;
+}
+
+function showVictoryScreen(winner){
+  const ov = document.getElementById("victory-overlay");
+  if(ov.classList.contains("active")) return; // déjà affiché
+  closeModal();
+
+  const box = document.getElementById("victory-box");
+  if(winner){
+    const houses = winner.properties.reduce((a,i)=>a+(board[i].houses===5?0:(board[i].houses||0)),0);
+    const hotels = winner.properties.filter(i=>board[i].houses===5).length;
+    box.innerHTML = `
+      <div class="victory-trophy">🏆</div>
+      <h1>${winner.name} remporte la partie !</h1>
+      <p><span class="victory-token" style="background:${winner.color}">${winner.symbol||""}</span> Dernier joueur en lice</p>
+      <div class="victory-stats">
+        <div class="victory-stat"><b>${winner.money}€</b><span>Fortune finale</span></div>
+        <div class="victory-stat"><b>${winner.properties.length}</b><span>Propriétés</span></div>
+        <div class="victory-stat"><b>${houses}</b><span>Maisons</span></div>
+        <div class="victory-stat"><b>${hotels}</b><span>Hôtels</span></div>
+      </div>
+      <button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>
+    `;
+    log(`🏆 ${winner.name} remporte la partie !`);
+  } else {
+    box.innerHTML = `
+      <div class="victory-trophy">🤝</div>
+      <h1>Match nul</h1>
+      <button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>
+    `;
+    log("Match nul.");
+  }
+
+  spawnConfetti(ov, winner ? winner.color : null);
+  ov.classList.add("active");
+  netScheduleSync();
+}
+
+function spawnConfetti(ov, extraColor){
+  const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12","#9b59b6"];
+  if(extraColor) palette.push(extraColor, extraColor);
+  for(let k=0;k<90;k++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random()*100)+"vw";
+    c.style.background = palette[Math.floor(Math.random()*palette.length)];
+    c.style.width = (6+Math.random()*8)+"px";
+    c.style.height = (10+Math.random()*12)+"px";
+    c.style.animationDuration = (2.6+Math.random()*3)+"s";
+    c.style.animationDelay = (Math.random()*3)+"s";
+    ov.appendChild(c);
+  }
+}
+
+function finishLanding(p, isDouble, wentToJail){
+  renderPlayers();
+  if(activePlayers().length<=1){ checkWin(); return; }
+  if(isDouble && !wentToJail && !p.bankrupt){
+    log(`${p.name} a fait un double, il rejoue !`);
+    document.getElementById("rollBtn").disabled = false;
+    document.getElementById("endTurnBtn").disabled = false;
+  } else {
+    document.getElementById("endTurnBtn").disabled = false;
+    document.getElementById("rollBtn").disabled = true;
+  }
+
+  // tour IA : rejouer (double) ou gérer ses biens puis passer la main
+  if(isAiTurn()){
+    const cur = players[currentPlayerIndex];
+    aiDelay(()=>{
+      if(!isAiTurn() || players[currentPlayerIndex]!==cur) return;
+      if(cur.bankrupt){ nextTurn(); return; }
+      if(!document.getElementById("rollBtn").disabled && !awaitingDecision && !animating){
+        rollDice(false);
+      } else {
+        aiManageAssets(cur);
+        aiMaybeProposeTrade(cur, ()=>{
+          aiDelay(()=>{
+            if(isAiTurn() && players[currentPlayerIndex]===cur && !awaitingDecision && !animating) nextTurn();
+          }, 400);
+        });
+      }
+    });
+  }
+}
+
+function nextTurn(){
+  if(activePlayers().length<=1){ checkWin(); return; }
+  closeModal();
+  do{
+    currentPlayerIndex = (currentPlayerIndex+1) % players.length;
+  } while(players[currentPlayerIndex].bankrupt);
+  startTurn();
+}
+
+/* ============================================================
+   MODAL HELPERS
+   ============================================================ */
+function openModal(html, actor){
+  modalActor = (actor===undefined || actor===null) ? currentPlayerIndex : actor;
+  modalRev++;
+  document.getElementById("modal-body").innerHTML = html;
+  document.getElementById("modal-overlay").classList.add("active");
+  netApplyModalLock();
+  netScheduleSync();
+}
+function closeModal(){
+  document.getElementById("modal-overlay").classList.remove("active");
+  document.getElementById("modal-body").innerHTML = ""; // neutralise les boutons obsolètes
+  const note = document.getElementById("netWaitNote");
+  if(note) note.remove();
+  modalActor = null;
+  netScheduleSync();
+}
+
+/* en ligne : seule la personne concernée peut cliquer dans la modale,
+   l'autre voit une note d'attente */
+function netApplyModalLock(){
+  const m = document.getElementById("modal");
+  const note = document.getElementById("netWaitNote");
+  if(!NET.mode){ m.classList.remove("net-locked"); if(note) note.remove(); return; }
+  const actorP = players[modalActor];
+  const mine = !!(actorP && actorP.side===NET.mySide);
+  m.classList.toggle("net-locked", !mine);
+  if(!mine){
+    let n = note;
+    if(!n){
+      n = document.createElement("div");
+      n.id = "netWaitNote";
+      n.className = "net-wait-note";
+      m.prepend(n);
+    }
+    n.textContent = actorP ? `⏳ Au tour de ${actorP.name}…` : "⏳ En attente…";
+  } else if(note){
+    note.remove();
+  }
+}
+
+/* ============================================================
+   MODE EN LIGNE — PeerJS
+   L'hôte fait tourner tout le moteur de jeu. L'invité reçoit
+   l'état complet (plateau, joueurs, journal, modales) et
+   renvoie ses actions, que l'hôte valide et exécute.
+   ============================================================ */
+function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
+function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sans I/O/0/1 ambigus
+  let c = "";
+  for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(obj){
+  if(NET.conn && NET.conn.open){
+    try{ NET.conn.send(obj); }catch(e){}
+  }
+}
+function netModalIsOpen(){ return document.getElementById("modal-overlay").classList.contains("active"); }
+
+/* ---------- écran d'accueil ---------- */
+document.getElementById("netLocalBtn").onclick = ()=>{
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+};
+document.getElementById("netHostBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netHostPanel").style.display = "block";
+  netHost(0);
+};
+document.getElementById("netJoinBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netJoinPanel").style.display = "block";
+};
+document.getElementById("netConnectBtn").onclick = ()=>{
+  const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
+  const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
+  if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  document.getElementById("netConnectBtn").disabled = true;
+  netJoin(code, name);
+};
+
+/* ---------- hôte ---------- */
+function netHost(attempt){
+  NET.mode = "host";
+  NET.mySide = "host";
+  const code = netGenCode();
+  netStatus("netHostStatus","Création de la partie…");
+  const peer = new Peer("mono-"+code);
+  NET.peer = peer;
+  peer.on("open", ()=>{
+    document.getElementById("netCode").textContent = code;
+    netStatus("netHostStatus","En attente de l'autre joueur… Envoie-lui ce code !");
+  });
+  peer.on("error", (e)=>{
+    if(e.type==="unavailable-id" && attempt<4){
+      try{ peer.destroy(); }catch(err){}
+      netHost(attempt+1);
+    } else {
+      netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+    }
+  });
+  peer.on("connection", (c)=>{
+    if(NET.conn && NET.conn.open){ try{ c.close(); }catch(err){} return; } // une seule personne à la fois
+    NET.conn = c;
+    c.on("data", netHostOnData);
+    c.on("close", netOnConnLost);
+    c.on("error", netOnConnLost);
+  });
+}
+
+function netShowSetupAsHost(){
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  const info = document.getElementById("netSetupInfo");
+  info.style.display = "block";
+  info.textContent = `🌐 Partie en ligne — ${NET.guestName} est connecté(e) ! Vous êtes le joueur 1, ${NET.guestName} le joueur 2. Ajoutez des IA si vous voulez plus de joueurs.`;
+  numPlayersSel.value = "2";
+  renderPlayerInputs();
+}
+setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 400); // filet de sécurité
+
+function netHostOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="hello"){
+    NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+    if(NET.started){
+      netHideBanner();
+      log(`🔌 ${NET.guestName} s'est reconnecté(e) à la partie.`);
+      NET.lastModalRevSent = -1; // force le renvoi du HTML de la modale en cours si besoin
+      netSendState();
+    } else {
+      netShowSetupAsHost();
+    }
+  } else if(msg.t==="setupGuest"){
+    netApplyGuestSetupChange(msg);
+  } else if(msg.t==="main"){
+    netHandleMainFromGuest(String(msg.id));
+  } else if(msg.t==="modal"){
+    netHandleModalFromGuest(msg);
+  } else if(msg.t==="modalChange"){
+    netHandleModalChangeFromGuest(msg);
+  }
+}
+
+/* ---------- personnalisation en direct du pion de l'invité ---------- */
+function netBroadcastSetup(){
+  if(NET.mode!=="host" || NET.started || !NET.conn || !NET.conn.open) return;
+  const v = VERSIONS[versionSel.value];
+  const colorEl = document.getElementById("pcolor1");
+  const symbolEl = document.getElementById("psymbol1");
+  const nameEl = document.getElementById("pname1");
+  if(!colorEl || !symbolEl || !nameEl) return;
+  netSend({
+    t:"setup",
+    label:v.label, desc:v.desc, theme:v.theme, tokens:v.tokens,
+    guestColor:colorEl.value, guestSymbol:symbolEl.value, guestName:nameEl.value
+  });
+}
+
+function netApplyGuestSetupChange(msg){
+  if(NET.started) return;
+  const nameEl = document.getElementById("pname1");
+  const colorEl = document.getElementById("pcolor1");
+  const symbolEl = document.getElementById("psymbol1");
+  if(!nameEl || !colorEl || !symbolEl) return;
+  NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+  nameEl.value = NET.guestName;
+  if(msg.color) colorEl.value = msg.color;
+  if(msg.symbol && Array.from(symbolEl.options).some(o=>o.value===msg.symbol)) symbolEl.value = msg.symbol;
+  netBroadcastSetup();
+}
+
+function netHandleMainFromGuest(id){
+  if(!NET.started || animating) return;
+  const p = players[currentPlayerIndex];
+  if(!p || p.side!=="guest" || p.bankrupt) return;
+  if(id==="rollBtn"){
+    if(!netModalIsOpen() && !document.getElementById("rollBtn").disabled) rollDice(false);
+  } else if(id==="endTurnBtn"){
+    if(!netModalIsOpen() && !document.getElementById("endTurnBtn").disabled && !awaitingDecision) nextTurn();
+  } else if(id==="manageBtn"){
+    if(!netModalIsOpen()) openManageModal();
+  } else if(id==="tradeBtn"){
+    if(!netModalIsOpen()) openTradeModal();
+  } else if(id==="giftBtn"){
+    if(!netModalIsOpen()) openGiftModal();
+  }
+}
+
+function netGuestMayAct(){
+  const actorP = players[modalActor];
+  return !!(actorP && actorP.side==="guest");
+}
+
+/* l'invité a cliqué sur un bouton de la modale : on reporte ses saisies
+   dans la modale de l'hôte (même HTML, mêmes champs) puis on clique */
+function netHandleModalFromGuest(msg){
+  if(!netModalIsOpen() || msg.rev!==modalRev || !netGuestMayAct()) return;
+  const body = document.getElementById("modal-body");
+  const fields = body.querySelectorAll("input, select, textarea");
+  (Array.isArray(msg.inputs)?msg.inputs:[]).forEach((f,i)=>{
+    const el = fields[i];
+    if(!el || !f) return;
+    if(el.type==="checkbox" || el.type==="radio") el.checked = !!f.c;
+    else el.value = f.v;
+  });
+  const btns = body.querySelectorAll("button");
+  const b = btns[msg.btnIndex];
+  if(b && !b.disabled) b.click();
+}
+
+function netHandleModalChangeFromGuest(msg){
+  if(!netModalIsOpen() || msg.rev!==modalRev || !netGuestMayAct()) return;
+  const fields = document.getElementById("modal-body").querySelectorAll("input, select, textarea");
+  const el = fields[msg.inputIndex];
+  if(!el) return;
+  el.value = msg.value;
+  el.dispatchEvent(new Event("change"));
+}
+
+/* ---------- synchronisation hôte -> invité ---------- */
+function netScheduleSync(){
+  if(NET.mode!=="host" || !NET.conn) return;
+  if(NET.syncTimer) return;
+  NET.syncTimer = setTimeout(()=>{ NET.syncTimer = null; netSendState(); }, 40);
+}
+
+function netSendState(){
+  if(NET.mode!=="host" || !NET.started || NET.ended || !NET.conn || !NET.conn.open) return;
+  const modalOpen = netModalIsOpen();
+  const victOn = document.getElementById("victory-overlay").classList.contains("active");
+  const snap = {
+    t:"state",
+    versionId: NET.versionId,
+    rules, parkingPot,
+    board: board.map(sp=>({o: sp.owner===undefined?null:sp.owner, m:!!sp.mortgaged, h:sp.houses||0})),
+    players: players.map(p=>({
+      name:p.name, color:p.color, symbol:p.symbol, ai:p.ai, side:p.side||null,
+      money:p.money, position:p.position, properties:p.properties.slice(),
+      inJail:p.inJail, jailTurns:p.jailTurns, bankrupt:p.bankrupt, jailFreeCards:p.jailFreeCards||0
+    })),
+    cur: currentPlayerIndex,
+    lastRoll,
+    dice:{d1:document.getElementById("die1").textContent, d2:document.getElementById("die2").textContent},
+    controls:{roll:document.getElementById("rollBtn").disabled, end:document.getElementById("endTurnBtn").disabled},
+    texts:{turn:document.getElementById("turn-title").textContent, info:document.getElementById("current-space-info").textContent},
+    log: logHistory.slice(-120),
+    modal:{open:modalOpen, rev:modalRev, actor:modalActor},
+    victory: victOn ? {active:true, html:document.getElementById("victory-box").innerHTML} : {active:false}
+  };
+  if(modalOpen && modalRev!==NET.lastModalRevSent){
+    snap.modal.html = document.getElementById("modal-body").innerHTML;
+    NET.lastModalRevSent = modalRev;
+  }
+  const curP = players[currentPlayerIndex];
+  document.getElementById("controls").classList.toggle("net-not-you", !curP || curP.side!=="host");
+  netSend(snap);
+}
+
+/* ---------- invité ---------- */
+function netJoin(code, name){
+  NET.mode = "guest";
+  NET.mySide = "guest";
+  NET.joinCode = code;
+  NET.guestName = name;
+  netConnectAsGuest(false);
+}
+
+/* isReconnect=false : premier essai depuis l'écran "Rejoindre" (échec = message + bouton réactivé)
+   isReconnect=true  : tentative automatique après coupure (échec = nouvelle tentative programmée) */
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
+  const peer = new Peer();
+  NET.peer = peer;
+  let settled = false;
+  const fail = (msg)=>{
+    if(settled) return;
+    settled = true;
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect){
+      netScheduleGuestRetry();
+    } else {
+      netStatus("netJoinStatus", msg);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
+  };
+  peer.on("error", (e)=>{
+    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+  });
+  peer.on("open", ()=>{
+    const c = peer.connect("mono-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    c.on("open", ()=>{
+      clearTimeout(to);
+      settled = true;
+      NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName});
+      if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Personnalise ton pion ci-dessous.");
+      else log("🔌 Reconnecté(e) à la partie.");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+  });
+}
+
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts = (NET.reconnectAttempts||0) + 1;
+  netShowReconnectBanner();
+  if(NET.reconnectAttempts > 30){
+    netReconnectFailed();
+    return;
+  }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="dice"){
+    netGuestAnimateDice(msg.d1, msg.d2);
+  } else if(msg.t==="state"){
+    netApplySnapshot(msg);
+  } else if(msg.t==="setup"){
+    netApplySetupMsg(msg);
+  }
+}
+
+/* ---------- personnalisation du pion (écran d'attente) ---------- */
+function netApplySetupMsg(msg){
+  if(NET.started) return;
+  const panel = document.getElementById("netJoinReadyPanel");
+  panel.style.display = "block";
+  document.getElementById("netGuestVersionDesc").textContent = `${msg.label} — ${msg.desc}`;
+  const r = document.documentElement.style;
+  r.setProperty("--bg", msg.theme.bg);
+  r.setProperty("--board-bg", msg.theme.boardBg);
+  r.setProperty("--center-bg", msg.theme.centerBg);
+  r.setProperty("--logo-color", msg.theme.logo);
+  r.setProperty("--accent", msg.theme.accent);
+  const symSel = document.getElementById("netGuestSymbol");
+  const tokensKey = msg.tokens.join(",");
+  if(symSel.dataset.tokensKey !== tokensKey){
+    symSel.dataset.tokensKey = tokensKey;
+    symSel.innerHTML = msg.tokens.map(t=>`<option value="${netEsc(t)}">${t}</option>`).join("");
+  }
+  if(document.activeElement !== symSel) symSel.value = msg.guestSymbol;
+  const colorEl = document.getElementById("netGuestColor");
+  if(document.activeElement !== colorEl) colorEl.value = msg.guestColor;
+  const nameEl = document.getElementById("netGuestNameLive");
+  if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+}
+
+let netGuestSetupTimer = null;
+function netSendGuestSetup(){
+  if(NET.mode!=="guest") return;
+  clearTimeout(netGuestSetupTimer);
+  netGuestSetupTimer = setTimeout(()=>{
+    netSend({
+      t:"setupGuest",
+      name: document.getElementById("netGuestNameLive").value,
+      color: document.getElementById("netGuestColor").value,
+      symbol: document.getElementById("netGuestSymbol").value
+    });
+  }, 120);
+}
+["netGuestColor","netGuestSymbol","netGuestNameLive"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("input", netSendGuestSetup);
+  el.addEventListener("change", netSendGuestSetup);
+});
+
+function netGuestAnimateDice(d1, d2){
+  NET.guestDiceAnim = true;
+  const e1 = document.getElementById("die1");
+  const e2 = document.getElementById("die2");
+  e1.classList.add("rolling");
+  e2.classList.add("rolling");
+  let ticks = 0;
+  const iv = setInterval(()=>{
+    e1.textContent = 1+Math.floor(Math.random()*6);
+    e2.textContent = 1+Math.floor(Math.random()*6);
+    if(++ticks>=8){
+      clearInterval(iv);
+      e1.textContent = d1;
+      e2.textContent = d2;
+      e1.classList.remove("rolling");
+      e2.classList.remove("rolling");
+      NET.guestDiceAnim = false;
+    }
+  }, 70);
+}
+
+function netRenderLog(arr){
+  if(!Array.isArray(arr)) return;
+  const key = arr.length+"|"+(arr[0]||"")+"|"+(arr[arr.length-1]||"");
+  if(NET.logKey===key) return;
+  NET.logKey = key;
+  const logEl = document.getElementById("log");
+  logEl.innerHTML = "";
+  arr.forEach(m=>{
+    const d = document.createElement("div");
+    d.textContent = m;
+    logEl.appendChild(d);
+  });
+}
+
+function netApplySnapshot(s){
+  if(NET.ended) return;
+  if(!NET.started){
+    NET.started = true;
+    NET.versionId = s.versionId;
+    const v = VERSIONS[s.versionId] || VERSIONS.paris;
+    board = buildBoardData(v);
+    applyTheme(v);
+    rules = s.rules;
+    players = s.players.map(p=>Object.assign({}, p));
+    document.getElementById("netHome").style.display = "none";
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("game").classList.add("active");
+    buildBoard(v);
+  }
+  rules = s.rules;
+  parkingPot = s.parkingPot;
+  s.board.forEach((b,i)=>{
+    const sp = board[i];
+    if(!sp) return;
+    if(b.o===null) delete sp.owner; else sp.owner = b.o;
+    sp.mortgaged = b.m;
+    if(sp.type==="property") sp.houses = b.h;
+  });
+  s.players.forEach((p,i)=>{ if(players[i]) Object.assign(players[i], p); });
+  currentPlayerIndex = s.cur;
+  lastRoll = s.lastRoll;
+  document.getElementById("turn-title").textContent = s.texts.turn;
+  document.getElementById("current-space-info").textContent = s.texts.info;
+  if(!NET.guestDiceAnim){
+    document.getElementById("die1").textContent = s.dice.d1;
+    document.getElementById("die2").textContent = s.dice.d2;
+  }
+  const myTurn = !!(players[currentPlayerIndex] && players[currentPlayerIndex].side==="guest");
+  document.getElementById("rollBtn").disabled = s.controls.roll || !myTurn;
+  document.getElementById("endTurnBtn").disabled = s.controls.end || !myTurn;
+  document.getElementById("controls").classList.toggle("net-not-you", !myTurn);
+  netRenderLog(s.log);
+  updatePotDisplay();
+  renderPlayers();
+  renderBoardState();
+  renderTokens();
+  const ovl = document.getElementById("modal-overlay");
+  if(s.modal && s.modal.open){
+    if(s.modal.html!==undefined && s.modal.rev!==NET.lastModalRevApplied){
+      document.getElementById("modal-body").innerHTML = s.modal.html;
+    }
+    NET.lastModalRevApplied = s.modal.rev;
+    modalActor = s.modal.actor;
+    ovl.classList.add("active");
+    netApplyModalLock();
+  } else {
+    ovl.classList.remove("active");
+    document.getElementById("modal-body").innerHTML = "";
+  }
+  if(s.victory && s.victory.active){
+    const vo = document.getElementById("victory-overlay");
+    if(!vo.classList.contains("active")){
+      document.getElementById("victory-box").innerHTML = s.victory.html;
+      spawnConfetti(vo, null);
+      vo.classList.add("active");
+    }
+  }
+}
+
+/* l'invité clique dans la modale : on envoie le n° du bouton + toutes
+   les saisies (enchère, montants, cases cochées…) à l'hôte */
+document.getElementById("modal-body").addEventListener("click", (e)=>{
+  if(NET.mode!=="guest") return;
+  const btn = e.target.closest("button");
+  if(!btn || btn.disabled) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const body = document.getElementById("modal-body");
+  const inputs = Array.from(body.querySelectorAll("input, select, textarea")).map(el=>({v:el.value, c:el.checked}));
+  const btnIndex = Array.from(body.querySelectorAll("button")).indexOf(btn);
+  netSend({t:"modal", rev:NET.lastModalRevApplied, btnIndex, inputs});
+}, true);
+
+/* changement de liste déroulante (ex. choix du partenaire d'échange) */
+document.getElementById("modal-body").addEventListener("change", (e)=>{
+  if(NET.mode!=="guest") return;
+  const el = e.target;
+  if(!el || el.tagName!=="SELECT") return;
+  const fields = Array.from(document.getElementById("modal-body").querySelectorAll("input, select, textarea"));
+  netSend({t:"modalChange", rev:NET.lastModalRevApplied, inputIndex:fields.indexOf(el), value:el.value});
+});
+
+/* ---------- déconnexion / reconnexion ----------
+   Une coupure n'arrête plus la partie : l'hôte garde son PeerJS ouvert et
+   attend une nouvelle connexion sur le même code ; l'invité(e) retente
+   automatiquement en tâche de fond (ou peut rejoindre à nouveau avec le
+   même code si son onglet a été rechargé). ---------- */
+function netShowBanner(html){
+  let b = document.getElementById("netBanner");
+  if(!b){
+    b = document.createElement("div");
+    b.id = "netBanner";
+    b.className = "net-reconnect-banner";
+    document.body.appendChild(b);
+  }
+  b.innerHTML = html;
+}
+function netHideBanner(){
+  const b = document.getElementById("netBanner");
+  if(b) b.remove();
+}
+
+function netOnConnLost(){
+  if(NET.mode==="host") netHostOnDisconnect();
+  else if(NET.mode==="guest") netGuestOnDisconnect();
+}
+
+function netHostOnDisconnect(){
+  NET.conn = null;
+  if(!NET.started){
+    const info = document.getElementById("netSetupInfo");
+    if(info && document.getElementById("setup").style.display!=="none"){
+      info.style.display = "block";
+      info.style.background = "#fdecea";
+      info.style.color = "#7a1f1f";
+      info.textContent = `🔌 ${NET.guestName||"L'autre joueur"} s'est déconnecté(e) avant le début de la partie. Renvoie-lui le lien et le code pour qu'il/elle revienne.`;
+    } else {
+      netStatus("netHostStatus","Le joueur s'est déconnecté avant le début. Attends qu'il/elle revienne avec le même code.");
+    }
+    return;
+  }
+  netShowBanner(`🔌 ${netEsc(NET.guestName)} s'est déconnecté(e). En attente de reconnexion (le lien et le code restent valables)… <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  const btn = document.getElementById("netHostGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+
+function netGuestOnDisconnect(){
+  if(NET.reconnecting || NET.ended) return;
+  NET.conn = null;
+  NET.reconnectAttempts = 0;
+  try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
+  netScheduleGuestRetry();
+}
+
+function netShowReconnectBanner(){
+  netShowBanner(`🔌 Connexion perdue. Reconnexion en cours… (tentative ${NET.reconnectAttempts}/30) <button id="netRetryNowBtn">Réessayer maintenant</button>`);
+  const btn = document.getElementById("netRetryNowBtn");
+  if(btn) btn.onclick = ()=>{ netConnectAsGuest(true); };
+}
+
+function netReconnectFailed(){
+  NET.reconnecting = false;
+  NET.ended = true;
+  netShowBanner(`❌ Impossible de se reconnecter — l'autre joueur a peut-être fermé la partie. <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+  const btn = document.getElementById("netGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+</script>
+</body>
+</html>

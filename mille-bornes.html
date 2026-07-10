@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1000 Bornes HTML</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#1b2a3a;
+    --panel-bg:#ffffff;
+    --accent:#c0392b;
+    --road:#3a3f44;
+    --text:#1a1a1a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:linear-gradient(180deg,var(--bg),#0e1620);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+  }
+  .btn{
+    cursor:pointer;border:none;border-radius:8px;padding:10px 16px;
+    font-size:15px;font-weight:600;background:var(--accent);color:#fff;
+    transition:filter .15s, transform .1s;
+  }
+  .btn:hover{filter:brightness(1.15);}
+  .btn:active{transform:scale(.96);}
+  .btn.secondary{background:#555;}
+  .btn.danger{background:#7a1f1f;}
+  .btn:disabled{background:#aaa;cursor:not-allowed;filter:none;}
+  .hint{font-size:12px;color:#666;}
+
+  /* ---------- ACCUEIL / RÉSEAU ---------- */
+  #netHome, #setup{
+    background:var(--panel-bg);border-radius:12px;padding:28px 32px;
+    max-width:520px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+  #netHome h1, #setup h1{margin-top:0;text-align:center;}
+  .net-big-btn{display:block;width:100%;margin:10px 0;font-size:16px;padding:14px;}
+  #netCode{font-size:38px;font-weight:800;letter-spacing:8px;text-align:center;margin:10px 0;color:var(--accent);user-select:all;}
+  .net-status{font-size:13px;color:#555;min-height:18px;text-align:center;}
+  #netSetupInfo{
+    display:none;background:#e3f2fd;border:1px solid #90caf9;color:#0d47a1;
+    border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px;font-weight:600;
+  }
+  #netJoinReadyPanel .player-row{justify-content:center;margin-top:10px;}
+  #netJoinReadyPanel .player-row input[type=text]{flex:0 1 160px;}
+  .player-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .player-row input[type=text]{flex:1;padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
+  .player-row input[type=color]{width:34px;height:32px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;}
+  .player-row select.psymbol{font-size:17px;padding:3px 4px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;}
+  .player-row select.ptype{font-size:12px;padding:4px 3px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;max-width:120px;}
+  #setup .row{display:flex;gap:10px;margin:14px 0;align-items:center;flex-wrap:wrap;}
+  .net-reconnect-banner{
+    position:fixed;top:0;left:0;right:0;z-index:300;background:#7a1f1f;color:#fff;text-align:center;
+    padding:10px 14px;font-size:13.5px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3);
+  }
+  .net-reconnect-banner button{margin-left:10px;background:#fff;color:#7a1f1f;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:12.5px;}
+
+  /* ---------- JEU ---------- */
+  #game{display:none;width:100%;max-width:1200px;flex-direction:column;gap:12px;}
+  #game.active{display:flex;}
+  #topBar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    background:var(--panel-bg);border-radius:10px;padding:10px 16px;box-shadow:0 4px 16px rgba(0,0,0,.25);
+  }
+  #topBar .deck-info{display:flex;align-items:center;gap:14px;font-size:13px;font-weight:700;}
+  #turnTitle{font-weight:800;font-size:15px;}
+  #mats{display:flex;flex-wrap:wrap;gap:10px;}
+  .mb-mat{
+    flex:1 1 260px;min-width:240px;background:var(--panel-bg);border-radius:10px;padding:10px 12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.22);border:2px solid transparent;
+  }
+  .mb-mat.current{border-color:#ffb300;background:#fffdf3;}
+  .mb-mat-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
+  .mb-dot{width:12px;height:12px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  .mb-km{margin-left:auto;font-weight:800;font-size:13px;}
+  /* ---------- ROUTE / PISTE DE PROGRESSION ---------- */
+  #raceTrack{background:var(--panel-bg);border-radius:10px;padding:12px 16px 8px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  .race-labels{display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;color:#555;margin-bottom:8px;}
+  #raceRoad{
+    position:relative;border-radius:8px;padding:6px 0;
+    background:repeating-linear-gradient(180deg,#3a3f44,#3a3f44 10px,#34383c 10px,#34383c 20px);
+    border:2px solid #222;
+  }
+  .race-lane{position:relative;height:36px;}
+  .race-lane:not(:last-child){border-bottom:2px dashed rgba(241,196,15,.45);}
+  .race-lane.current{background:rgba(255,179,0,.14);}
+  .race-car{
+    position:absolute;top:50%;transform:translate(-50%,-50%);
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:14px;
+    border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.55);
+    transition:left .6s ease;z-index:2;
+  }
+  .race-car-label{
+    position:absolute;top:1px;transform:translateX(-50%);
+    font-size:9px;font-weight:700;color:#fff;white-space:nowrap;
+    text-shadow:1px 1px 3px #000;transition:left .6s ease;z-index:2;
+    background:rgba(0,0,0,.35);padding:0 4px;border-radius:4px;
+  }
+  .race-ticks{display:flex;justify-content:space-between;font-size:10px;color:#999;margin-top:5px;padding:0 2px;}
+  .mb-row{display:flex;gap:6px;margin-bottom:4px;flex-wrap:wrap;}
+  .mb-zone{flex:1;min-width:60px;text-align:center;}
+  .mb-zone-wide{flex:2;}
+  .mb-zone-label{font-size:9.5px;color:#777;font-weight:700;text-transform:uppercase;margin-bottom:2px;}
+  .mb-safeties{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;}
+  .mb-empty{font-size:11px;color:#999;}
+  .mb-status{font-size:12px;font-weight:700;margin-top:2px;}
+  .mb-handcount{font-size:12px;color:#555;margin-top:4px;}
+  .mb-mat.attackable{cursor:pointer;border-color:#c0392b;box-shadow:0 0 0 3px rgba(192,57,43,.35);}
+  .mb-mat.attackable:hover{background:#fff0ef;}
+
+  /* cartes */
+  .mb-card{
+    width:60px;height:82px;border-radius:8px;border:2px solid #222;background:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;font-size:10px;line-height:1.15;padding:3px;flex-shrink:0;user-select:none;
+  }
+  .mb-card.mb-small{width:40px;height:56px;font-size:8px;}
+  .mb-card .mb-value{font-size:20px;font-weight:800;}
+  .mb-card.mb-small .mb-value{font-size:14px;}
+  .mb-card .mb-unit{font-size:9px;color:#555;}
+  .mb-card .mb-icon{font-size:18px;}
+  .mb-card.mb-small .mb-icon{font-size:13px;}
+  .mb-card .mb-label{font-weight:700;margin-top:2px;}
+  .mb-card.mb-distance{background:#eaf3ff;border-color:#1a5cbf;color:#1a5cbf;}
+  .mb-card.mb-hazard{background:#fdecea;border-color:#c0392b;color:#7a1f1f;}
+  .mb-card.mb-remedy{background:#e9f9ee;border-color:#1e9e45;color:#166a30;}
+  .mb-card.mb-safety{background:#fff8e1;border-color:#c9971f;color:#7a5c00;}
+  .mb-card.mb-back{background:repeating-linear-gradient(45deg,#c0392b,#c0392b 6px,#a93226 6px,#a93226 12px);color:#fff;border-color:#7a1f1f;}
+  .mb-back-logo{font-size:9px;font-weight:800;text-shadow:1px 1px 0 #000;}
+
+  #centerPiles{display:flex;align-items:center;justify-content:center;gap:22px;background:var(--panel-bg);border-radius:10px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,.22);}
+  .pile-block{text-align:center;}
+  .pile-block .pile-label{font-size:11px;font-weight:700;color:#555;margin-bottom:4px;}
+
+  #handPanel{background:var(--panel-bg);border-radius:10px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  #handPanel .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+  #handArea{display:flex;gap:8px;flex-wrap:wrap;min-height:90px;}
+  .mb-card-wrap{cursor:pointer;transition:transform .1s;}
+  .mb-card-wrap:hover{transform:translateY(-4px);}
+  .mb-card-wrap.sel .mb-card{outline:3px solid #ffb300;transform:translateY(-6px);}
+  .mb-card-wrap.illegal{opacity:.45;}
+  #handActions{display:none;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;}
+  #targetHint{font-size:12.5px;font-weight:700;color:#c0392b;margin-top:6px;min-height:16px;}
+
+  #log{max-height:150px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column-reverse;background:var(--panel-bg);border-radius:10px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  #log div{padding:2px 2px;border-bottom:1px solid #eee;}
+
+  #rulesBox{border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:14px 0;font-size:12px;color:#444;line-height:1.5;}
+  #rulesBox summary{cursor:pointer;font-weight:700;color:#222;}
+
+  #victory-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;overflow:hidden;}
+  #victory-overlay.active{display:flex;}
+  #victory-box{position:relative;z-index:2;background:#fff;border-radius:18px;padding:34px 46px;text-align:center;max-width:min(92vw,480px);box-shadow:0 14px 60px rgba(0,0,0,.5);}
+  .confetti{position:absolute;top:-24px;z-index:1;border-radius:2px;animation:confettiFall linear infinite;}
+  @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);}}
+
+  #controls{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px;}
+  #controls.net-not-you{opacity:.55;pointer-events:none;}
+  .cross-link{position:fixed;top:10px;right:12px;font-size:12px;}
+  .cross-link a{color:#fff;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;text-decoration:none;font-weight:600;}
+
+  @media(max-width:820px){ .mb-mat{flex:1 1 100%;} }
+</style>
+</head>
+<body>
+
+<div class="cross-link"><a href="index.html">🏠 Menu des jeux</a></div>
+
+<!-- ===================== ACCUEIL / RÉSEAU ===================== -->
+<div id="netHome">
+  <h1>🚗 1000 Bornes</h1>
+  <div id="netChoice">
+    <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer sur cet ordinateur</button>
+    <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
+    <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
+    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code à l'autre.</p>
+  </div>
+  <div id="netHostPanel" style="display:none;text-align:center;">
+    <p style="margin-bottom:0;">Code de la partie :</p>
+    <div id="netCode">·····</div>
+    <p class="net-status" id="netHostStatus"></p>
+  </div>
+  <div id="netJoinPanel" style="display:none;">
+    <div class="player-row">
+      <input type="text" id="netNameInput" placeholder="Ton prénom" maxlength="20">
+    </div>
+    <div class="player-row">
+      <input type="text" id="netCodeInput" placeholder="Code de la partie (ABCDE)" maxlength="8" style="text-transform:uppercase;">
+    </div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn" id="netConnectBtn">Rejoindre</button>
+    </div>
+    <p class="net-status" id="netJoinStatus"></p>
+    <div id="netJoinReadyPanel" style="display:none;">
+      <p class="net-status" style="font-weight:600;color:var(--accent);">Personnalise ta voiture :</p>
+      <div class="player-row">
+        <input type="color" id="netGuestColor" value="#2980b9" title="Couleur">
+        <select id="netGuestSymbol" title="Symbole"></select>
+        <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
+      </div>
+      <p class="net-status">✅ Connecté(e) ! En attente que l'autre joueur lance la partie…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" style="display:none;">
+  <h1>🚗 1000 Bornes</h1>
+  <div id="netSetupInfo"></div>
+
+  <div class="row">
+    <label for="numPlayers"><b>Nombre de joueurs :</b></label>
+    <select id="numPlayers">
+      <option value="2" selected>2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+  <div id="playerInputs"></div>
+
+  <div class="row">
+    <label><input type="checkbox" id="randomOrder" checked> <b>🎲 Ordre de jeu aléatoire</b></label>
+  </div>
+
+  <div class="row">
+    <label for="targetSel"><b>Distance à parcourir :</b></label>
+    <select id="targetSel">
+      <option value="700">700 km (partie courte)</option>
+      <option value="1000" selected>1000 km (partie longue)</option>
+    </select>
+  </div>
+
+  <details id="rulesBox">
+    <summary>📖 Règles rapides</summary>
+    <p>Le premier arrivé à la distance choisie gagne. Chaque tour : piochez, puis jouez une carte (ou défaussez-en une).</p>
+    <p>🚦 Vous devez jouer un <b>Feu Vert</b> avant de pouvoir avancer (sauf avec la botte Prioritaire). Les cartes <b>Distance</b> avancent votre voiture. Les cartes <b>Panne</b> (Accident, Panne d'essence, Crevaison, Feu Rouge, Limite de Vitesse) s'attaquent à un adversaire pour le bloquer ou le ralentir. Les cartes <b>Réparation</b> vous remettent en route. Les 4 <b>Bottes</b> (cartes de sécurité) vous protègent définitivement contre une panne précise et vous font rejouer aussitôt.</p>
+    <p>Maximum deux cartes 200 km jouées par joueur et par partie.</p>
+  </details>
+
+  <div style="text-align:center;">
+    <button class="btn" id="startBtn">Démarrer la partie</button>
+  </div>
+</div>
+
+<!-- ===================== JEU ===================== -->
+<div id="game">
+  <div id="topBar">
+    <div id="turnTitle"></div>
+    <div class="deck-info">
+      <span>🂠 Pioche : <b id="deckCount">0</b></span>
+      <span>🗑 Défausse : <span id="discardTop">—</span></span>
+    </div>
+  </div>
+
+  <div id="raceTrack">
+    <div class="race-labels">
+      <span>🚦 Départ</span>
+      <span>🏁 Arrivée — <span id="raceTargetLabel"></span> km</span>
+    </div>
+    <div id="raceRoad"></div>
+    <div id="raceTicks" class="race-ticks"></div>
+  </div>
+
+  <div id="mats"></div>
+
+  <div id="handPanel">
+    <div class="panel-head">
+      <b>🖐 Votre main</b>
+      <span id="handSubtitle" class="hint"></span>
+    </div>
+    <div id="handArea"></div>
+    <div id="handActions">
+      <button class="btn" id="playSelectedBtn">▶ Jouer</button>
+      <button class="btn secondary" id="discardSelectedBtn">🗑 Défausser</button>
+      <button class="btn secondary" id="cancelSelectBtn">Annuler</button>
+    </div>
+    <div id="targetHint"></div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<!-- ===================== VICTOIRE ===================== -->
+<div id="victory-overlay">
+  <div id="victory-box"></div>
+</div>
+
+<script>
+/* ============================================================
+   CARTES — deck classique 1000 Bornes (106 cartes)
+   ============================================================ */
+const CARD_DEFS = {
+  d25:{type:"distance", value:25, label:"25 km", icon:"🚗", count:10},
+  d50:{type:"distance", value:50, label:"50 km", icon:"🚗", count:10},
+  d75:{type:"distance", value:75, label:"75 km", icon:"🚗", count:10},
+  d100:{type:"distance", value:100, label:"100 km", icon:"🚗", count:12},
+  d200:{type:"distance", value:200, label:"200 km", icon:"🚗", count:4},
+
+  h_accident:{type:"hazard", hazard:"accident", label:"Accident", icon:"💥", count:3},
+  h_gas:{type:"hazard", hazard:"gas", label:"Panne d'essence", icon:"⛽", count:3},
+  h_flat:{type:"hazard", hazard:"flat", label:"Crevaison", icon:"🛞", count:3},
+  h_stop:{type:"hazard", hazard:"stop", label:"Feu Rouge", icon:"🛑", count:5},
+  h_limit:{type:"hazard", hazard:"limit", label:"Limite 50", icon:"🐌", count:4},
+
+  r_repair:{type:"remedy", fixes:"accident", label:"Réparations", icon:"🔧", count:6},
+  r_gasoline:{type:"remedy", fixes:"gas", label:"Essence", icon:"⛽", count:6},
+  r_spare:{type:"remedy", fixes:"flat", label:"Roue de Secours", icon:"🛞", count:6},
+  r_green:{type:"remedy", fixes:"stop", label:"Feu Vert", icon:"🟢", count:14},
+  r_endlimit:{type:"remedy", fixes:"limit", label:"Fin de Limite", icon:"🏁", count:6},
+
+  s_ace:{type:"safety", guards:["accident"], label:"As du Volant", icon:"🏎️", count:1},
+  s_unflat:{type:"safety", guards:["flat"], label:"Increvable", icon:"🛡️", count:1},
+  s_tank:{type:"safety", guards:["gas"], label:"Citerne Blindée", icon:"🛢️", count:1},
+  s_priority:{type:"safety", guards:["stop","limit"], label:"Prioritaire", icon:"🚦", count:1},
+};
+
+function buildDeck(){
+  const arr = [];
+  Object.keys(CARD_DEFS).forEach(id=>{
+    for(let i=0;i<CARD_DEFS[id].count;i++) arr.push(id);
+  });
+  return shuffle(arr);
+}
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+function safetyCardFor(hazard){
+  return Object.keys(CARD_DEFS).find(k=>CARD_DEFS[k].type==="safety" && CARD_DEFS[k].guards.includes(hazard));
+}
+
+const AI_LEVELS = {
+  easy:{label:"IA facile", icon:"🙂", smart:0.30},
+  medium:{label:"IA moyenne", icon:"🤖", smart:0.65},
+  hard:{label:"IA difficile", icon:"😈", smart:0.95},
+};
+const TOKEN_COLORS = ["#e74c3c","#2980b9","#27ae60","#f39c12"];
+const CAR_SYMBOLS = ["🚗","🚙","🏎️","🚓","🚕","🚐","🚌","🚚"];
+
+/* ============================================================
+   ÉTAT DU JEU
+   ============================================================ */
+let deck = [];
+let discard = [];
+let players = [];
+let currentPlayerIndex = 0;
+let targetKm = 1000;
+let selectedCardIdx = null;
+let pendingAttackCard = null; // index de la carte-attaque sélectionnée en attente d'une cible
+let gameOver = false;
+let logHistory = [];
+
+const NET = {
+  mode:null, mySide:null, peer:null, conn:null,
+  guestName:"Joueur 2", started:false, ended:false,
+  syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
+};
+
+function log(msg){
+  logHistory.push(msg);
+  if(logHistory.length>300) logHistory.splice(0, logHistory.length-300);
+  const logEl = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = msg;
+  logEl.appendChild(div);
+  logEl.scrollTop = 0;
+  netScheduleSync();
+}
+
+/* ============================================================
+   SETUP UI
+   ============================================================ */
+const numPlayersSel = document.getElementById("numPlayers");
+const playerInputsDiv = document.getElementById("playerInputs");
+
+function symbolOptionsHtml(selectedIdx){
+  return CAR_SYMBOLS.map((t,k)=>`<option value="${t}" ${k===selectedIdx%CAR_SYMBOLS.length?"selected":""}>${t}</option>`).join("");
+}
+
+function renderPlayerInputs(){
+  const n = parseInt(numPlayersSel.value);
+  playerInputsDiv.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const row = document.createElement("div");
+    row.className = "player-row";
+    row.innerHTML = `
+      <input type="color" class="pcolor" id="pcolor${i}" value="${TOKEN_COLORS[i]}" title="Couleur">
+      <select class="psymbol" id="psymbol${i}" title="Symbole">${symbolOptionsHtml(i)}</select>
+      <input type="text" id="pname${i}" placeholder="Nom du joueur ${i+1}" value="Joueur ${i+1}">
+      <select class="ptype" id="ptype${i}" title="Humain ou IA">
+        <option value="">👤 Humain</option>
+        <option value="easy">🙂 IA facile</option>
+        <option value="medium">🤖 IA moyenne</option>
+        <option value="hard">😈 IA difficile</option>
+      </select>
+    `;
+    playerInputsDiv.appendChild(row);
+  }
+  if(NET.mode==="host"){
+    for(let i=0;i<n;i++){
+      const typeSel = document.getElementById("ptype"+i);
+      const nameInput = document.getElementById("pname"+i);
+      if(i===0){
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#555;flex-shrink:0;font-weight:600;";
+        tag.textContent = "👤 vous";
+        typeSel.parentNode.appendChild(tag);
+      } else if(i===1){
+        nameInput.value = NET.guestName;
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#0d47a1;flex-shrink:0;font-weight:600;";
+        tag.textContent = "🌐 en ligne";
+        typeSel.parentNode.appendChild(tag);
+      } else {
+        const humanOpt = typeSel.querySelector('option[value=""]');
+        if(humanOpt) humanOpt.remove();
+        typeSel.value = "medium";
+      }
+    }
+    ["pname1","pcolor1","psymbol1"].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.addEventListener("input", netBroadcastSetup);
+    });
+    netBroadcastSetup();
+  }
+}
+numPlayersSel.addEventListener("change", renderPlayerInputs);
+renderPlayerInputs();
+document.getElementById("targetSel").addEventListener("change", ()=>{ if(NET.mode==="host") netBroadcastSetup(); });
+
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  targetKm = parseInt(document.getElementById("targetSel").value);
+  const n = parseInt(numPlayersSel.value);
+  players = [];
+  for(let i=0;i<n;i++){
+    const name = (document.getElementById("pname"+i).value || `Joueur ${i+1}`).trim();
+    const color = document.getElementById("pcolor"+i).value || TOKEN_COLORS[i];
+    const symbol = document.getElementById("psymbol"+i).value || CAR_SYMBOLS[i%CAR_SYMBOLS.length];
+    const ai = document.getElementById("ptype"+i).value || null;
+    players.push(createPlayer(name,color,symbol,ai,null));
+  }
+  if(NET.mode==="host"){ players[0].side="host"; players[0].ai=null; players[1].side="guest"; players[1].ai=null; }
+  if(document.getElementById("randomOrder").checked){
+    for(let i=players.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [players[i], players[j]] = [players[j], players[i]];
+    }
+  }
+  deck = buildDeck();
+  discard = [];
+  players.forEach(p=>{ for(let k=0;k<6;k++) p.hand.push(deck.pop()); });
+  currentPlayerIndex = 0;
+  gameOver = false;
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("game").classList.add("active");
+  const activeRules = [];
+  log(`Partie lancée — objectif ${targetKm} km.`);
+  log(`${document.getElementById("randomOrder").checked?"🎲 Ordre tiré au sort : ":"Ordre de jeu : "}${players.map(p=>p.symbol+" "+p.name).join(" → ")}.`);
+  if(NET.mode==="host"){ NET.started = true; }
+  startTurn();
+  if(NET.mode==="host"){ netSendState(); }
+});
+
+function createPlayer(name,color,symbol,ai,side){
+  return {
+    name, color, symbol, ai, side,
+    hand:[], km:0, status:"needsGo", speedLimited:false,
+    battleCardId:null, speedCardId:null,
+    safeties:new Set(), twoHundredPlayed:0,
+  };
+}
+
+/* ============================================================
+   MOTEUR DE JEU
+   ============================================================ */
+function canPlayCard(p, cardId, targetIdx){
+  const def = CARD_DEFS[cardId];
+  if(!def) return false;
+  if(def.type==="distance"){
+    if(p.status!=="go") return false;
+    if(p.speedLimited && def.value>50) return false;
+    if(p.km + def.value > targetKm) return false;
+    if(def.value===200 && p.twoHundredPlayed>=2) return false;
+    return true;
+  }
+  if(def.type==="remedy"){
+    if(def.fixes==="limit") return p.speedLimited===true;
+    if(def.fixes==="stop") return p.status==="stop" || p.status==="needsGo";
+    return p.status===def.fixes;
+  }
+  if(def.type==="safety"){
+    return !p.safeties.has(cardId);
+  }
+  if(def.type==="hazard"){
+    if(targetIdx===undefined || targetIdx===null || targetIdx===players.indexOf(p)) return false;
+    const t = players[targetIdx];
+    if(!t) return false;
+    if(def.hazard==="limit"){
+      if(t.status!=="go" || t.speedLimited) return false;
+      if(t.safeties.has("s_priority")) return false;
+      return true;
+    }
+    if(def.hazard==="stop"){
+      if(t.status!=="go") return false;
+      if(t.safeties.has("s_priority")) return false;
+      return true;
+    }
+    if(t.status!=="go") return false;
+    const guardCard = safetyCardFor(def.hazard);
+    if(guardCard && t.safeties.has(guardCard)) return false;
+    return true;
+  }
+  return false;
+}
+
+function hasAnyLegalTarget(p, cardId){
+  const pIdx = players.indexOf(p);
+  return players.some((t,i)=> i!==pIdx && canPlayCard(p, cardId, i));
+}
+
+/* renvoie {ok:true, extraTurn} ou {ok:false} */
+function playCard(pIdx, handIdx, targetIdx){
+  const p = players[pIdx];
+  const cardId = p.hand[handIdx];
+  const def = cardId && CARD_DEFS[cardId];
+  if(!def || !canPlayCard(p, cardId, targetIdx)) return {ok:false};
+  p.hand.splice(handIdx,1);
+  let extraTurn = false;
+
+  if(def.type==="distance"){
+    p.km += def.value;
+    if(def.value===200) p.twoHundredPlayed++;
+    discard.push(cardId);
+    log(`${p.symbol} ${p.name} avance de ${def.value} km (total ${p.km} km).`);
+  } else if(def.type==="safety"){
+    p.safeties.add(cardId);
+    if(def.guards.includes(p.status)){
+      if(p.battleCardId) discard.push(p.battleCardId);
+      p.status = "go";
+      p.battleCardId = cardId;
+    } else if(p.status==="needsGo" && cardId==="s_priority"){
+      p.status = "go";
+      p.battleCardId = cardId;
+    }
+    if(def.guards.includes("limit") && p.speedLimited){
+      if(p.speedCardId) discard.push(p.speedCardId);
+      p.speedLimited = false;
+      p.speedCardId = null;
+    }
+    log(`${p.symbol} ${p.name} joue une botte : ${def.label} ! Il/elle rejoue.`);
+    extraTurn = true;
+  } else if(def.type==="remedy"){
+    if(def.fixes==="limit"){
+      if(p.speedCardId) discard.push(p.speedCardId);
+      p.speedLimited = false;
+      p.speedCardId = null;
+      discard.push(cardId);
+    } else {
+      if(p.battleCardId) discard.push(p.battleCardId);
+      p.status = "go";
+      p.battleCardId = cardId;
+    }
+    log(`${p.symbol} ${p.name} joue ${def.label}.`);
+  } else if(def.type==="hazard"){
+    const t = players[targetIdx];
+    if(def.hazard==="limit"){
+      t.speedLimited = true;
+      t.speedCardId = cardId;
+    } else {
+      if(t.battleCardId) discard.push(t.battleCardId);
+      t.status = def.hazard;
+      t.battleCardId = cardId;
+    }
+    log(`${p.symbol} ${p.name} joue ${def.label} contre ${t.symbol} ${t.name} !`);
+  }
+
+  if(p.km>=targetKm){
+    gameOver = true;
+    log(`🏁 ${p.symbol} ${p.name} atteint ${targetKm} km et remporte la partie !`);
+  }
+  return {ok:true, extraTurn};
+}
+
+function discardCard(pIdx, handIdx){
+  const p = players[pIdx];
+  const cardId = p.hand.splice(handIdx,1)[0];
+  if(cardId){
+    discard.push(cardId);
+    log(`${p.symbol} ${p.name} défausse ${CARD_DEFS[cardId].label}.`);
+  }
+}
+
+function drawForCurrentPlayer(){
+  const p = players[currentPlayerIndex];
+  if(deck.length===0 && discard.length>1){
+    const top = discard.pop();
+    deck = shuffle(discard);
+    discard = [top];
+    log("🂠 La pioche est reformée à partir de la défausse.");
+  }
+  if(deck.length) p.hand.push(deck.pop());
+}
+
+function startTurn(){
+  if(gameOver){ renderAll(); showVictory(); return; }
+  drawForCurrentPlayer();
+  selectedCardIdx = null;
+  pendingAttackCard = null;
+  renderAll();
+  const p = players[currentPlayerIndex];
+  if(p.ai) aiTakeTurn(p);
+}
+
+function afterAction(extraTurn){
+  if(gameOver){ renderAll(); showVictory(); netScheduleSync(); return; }
+  if(extraTurn){
+    startTurn();
+  } else {
+    currentPlayerIndex = (currentPlayerIndex+1) % players.length;
+    startTurn();
+  }
+}
+
+/* ============================================================
+   IA
+   ============================================================ */
+function aiDelay(fn){ setTimeout(fn, 650+Math.random()*500); }
+
+function aiChooseAction(p){
+  const pIdx = players.indexOf(p);
+  const lvl = AI_LEVELS[p.ai];
+  const smart = Math.random() < lvl.smart;
+
+  if(["accident","gas","flat"].includes(p.status)){
+    const remedyId = Object.keys(CARD_DEFS).find(k=>CARD_DEFS[k].type==="remedy" && CARD_DEFS[k].fixes===p.status);
+    const idx = p.hand.indexOf(remedyId);
+    if(idx>=0 && smart) return {handIdx:idx};
+  }
+  if(p.status==="stop" || p.status==="needsGo"){
+    const pidx = p.hand.indexOf("s_priority");
+    if(pidx>=0) return {handIdx:pidx};
+    const idx = p.hand.indexOf("r_green");
+    if(idx>=0 && smart) return {handIdx:idx};
+  }
+  const safetyIdx = p.hand.findIndex(c=>CARD_DEFS[c].type==="safety" && !p.safeties.has(c));
+  if(safetyIdx>=0 && (smart || p.ai==="hard")) return {handIdx:safetyIdx};
+
+  if(p.speedLimited){
+    const idx = p.hand.indexOf("r_endlimit");
+    if(idx>=0 && smart) return {handIdx:idx};
+  }
+
+  if(p.status==="go"){
+    const opts = p.hand.map((c,i)=>({c,i})).filter(o=>CARD_DEFS[o.c].type==="distance" && canPlayCard(p,o.c));
+    if(opts.length){
+      opts.sort((a,b)=>CARD_DEFS[b.c].value-CARD_DEFS[a.c].value);
+      const pick = smart ? opts[0] : opts[Math.floor(Math.random()*opts.length)];
+      return {handIdx:pick.i};
+    }
+  }
+
+  const opponents = players.map((o,i)=>i).filter(i=>i!==pIdx);
+  const attacks = [];
+  p.hand.forEach((c,i)=>{
+    if(CARD_DEFS[c].type==="hazard"){
+      opponents.forEach(ti=>{ if(canPlayCard(p,c,ti)) attacks.push({i,ti}); });
+    }
+  });
+  if(attacks.length){
+    let pick;
+    if(smart){
+      attacks.sort((a,b)=> players[b.ti].km - players[a.ti].km);
+      pick = attacks[0];
+    } else {
+      pick = attacks[Math.floor(Math.random()*attacks.length)];
+    }
+    return {handIdx:pick.i, targetIdx:pick.ti};
+  }
+
+  let discardIdx = p.hand.findIndex(c=>CARD_DEFS[c].type==="hazard");
+  if(discardIdx<0) discardIdx = 0;
+  return {discardIdx};
+}
+
+function aiTakeTurn(p){
+  aiDelay(()=>{
+    if(gameOver || players[currentPlayerIndex]!==p) return;
+    const choice = aiChooseAction(p);
+    const pIdx = players.indexOf(p);
+    if(choice.discardIdx!==undefined){
+      discardCard(pIdx, choice.discardIdx);
+      afterAction(false);
+    } else {
+      const res = playCard(pIdx, choice.handIdx, choice.targetIdx);
+      if(res.ok) afterAction(res.extraTurn);
+      else { discardCard(pIdx, 0); afterAction(false); }
+    }
+  });
+}
+
+/* ============================================================
+   RENDU
+   ============================================================ */
+function cardHtml(cardId, opts){
+  opts = opts || {};
+  const def = CARD_DEFS[cardId];
+  if(!def) return "";
+  const cls = "mb-card mb-"+def.type+(opts.small?" mb-small":"");
+  let body;
+  if(def.type==="distance"){
+    body = `<div class="mb-value">${def.value}</div><div class="mb-unit">km</div>`;
+  } else {
+    body = `<div class="mb-icon">${def.icon}</div><div class="mb-label">${def.label}</div>`;
+  }
+  return `<div class="${cls}">${body}</div>`;
+}
+function cardBackHtml(small){
+  return `<div class="mb-card mb-back${small?" mb-small":""}"><div class="mb-back-logo">1000<br>BORNES</div></div>`;
+}
+
+function statusText(p){
+  const parts = [];
+  if(p.status==="needsGo") parts.push("🚦 En attente du feu vert");
+  else if(p.status==="go") parts.push("✅ En route");
+  else if(p.status==="stop") parts.push("🛑 Arrêté (Feu Rouge)");
+  else if(p.status==="accident") parts.push("💥 Accidenté");
+  else if(p.status==="gas") parts.push("⛽ Panne d'essence");
+  else if(p.status==="flat") parts.push("🛞 Crevaison");
+  if(p.speedLimited) parts.push("🐌 Limité à 50");
+  return parts.join(" · ");
+}
+
+/* index du joueur dont on doit afficher la main sur CET écran */
+function myVisibleHandIndex(){
+  if(NET.mode==="host") return 0;
+  if(NET.mode==="guest") return 1;
+  const p = players[currentPlayerIndex];
+  return (p && !p.ai) ? currentPlayerIndex : null;
+}
+function netCanAct(){
+  if(!NET.mode) return true;
+  const p = players[currentPlayerIndex];
+  return !!(p && p.side===NET.mySide);
+}
+
+function renderMat(p, idx){
+  const safetiesHtml = [...p.safeties].map(id=>cardHtml(id,{small:true})).join("") || '<span class="mb-empty">—</span>';
+  const battleHtml = p.battleCardId ? cardHtml(p.battleCardId,{small:true}) : '<span class="mb-empty">—</span>';
+  const speedHtml = p.speedCardId ? cardHtml(p.speedCardId,{small:true}) : '<span class="mb-empty">Libre</span>';
+  return `
+  <div class="mb-mat${idx===currentPlayerIndex?" current":""}" data-player="${idx}">
+    <div class="mb-mat-head">
+      <span class="mb-dot" style="background:${p.color}"></span>
+      <b>${p.symbol} ${p.name}</b>${p.ai?` <small title="${AI_LEVELS[p.ai].label}">${AI_LEVELS[p.ai].icon}</small>`:""}
+      <span class="mb-km">${p.km} / ${targetKm} km</span>
+    </div>
+    <div class="mb-row">
+      <div class="mb-zone"><div class="mb-zone-label">Route</div>${battleHtml}</div>
+      <div class="mb-zone"><div class="mb-zone-label">Vitesse</div>${speedHtml}</div>
+      <div class="mb-zone mb-zone-wide"><div class="mb-zone-label">Bottes</div><div class="mb-safeties">${safetiesHtml}</div></div>
+    </div>
+    <div class="mb-status">${statusText(p)}</div>
+    <div class="mb-handcount">🂠 × ${p.hand.length}</div>
+  </div>`;
+}
+
+function renderRaceTrack(){
+  document.getElementById("raceTargetLabel").textContent = targetKm;
+  const road = document.getElementById("raceRoad");
+  road.innerHTML = players.map((p,i)=>{
+    const frac = Math.max(0, Math.min(1, p.km/targetKm));
+    const pct = 3 + frac*94; // marge pour ne jamais coller les bords
+    return `
+    <div class="race-lane${i===currentPlayerIndex?" current":""}">
+      <div class="race-car-label" style="left:${pct}%;">${p.symbol} ${p.name} · ${p.km}km</div>
+      <div class="race-car" style="left:${pct}%;background:${p.color};" title="${p.name} — ${p.km} km">${p.symbol}</div>
+    </div>`;
+  }).join("");
+  const ticks = document.getElementById("raceTicks");
+  const steps = 4;
+  ticks.innerHTML = Array.from({length:steps+1}, (_,i)=>`<span>${Math.round(targetKm*i/steps)}</span>`).join("");
+}
+
+function renderMats(){
+  document.getElementById("mats").innerHTML = players.map((p,i)=>renderMat(p,i)).join("");
+  if(pendingAttackCard!==null){
+    const myIdx = myVisibleHandIndex();
+    const p = players[myIdx];
+    const cardId = p.hand[pendingAttackCard];
+    players.forEach((t,i)=>{
+      if(i===myIdx) return;
+      const matEl = document.querySelector(`.mb-mat[data-player="${i}"]`);
+      if(matEl && canPlayCard(p, cardId, i)){
+        matEl.classList.add("attackable");
+        matEl.onclick = ()=> tryPlay(pendingAttackCard, i);
+      }
+    });
+  }
+}
+
+function renderTopBar(){
+  document.getElementById("deckCount").textContent = deck.length;
+  const top = discard[discard.length-1];
+  document.getElementById("discardTop").innerHTML = top ? cardHtml(top,{small:true}) : "—";
+  const cur = players[currentPlayerIndex];
+  if(!cur) return;
+  document.getElementById("turnTitle").textContent = gameOver ? "Partie terminée" : `Tour de ${cur.symbol} ${cur.name}${cur.ai?" "+AI_LEVELS[cur.ai].icon:""}`;
+}
+
+/* détermine si la carte sélectionnée est une attaque en attente de cible —
+   doit être calculé AVANT renderMats() pour que la surbrillance soit à jour */
+function updatePendingAttack(){
+  pendingAttackCard = null;
+  const myIdx = myVisibleHandIndex();
+  if(myIdx===null || selectedCardIdx===null) return;
+  const p = players[myIdx];
+  const cardId = p.hand[selectedCardIdx];
+  if(cardId && CARD_DEFS[cardId] && CARD_DEFS[cardId].type==="hazard"){
+    pendingAttackCard = selectedCardIdx;
+  }
+}
+
+function renderHand(){
+  const area = document.getElementById("handArea");
+  const actions = document.getElementById("handActions");
+  const sub = document.getElementById("handSubtitle");
+  const hint = document.getElementById("targetHint");
+  const myIdx = myVisibleHandIndex();
+  hint.textContent = "";
+  if(myIdx===null){
+    area.innerHTML = `<p class="hint">🤖 L'IA réfléchit…</p>`;
+    actions.style.display = "none";
+    sub.textContent = "";
+    return;
+  }
+  const p = players[myIdx];
+  const isMyTurn = myIdx===currentPlayerIndex && !gameOver;
+  const canAct = netCanAct() && isMyTurn;
+  sub.textContent = canAct ? "Cliquez une carte, puis Jouer ou Défausser." : (gameOver ? "" : "En attente de votre tour…");
+  area.innerHTML = p.hand.map((c,i)=>{
+    const def = CARD_DEFS[c];
+    const legal = def.type==="hazard" ? hasAnyLegalTarget(p,c) : canPlayCard(p,c);
+    return `<div class="mb-card-wrap${i===selectedCardIdx?" sel":""}${legal?"":" illegal"}" data-idx="${i}">${cardHtml(c)}</div>`;
+  }).join("");
+  if(!canAct){
+    actions.style.display = "none";
+    return;
+  }
+  Array.from(area.children).forEach(el=>{
+    el.onclick = ()=> selectHandCard(parseInt(el.dataset.idx));
+  });
+  if(selectedCardIdx!==null){
+    actions.style.display = "flex";
+    const cardId = p.hand[selectedCardIdx];
+    const def = CARD_DEFS[cardId];
+    const isHazard = def.type==="hazard";
+    document.getElementById("playSelectedBtn").style.display = isHazard ? "none" : "inline-block";
+    if(isHazard){
+      hint.textContent = hasAnyLegalTarget(p,cardId) ? "🎯 Cliquez l'adversaire à attaquer." : "Aucune cible valide pour cette carte.";
+    }
+  } else {
+    actions.style.display = "none";
+  }
+}
+
+function renderAll(){
+  updatePendingAttack();
+  renderTopBar();
+  renderRaceTrack();
+  renderMats();
+  renderHand();
+  netScheduleSync();
+}
+
+function selectHandCard(idx){
+  selectedCardIdx = (selectedCardIdx===idx) ? null : idx;
+  renderAll();
+}
+
+function tryPlay(handIdx, targetIdx){
+  const myIdx = myVisibleHandIndex();
+  if(myIdx!==currentPlayerIndex || gameOver) return;
+  if(NET.mode==="guest"){
+    netSend({t:"action", kind:"play", handIdx, targetIdx});
+    selectedCardIdx = null; pendingAttackCard = null;
+    return;
+  }
+  const res = playCard(myIdx, handIdx, targetIdx);
+  if(res.ok){
+    selectedCardIdx = null; pendingAttackCard = null;
+    afterAction(res.extraTurn);
+  } else {
+    renderAll();
+  }
+}
+
+document.getElementById("playSelectedBtn").addEventListener("click", ()=>{
+  if(selectedCardIdx===null) return;
+  tryPlay(selectedCardIdx, undefined);
+});
+document.getElementById("discardSelectedBtn").addEventListener("click", ()=>{
+  if(selectedCardIdx===null) return;
+  const myIdx = myVisibleHandIndex();
+  if(myIdx!==currentPlayerIndex || gameOver) return;
+  if(NET.mode==="guest"){
+    netSend({t:"action", kind:"discard", handIdx:selectedCardIdx});
+    selectedCardIdx = null;
+    return;
+  }
+  discardCard(myIdx, selectedCardIdx);
+  selectedCardIdx = null;
+  afterAction(false);
+});
+document.getElementById("cancelSelectBtn").addEventListener("click", ()=>{
+  selectedCardIdx = null; pendingAttackCard = null; renderAll();
+});
+
+/* ============================================================
+   VICTOIRE
+   ============================================================ */
+function showVictory(){
+  const ov = document.getElementById("victory-overlay");
+  if(ov.classList.contains("active")) return;
+  const winner = players.find(p=>p.km>=targetKm);
+  const box = document.getElementById("victory-box");
+  if(winner){
+    box.innerHTML = `
+      <div style="font-size:64px;">🏆</div>
+      <h1>${winner.symbol} ${winner.name} remporte la course !</h1>
+      <p>${winner.km} km parcourus · ${winner.safeties.size} botte(s) jouée(s)</p>
+      <button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>
+    `;
+  } else {
+    box.innerHTML = `<div style="font-size:64px;">🤝</div><h1>Partie terminée</h1><button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>`;
+  }
+  const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12"];
+  if(winner) palette.push(winner.color, winner.color);
+  for(let k=0;k<90;k++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random()*100)+"vw";
+    c.style.background = palette[Math.floor(Math.random()*palette.length)];
+    c.style.width = (6+Math.random()*8)+"px";
+    c.style.height = (10+Math.random()*12)+"px";
+    c.style.animationDuration = (2.6+Math.random()*3)+"s";
+    c.style.animationDelay = (Math.random()*3)+"s";
+    ov.appendChild(c);
+  }
+  ov.classList.add("active");
+  netScheduleSync();
+}
+
+/* ============================================================
+   MODE EN LIGNE — PeerJS (même architecture que Monopoly)
+   ============================================================ */
+function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
+function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } }
+
+document.getElementById("netLocalBtn").onclick = ()=>{
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+};
+document.getElementById("netHostBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netHostPanel").style.display = "block";
+  netHost(0);
+};
+document.getElementById("netJoinBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netJoinPanel").style.display = "block";
+};
+document.getElementById("netConnectBtn").onclick = ()=>{
+  const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
+  const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
+  if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  document.getElementById("netConnectBtn").disabled = true;
+  netJoin(code, name);
+};
+
+/* ---------- hôte ---------- */
+function netHost(attempt){
+  NET.mode = "host"; NET.mySide = "host";
+  const code = netGenCode();
+  netStatus("netHostStatus","Création de la partie…");
+  const peer = new Peer("mb-"+code);
+  NET.peer = peer;
+  peer.on("open", ()=>{
+    document.getElementById("netCode").textContent = code;
+    netStatus("netHostStatus","En attente de l'autre joueur… Envoie-lui ce code !");
+  });
+  peer.on("error", (e)=>{
+    if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
+    else netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+  });
+  peer.on("connection", (c)=>{
+    if(NET.conn && NET.conn.open){ try{ c.close(); }catch(err){} return; }
+    NET.conn = c;
+    c.on("data", netHostOnData);
+    c.on("close", netOnConnLost);
+    c.on("error", netOnConnLost);
+  });
+}
+
+function netShowSetupAsHost(){
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  const info = document.getElementById("netSetupInfo");
+  info.style.display = "block";
+  info.style.background = ""; info.style.color = "";
+  info.textContent = `🌐 Partie en ligne — ${NET.guestName} est connecté(e) ! Vous êtes le joueur 1, ${NET.guestName} le joueur 2.`;
+  numPlayersSel.value = "2";
+  renderPlayerInputs();
+}
+setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 400);
+
+function netHostOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="hello"){
+    NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+    if(NET.started){
+      netHideBanner();
+      log(`🔌 ${NET.guestName} s'est reconnecté(e) à la partie.`);
+      netSendState();
+    } else {
+      netShowSetupAsHost();
+    }
+  } else if(msg.t==="setupGuest"){
+    netApplyGuestSetupChange(msg);
+  } else if(msg.t==="action"){
+    netHandleGuestAction(msg);
+  }
+}
+
+function netBroadcastSetup(){
+  if(NET.mode!=="host" || NET.started || !NET.conn || !NET.conn.open) return;
+  const colorEl = document.getElementById("pcolor1");
+  const symbolEl = document.getElementById("psymbol1");
+  const nameEl = document.getElementById("pname1");
+  if(!colorEl || !symbolEl || !nameEl) return;
+  netSend({
+    t:"setup", target:parseInt(document.getElementById("targetSel").value),
+    guestColor:colorEl.value, guestSymbol:symbolEl.value, guestName:nameEl.value
+  });
+}
+function netApplyGuestSetupChange(msg){
+  if(NET.started) return;
+  const nameEl = document.getElementById("pname1");
+  const colorEl = document.getElementById("pcolor1");
+  const symbolEl = document.getElementById("psymbol1");
+  if(!nameEl || !colorEl || !symbolEl) return;
+  NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+  nameEl.value = NET.guestName;
+  if(msg.color) colorEl.value = msg.color;
+  if(msg.symbol && Array.from(symbolEl.options).some(o=>o.value===msg.symbol)) symbolEl.value = msg.symbol;
+  netBroadcastSetup();
+}
+
+function netHandleGuestAction(msg){
+  if(!NET.started || gameOver) return;
+  const p = players[currentPlayerIndex];
+  if(!p || p.side!=="guest") return;
+  const pIdx = currentPlayerIndex;
+  if(msg.kind==="play"){
+    const res = playCard(pIdx, msg.handIdx, msg.targetIdx);
+    if(res.ok) afterAction(res.extraTurn); else renderAll();
+  } else if(msg.kind==="discard"){
+    discardCard(pIdx, msg.handIdx);
+    afterAction(false);
+  }
+}
+
+/* ---------- synchronisation hôte -> invité ---------- */
+function netScheduleSync(){
+  if(NET.mode!=="host" || !NET.conn) return;
+  if(NET.syncTimer) return;
+  NET.syncTimer = setTimeout(()=>{ NET.syncTimer=null; netSendState(); }, 40);
+}
+function netSendState(){
+  if(NET.mode!=="host" || !NET.started || NET.ended || !NET.conn || !NET.conn.open) return;
+  const victOn = document.getElementById("victory-overlay").classList.contains("active");
+  const snap = {
+    t:"state", targetKm, deckCount:deck.length, discardTop: discard[discard.length-1]||null,
+    cur: currentPlayerIndex, gameOver,
+    players: players.map((p,i)=>({
+      name:p.name, color:p.color, symbol:p.symbol, ai:p.ai, side:p.side||null,
+      km:p.km, status:p.status, speedLimited:p.speedLimited,
+      battleCardId:p.battleCardId, speedCardId:p.speedCardId,
+      safeties:[...p.safeties], handCount:p.hand.length,
+      hand: p.side==="guest" ? p.hand.slice() : undefined
+    })),
+    log: logHistory.slice(-120),
+    victory: victOn ? {active:true, html:document.getElementById("victory-box").innerHTML} : {active:false}
+  };
+  netSend(snap);
+}
+
+/* ---------- invité ---------- */
+function netJoin(code, name){
+  NET.mode = "guest"; NET.mySide = "guest";
+  NET.joinCode = code; NET.guestName = name;
+  const symSel = document.getElementById("netGuestSymbol");
+  symSel.innerHTML = CAR_SYMBOLS.map(t=>`<option value="${t}">${t}</option>`).join("");
+  netConnectAsGuest(false);
+}
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
+  const peer = new Peer();
+  NET.peer = peer;
+  let settled = false;
+  const fail = (msg)=>{
+    if(settled) return; settled = true;
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect) netScheduleGuestRetry();
+    else { netStatus("netJoinStatus", msg); document.getElementById("netConnectBtn").disabled = false; }
+  };
+  peer.on("error", (e)=>{
+    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+  });
+  peer.on("open", ()=>{
+    const c = peer.connect("mb-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    c.on("open", ()=>{
+      clearTimeout(to); settled = true; NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName});
+      if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Personnalise ta voiture ci-dessous.");
+      else log("🔌 Reconnecté(e) à la partie.");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+  });
+}
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts = (NET.reconnectAttempts||0)+1;
+  netShowReconnectBanner();
+  if(NET.reconnectAttempts>30){ netReconnectFailed(); return; }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="state") netApplySnapshot(msg);
+  else if(msg.t==="setup") netApplySetupMsg(msg);
+}
+
+function netApplySetupMsg(msg){
+  if(NET.started) return;
+  document.getElementById("netJoinReadyPanel").style.display = "block";
+  const symSel = document.getElementById("netGuestSymbol");
+  if(document.activeElement !== symSel) symSel.value = msg.guestSymbol;
+  const colorEl = document.getElementById("netGuestColor");
+  if(document.activeElement !== colorEl) colorEl.value = msg.guestColor;
+  const nameEl = document.getElementById("netGuestNameLive");
+  if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+}
+let netGuestSetupTimer = null;
+function netSendGuestSetup(){
+  if(NET.mode!=="guest") return;
+  clearTimeout(netGuestSetupTimer);
+  netGuestSetupTimer = setTimeout(()=>{
+    netSend({t:"setupGuest",
+      name: document.getElementById("netGuestNameLive").value,
+      color: document.getElementById("netGuestColor").value,
+      symbol: document.getElementById("netGuestSymbol").value
+    });
+  }, 120);
+}
+["netGuestColor","netGuestSymbol","netGuestNameLive"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("input", netSendGuestSetup);
+  el.addEventListener("change", netSendGuestSetup);
+});
+
+function netApplySnapshot(s){
+  if(NET.ended) return;
+  if(!NET.started){
+    NET.started = true;
+    targetKm = s.targetKm;
+    players = s.players.map(p=>createPlayer(p.name,p.color,p.symbol,p.ai,p.side));
+    document.getElementById("netHome").style.display = "none";
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("game").classList.add("active");
+  }
+  targetKm = s.targetKm;
+  deck = new Array(s.deckCount).fill("?"); // pour affichage du compteur uniquement
+  discard = s.discardTop ? [s.discardTop] : [];
+  currentPlayerIndex = s.cur;
+  gameOver = s.gameOver;
+  s.players.forEach((sp,i)=>{
+    const p = players[i]; if(!p) return;
+    p.name=sp.name; p.color=sp.color; p.symbol=sp.symbol; p.ai=sp.ai; p.side=sp.side;
+    p.km=sp.km; p.status=sp.status; p.speedLimited=sp.speedLimited;
+    p.battleCardId=sp.battleCardId; p.speedCardId=sp.speedCardId;
+    p.safeties = new Set(sp.safeties);
+    if(sp.hand){ p.hand = sp.hand.slice(); }
+    else { p.hand = new Array(sp.handCount).fill("?"); }
+  });
+  selectedCardIdx = null; pendingAttackCard = null;
+  renderAll();
+  if(s.victory && s.victory.active){
+    const vo = document.getElementById("victory-overlay");
+    if(!vo.classList.contains("active")){
+      document.getElementById("victory-box").innerHTML = s.victory.html;
+      const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12"];
+      for(let k=0;k<90;k++){
+        const c = document.createElement("div");
+        c.className = "confetti";
+        c.style.left = (Math.random()*100)+"vw";
+        c.style.background = palette[Math.floor(Math.random()*palette.length)];
+        c.style.width = (6+Math.random()*8)+"px";
+        c.style.height = (10+Math.random()*12)+"px";
+        c.style.animationDuration = (2.6+Math.random()*3)+"s";
+        c.style.animationDelay = (Math.random()*3)+"s";
+        vo.appendChild(c);
+      }
+      vo.classList.add("active");
+    }
+  }
+  const logEl = document.getElementById("log");
+  const key = s.log.length+"|"+(s.log[0]||"")+"|"+(s.log[s.log.length-1]||"");
+  if(logEl.dataset.key !== key){
+    logEl.dataset.key = key;
+    logEl.innerHTML = "";
+    s.log.forEach(m=>{ const d=document.createElement("div"); d.textContent=m; logEl.appendChild(d); });
+  }
+}
+
+/* ---------- déconnexion / reconnexion ---------- */
+function netShowBanner(html){
+  let b = document.getElementById("netBanner");
+  if(!b){ b = document.createElement("div"); b.id="netBanner"; b.className="net-reconnect-banner"; document.body.appendChild(b); }
+  b.innerHTML = html;
+}
+function netHideBanner(){ const b = document.getElementById("netBanner"); if(b) b.remove(); }
+function netOnConnLost(){
+  if(NET.mode==="host") netHostOnDisconnect();
+  else if(NET.mode==="guest") netGuestOnDisconnect();
+}
+function netHostOnDisconnect(){
+  NET.conn = null;
+  if(!NET.started){
+    const info = document.getElementById("netSetupInfo");
+    if(info && document.getElementById("setup").style.display!=="none"){
+      info.style.display = "block"; info.style.background="#fdecea"; info.style.color="#7a1f1f";
+      info.textContent = `🔌 ${NET.guestName||"L'autre joueur"} s'est déconnecté(e) avant le début. Renvoie-lui le lien et le code pour qu'il/elle revienne.`;
+    } else {
+      netStatus("netHostStatus","Le joueur s'est déconnecté avant le début. Attends qu'il/elle revienne avec le même code.");
+    }
+    return;
+  }
+  netShowBanner(`🔌 ${netEsc(NET.guestName)} s'est déconnecté(e). En attente de reconnexion… <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  const btn = document.getElementById("netHostGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+function netGuestOnDisconnect(){
+  if(NET.reconnecting || NET.ended) return;
+  NET.conn = null; NET.reconnectAttempts = 0;
+  try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
+  netScheduleGuestRetry();
+}
+function netShowReconnectBanner(){
+  netShowBanner(`🔌 Connexion perdue. Reconnexion en cours… (tentative ${NET.reconnectAttempts}/30) <button id="netRetryNowBtn">Réessayer maintenant</button>`);
+  const btn = document.getElementById("netRetryNowBtn");
+  if(btn) btn.onclick = ()=>{ netConnectAsGuest(true); };
+}
+function netReconnectFailed(){
+  NET.reconnecting = false; NET.ended = true;
+  netShowBanner(`❌ Impossible de se reconnecter — l'autre joueur a peut-être fermé la partie. <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+  const btn = document.getElementById("netGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+</script>
+</body>
+</html>
