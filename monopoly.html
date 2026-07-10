@@ -26,6 +26,7 @@
     align-items:center;
     justify-content:center;
     padding:12px;
+    padding-top:46px;
     transition:background .4s;
   }
 
@@ -550,6 +551,24 @@
 
   @media(max-width:820px){
     #side{width:100%;max-width:760px;}
+  }
+
+  @media(max-width:480px){
+    body{padding:8px;padding-top:46px;}
+    .cross-link{top:6px;right:6px;font-size:10.5px;}
+    .cross-link a{padding:4px 8px;}
+    #setup, #netHome{padding:20px 18px;}
+    .player-row{flex-wrap:wrap;row-gap:6px;}
+    .player-row input[type=text]{flex:1 1 100%;order:1;}
+    .player-row input[type=color]{order:2;}
+    .player-row select.psymbol{order:3;}
+    .player-row select.ptype{order:4;flex:1;max-width:none;}
+    #trade-columns, .trade-columns{flex-direction:column;gap:14px;}
+    .trade-col{width:100%;}
+    #modal{padding:18px 16px;}
+    .victory-stats{gap:8px;}
+    .victory-stat{padding:8px 10px;min-width:70px;}
+    #victory-box{padding:24px 20px;}
   }
 </style>
 </head>

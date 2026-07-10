@@ -24,6 +24,7 @@
     align-items:center;
     justify-content:center;
     padding:12px;
+    padding-top:46px;
   }
   .btn{
     cursor:pointer;border:none;border-radius:8px;padding:10px 16px;
@@ -89,6 +90,7 @@
     position:relative;border-radius:8px;padding:6px 0;
     background:repeating-linear-gradient(180deg,#3a3f44,#3a3f44 10px,#34383c 10px,#34383c 20px);
     border:2px solid #222;
+    overflow:hidden;
   }
   .race-lane{position:relative;height:36px;}
   .race-lane:not(:last-child){border-bottom:2px dashed rgba(241,196,15,.45);}
@@ -149,6 +151,9 @@
   .mb-card-wrap:hover{transform:translateY(-4px);}
   .mb-card-wrap.sel .mb-card{outline:3px solid #ffb300;transform:translateY(-6px);}
   .mb-card-wrap.illegal{opacity:.45;}
+  #handArea.disabled .mb-card-wrap{cursor:default;opacity:.55;}
+  #handArea.disabled .mb-card-wrap:hover{transform:none;}
+  #targetHint.error{color:#c0392b;}
   #handActions{display:none;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;}
   #targetHint{font-size:12.5px;font-weight:700;color:#c0392b;margin-top:6px;min-height:16px;}
 
@@ -170,6 +175,23 @@
   .cross-link a{color:#fff;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;text-decoration:none;font-weight:600;}
 
   @media(max-width:820px){ .mb-mat{flex:1 1 100%;} }
+
+  @media(max-width:480px){
+    body{padding:8px;padding-top:46px;}
+    .cross-link{top:6px;right:6px;font-size:10.5px;}
+    .cross-link a{padding:4px 8px;}
+    #setup, #netHome{padding:20px 18px;}
+    .player-row{flex-wrap:wrap;row-gap:6px;}
+    .player-row input[type=text]{flex:1 1 100%;order:1;}
+    .player-row input[type=color]{order:2;}
+    .player-row select.psymbol{order:3;}
+    .player-row select.ptype{order:4;flex:1;max-width:none;}
+    .mb-card{width:52px;height:72px;}
+    .mb-card .mb-value{font-size:17px;}
+    .mb-card .mb-icon{font-size:15px;}
+    .race-car-label{font-size:8px;}
+    #victory-box{padding:24px 20px;}
+  }
 </style>
 </head>
 <body>
@@ -786,9 +808,14 @@ function renderRaceTrack(){
   road.innerHTML = players.map((p,i)=>{
     const frac = Math.max(0, Math.min(1, p.km/targetKm));
     const pct = 3 + frac*94; // marge pour ne jamais coller les bords
+    // ancre le libellé à gauche/centre/droite selon la position pour qu'il ne sorte jamais de la route
+    const labelAlign = frac<0.18 ? "left" : frac>0.82 ? "right" : "center";
+    const labelStyle = labelAlign==="left" ? `left:${pct}%;transform:translateX(0);`
+      : labelAlign==="right" ? `left:${pct}%;transform:translateX(-100%);`
+      : `left:${pct}%;transform:translateX(-50%);`;
     return `
     <div class="race-lane${i===currentPlayerIndex?" current":""}">
-      <div class="race-car-label" style="left:${pct}%;">${p.symbol} ${p.name} · ${p.km}km</div>
+      <div class="race-car-label" style="${labelStyle}">${p.symbol} ${p.name} · ${p.km}km</div>
       <div class="race-car" style="left:${pct}%;background:${p.color};" title="${p.name} — ${p.km} km">${p.symbol}</div>
     </div>`;
   }).join("");
@@ -853,6 +880,7 @@ function renderHand(){
   const isMyTurn = myIdx===currentPlayerIndex && !gameOver;
   const canAct = netCanAct() && isMyTurn;
   sub.textContent = canAct ? "Cliquez une carte, puis Jouer ou Défausser." : (gameOver ? "" : "En attente de votre tour…");
+  area.classList.toggle("disabled", !canAct);
   area.innerHTML = p.hand.map((c,i)=>{
     const def = CARD_DEFS[c];
     const legal = def.type==="hazard" ? hasAnyLegalTarget(p,c) : canPlayCard(p,c);
@@ -870,9 +898,15 @@ function renderHand(){
     const cardId = p.hand[selectedCardIdx];
     const def = CARD_DEFS[cardId];
     const isHazard = def.type==="hazard";
-    document.getElementById("playSelectedBtn").style.display = isHazard ? "none" : "inline-block";
+    const playBtn = document.getElementById("playSelectedBtn");
     if(isHazard){
-      hint.textContent = hasAnyLegalTarget(p,cardId) ? "🎯 Cliquez l'adversaire à attaquer." : "Aucune cible valide pour cette carte.";
+      playBtn.style.display = "none";
+      hint.textContent = hasAnyLegalTarget(p,cardId) ? "🎯 Cliquez l'adversaire à attaquer." : "❌ Aucune cible valide pour cette carte — défaussez-la.";
+    } else {
+      const legal = canPlayCard(p, cardId);
+      playBtn.style.display = "inline-block";
+      playBtn.disabled = !legal;
+      hint.textContent = legal ? "" : "❌ Cette carte ne peut pas être jouée maintenant — défaussez-la ou choisissez-en une autre.";
     }
   } else {
     actions.style.display = "none";
@@ -907,6 +941,10 @@ function tryPlay(handIdx, targetIdx){
     afterAction(res.extraTurn);
   } else {
     renderAll();
+    const hint = document.getElementById("targetHint");
+    hint.textContent = "❌ Coup impossible.";
+    hint.classList.add("error");
+    setTimeout(()=>hint.classList.remove("error"), 1200);
   }
 }
 
