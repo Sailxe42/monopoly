@@ -770,8 +770,8 @@ function statusText(p){
 
 /* index du joueur dont on doit afficher la main sur CET écran */
 function myVisibleHandIndex(){
-  if(NET.mode==="host") return 0;
-  if(NET.mode==="guest") return 1;
+  if(NET.mode==="host") return players.findIndex(p=>p.side==="host");
+  if(NET.mode==="guest") return players.findIndex(p=>p.side==="guest");
   const p = players[currentPlayerIndex];
   return (p && !p.ai) ? currentPlayerIndex : null;
 }
@@ -1260,7 +1260,14 @@ function netApplySnapshot(s){
     if(sp.hand){ p.hand = sp.hand.slice(); }
     else { p.hand = new Array(sp.handCount).fill("?"); }
   });
-  selectedCardIdx = null; pendingAttackCard = null;
+  // ne réinitialise la sélection en cours que si elle n'est plus valide —
+  // sinon un simple sync périodique (toutes les 400ms) ferait disparaître
+  // les boutons Jouer/Défausser juste après avoir cliqué une carte
+  const myIdx = myVisibleHandIndex();
+  const myHand = (myIdx!==null && players[myIdx]) ? players[myIdx].hand : null;
+  if(!myHand || selectedCardIdx===null || selectedCardIdx>=myHand.length){
+    selectedCardIdx = null;
+  }
   renderAll();
   if(s.victory && s.victory.active){
     const vo = document.getElementById("victory-overlay");
