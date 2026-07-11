@@ -57,6 +57,7 @@
   .player-row input[type=text]{flex:1;min-width:120px;padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
   .player-row input[type=color]{width:34px;height:32px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;}
   .player-row select.psymbol{font-size:17px;padding:3px 4px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;}
+  .player-row select.ptype{font-size:12px;padding:4px 3px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;max-width:120px;}
   #setup .row{display:flex;gap:10px;margin:14px 0;align-items:center;flex-wrap:wrap;}
   .net-reconnect-banner{
     position:fixed;top:0;left:0;right:0;z-index:300;background:#7a1f1f;color:#fff;text-align:center;
@@ -203,7 +204,7 @@
     <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer sur cet ordinateur</button>
     <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
     <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
-    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code à l'autre (2 joueurs).</p>
+    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code à l'autre (+ IA possibles).</p>
   </div>
   <div id="netHostPanel" style="display:none;text-align:center;">
     <p style="margin-bottom:0;">Code de la partie :</p>
@@ -388,8 +389,8 @@ function log(msg){
   netScheduleSync();
 }
 
-function createPlayer(name,color,symbol,side){
-  return {name,color,symbol,side, rack:[], score:0};
+function createPlayer(name,color,symbol,ai,side){
+  return {name,color,symbol,ai,side, rack:[], score:0};
 }
 
 function drawTiles(n){
@@ -420,14 +421,40 @@ function renderPlayerInputs(){
       <input type="color" class="pcolor" id="pcolor${i}" value="${TOKEN_COLORS[i]}" title="Couleur">
       <select class="psymbol" id="psymbol${i}" title="Symbole">${symbolOptionsHtml(i)}</select>
       <input type="text" id="pname${i}" placeholder="Nom du joueur ${i+1}" value="Joueur ${i+1}">
+      <select class="ptype" id="ptype${i}" title="Humain ou IA">
+        <option value="">👤 Humain</option>
+        <option value="easy">🙂 IA facile</option>
+        <option value="medium">🤖 IA moyenne</option>
+        <option value="hard">😈 IA difficile</option>
+      </select>
     `;
     playerInputsDiv.appendChild(row);
   }
+  /* partie en ligne : joueur 1 = hôte, joueur 2 = invité, le reste = IA */
   if(NET.mode==="host"){
-    document.getElementById("numPlayersRow").style.display = "none";
     document.getElementById("randomOrder").parentNode.parentNode.style.display = "none";
-    const nameInput = document.getElementById("pname1");
-    if(nameInput) nameInput.value = NET.guestName;
+    for(let i=0;i<n;i++){
+      const typeSel = document.getElementById("ptype"+i);
+      if(i===0){
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#555;flex-shrink:0;font-weight:600;";
+        tag.textContent = "👤 vous";
+        typeSel.parentNode.appendChild(tag);
+      } else if(i===1){
+        const nameInput = document.getElementById("pname1");
+        if(nameInput) nameInput.value = NET.guestName;
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#0d47a1;flex-shrink:0;font-weight:600;";
+        tag.textContent = "🌐 en ligne";
+        typeSel.parentNode.appendChild(tag);
+      } else {
+        const humanOpt = typeSel.querySelector('option[value=""]');
+        if(humanOpt) humanOpt.remove();
+        typeSel.value = "medium";
+      }
+    }
     ["pname1","pcolor1","psymbol1"].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.addEventListener("input", netBroadcastSetup);
@@ -439,15 +466,19 @@ numPlayersSel.addEventListener("change", renderPlayerInputs);
 renderPlayerInputs();
 
 document.getElementById("startBtn").addEventListener("click", ()=>{
-  const n = NET.mode==="host" ? 2 : parseInt(numPlayersSel.value);
+  const n = parseInt(numPlayersSel.value);
   players = [];
   for(let i=0;i<n;i++){
     const name = (document.getElementById("pname"+i).value || `Joueur ${i+1}`).trim();
     const color = document.getElementById("pcolor"+i).value || TOKEN_COLORS[i];
     const symbol = document.getElementById("psymbol"+i).value || AVATAR_SYMBOLS[i%AVATAR_SYMBOLS.length];
-    players.push(createPlayer(name,color,symbol,null));
+    const ai = document.getElementById("ptype"+i).value || null;
+    players.push(createPlayer(name,color,symbol,ai,null));
   }
-  if(NET.mode==="host"){ players[0].side="host"; players[1].side="guest"; }
+  if(NET.mode==="host"){
+    players[0].side="host"; players[0].ai=null;
+    players[1].side="guest"; players[1].ai=null;
+  }
   if(NET.mode!=="host" && document.getElementById("randomOrder").checked){
     for(let i=players.length-1;i>0;i--){
       const j = Math.floor(Math.random()*(i+1));
@@ -476,7 +507,8 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
 function myVisibleRackIndex(){
   if(NET.mode==="host") return players.findIndex(p=>p.side==="host");
   if(NET.mode==="guest") return players.findIndex(p=>p.side==="guest");
-  return currentPlayerIndex;
+  const p = players[currentPlayerIndex];
+  return (p && !p.ai) ? currentPlayerIndex : null; // en local, la main d'une IA reste cachée
 }
 function netCanAct(){
   if(!NET.mode) return true;
@@ -490,6 +522,8 @@ function startTurn(){
   selectedTileId = null;
   exchangeSelection = new Set();
   renderAll();
+  const p = players[currentPlayerIndex];
+  if(p && p.ai && NET.mode!=="guest") aiTakeTurn(p); // l'IA tourne côté hôte / local
 }
 
 /* ============================================================
@@ -676,10 +710,14 @@ async function checkWordsDictionary(words){
 /* ============================================================
    ACTIONS DE JEU (exécutées côté hôte / local — autoritaires)
    ============================================================ */
-async function applyPlay(pIdx, placements){
+async function applyPlay(pIdx, placements, opts){
   const res = computeMove(placements);
   if(!res.ok) return res;
-  const dict = await checkWordsDictionary(res.words);
+  /* skipDict : coups de l'IA — ses mots viennent du lexique embarqué (déjà sûr),
+     inutile d'interroger le Wiktionnaire (et ça évite de le solliciter à chaque tour d'IA) */
+  const dict = (opts && opts.skipDict)
+    ? {allValid:true, invalid:[], unchecked:false}
+    : await checkWordsDictionary(res.words);
   if(!dict.allValid){
     return {ok:false, reason: `Mot(s) non reconnu(s) dans le dictionnaire : ${dict.invalid.join(", ")}.`};
   }
@@ -759,6 +797,137 @@ function nextTurn(){
 }
 
 /* ============================================================
+   IA — l'ordinateur joue avec son propre lexique embarqué de mots
+   français courants (tous sans accent, donc jouables tels quels sur
+   les tuiles). Il ne joue QUE des mots de cette liste, y compris pour
+   les mots croisés formés au passage — pas besoin du Wiktionnaire.
+   ============================================================ */
+const AI_LEVELS = {
+  easy:  {label:"IA facile",    icon:"🙂", sample:170},
+  medium:{label:"IA moyenne",   icon:"🤖", sample:0},
+  hard:  {label:"IA difficile", icon:"😈", sample:0},
+};
+
+const AI_WORDS_RAW = "AN,AS,AU,AI,BU,CE,CI,DE,DO,DU,EH,EN,ES,ET,EU,FA,HA,HI,HO,IF,IL,JE,LA,LE,LU,MA,ME,MI,MU,NE,NI,NU,OH,ON,OR,OS,OU,PI,PU,SA,SE,SI,SU,TA,TE,TU,UN,US,UT,VA,VU,XI,"+
+"AIL,AIR,AMI,ARC,ART,AXE,BAC,BAL,BAR,BAS,BEC,BOA,BOL,BON,BUS,BUT,CAP,CAR,CAS,CET,COL,COQ,COU,CRI,CRU,DES,DIT,DIS,DIX,DON,DOS,DUO,DUR,EAU,EST,EUX,FER,FEU,FIL,FIN,FIT,FOI,FOU,GAZ,GEL,ICI,JEU,JUS,LAC,LES,LIT,LIS,LOI,LOT,LUI,MAI,MAL,MER,MES,MET,MIS,MIT,MOI,MOT,MUR,NEZ,NID,NOM,NON,NOS,NUL,OIE,ONT,OSE,OUI,PAR,PAS,PEU,PIC,PIE,PIN,PLI,POT,PUR,QUE,QUI,RAT,RIT,RIZ,ROC,ROI,RUE,SAC,SEC,SEL,SES,SIX,SOI,SOL,SON,SUD,SUR,TAS,TES,TIR,TOI,TON,TRI,UNE,VAS,VIA,VIE,VIN,VIS,VIT,VOL,VOS,VUE,ZOO,"+
+"AIME,AMIE,AMIS,AVEC,BAIN,BANC,BEAU,BIEN,BLEU,BOIS,BOIT,BORD,BRAS,BRUN,CELA,CENT,CHAT,CHEF,CHER,CHEZ,CHOU,CIEL,CINQ,CLOU,COIN,COUP,COUR,DAME,DANS,DEUX,DOIT,DONC,DONS,DORS,DORT,DOUX,EAUX,ELLE,FAIM,FAIS,FAIT,FAUX,FILS,FOIS,FOND,FORT,FOUR,GARE,GENS,GRIS,GROS,HAUT,HUIT,JOLI,JOUE,JOUR,LAIT,LENT,LION,LOIN,LONG,LOUP,MAIN,MAIS,METS,MIEL,MOIS,MONT,MORT,MOTO,MOTS,NEUF,NOIR,NUIT,ONZE,PAGE,PAIN,PAIX,PARC,PART,PARS,PEAU,PEUR,PIED,PLAN,PLAT,PLUS,PONT,PORT,POUR,PRIS,PRIX,QUEL,RIRE,ROBE,ROIS,ROND,ROSE,ROUE,SAIT,SANG,SANS,SAUF,SEPT,SEUL,SOIF,SOIR,SONT,SORS,SORT,SOUS,SUIS,SUIT,TARD,TAXI,TOIT,TOUR,TOUS,TOUT,TROP,TROU,VAIS,VENT,VERS,VERT,VIDE,VITE,VOIE,VOIS,VOIT,VOIX,VONT,VOUS,YEUX,"+
+"AIMES,AMOUR,ARBRE,AUSSI,AUTRE,AVION,AVOIR,BANDE,BARBE,BLANC,BOIRE,BRAVO,CARTE,CHANT,CHATS,CHAUD,CHIEN,CHOSE,CLAIR,CORPS,COURT,DANSE,DENTS,DOIGT,DONNE,DOUZE,DROIT,FAIRE,FEMME,FLEUR,FORCE,FORME,FRAIS,FRUIT,GRAND,HERBE,HEURE,HIVER,HOMME,IMAGE,JAUNE,JEUDI,JEUNE,JOUER,JOUES,JOUET,LARGE,LEVER,LIVRE,LOURD,LUNDI,MAGIE,MANGE,MARDI,MATIN,MERCI,MILLE,MONDE,MOTIF,NEIGE,NOTRE,NUAGE,ORAGE,PARLE,PAUSE,PENSE,PETIT,PIANO,PLACE,PLAGE,PLUIE,POCHE,POINT,POIRE,POMME,PORTE,POSTE,POULE,PREND,RADIO,RESTE,ROUGE,ROUTE,SALLE,SALON,SAUTE,SPORT,STYLO,SUCRE,TABLE,TEMPS,TERRE,TIENS,TIENT,TIGRE,TITRE,TOMBE,TRAIN,TROIS,VACHE,VENIR,VERRE,VESTE,VIENS,VIENT,VILLE,VINGT,VIVRE,VOILE,VOTRE,"+
+"AIMENT,AMOURS,AUTEUR,ACTEUR,BATEAU,BUREAU,CADEAU,CHANTE,CHEMIN,CHEVAL,CHIENS,COURIR,DANSES,DANSER,DEVOIR,DONNES,DONNER,DORMIR,DOUBLE,ENFANT,FINIR,FLEURS,JARDIN,JOUENT,JOUEUR,MAISON,MANGER,MANGES,MIROIR,MONTER,NOMBRE,OISEAU,PARLER,PARLES,PARTIR,PASSER,PASSES,PENSER,PENSES,PORTER,PORTES,PRENDS,QUATRE,QUINZE,RESTER,RESTES,SAMEDI,SAUTER,SAUTES,SAVOIR,SIMPLE,SOLEIL,SOMBRE,SORTIR,TENDRE,TIMBRE,TIROIR,TOMBER,TOMBES,TREIZE,TRIPLE,TROUVE,VIOLET,VISAGE,VOYAGE,"+
+"BONJOUR,CHANTER,CHANTES,COULEUR,CUISINE,MANGENT,MUSIQUE,PARLENT,POISSON,TABLEAU,TROUVER,TROUVES,VOITURE,TOUJOURS";
+const AI_WORDS = AI_WORDS_RAW.split(",").filter(w=>w.length>=2);
+const AI_SET = new Set(AI_WORDS);
+
+function aiRackCounts(rack){
+  const counts = {};
+  let blanks = 0;
+  rack.forEach(t=>{
+    if(t.letter==="?") blanks++;
+    else counts[t.letter] = (counts[t.letter]||0)+1;
+  });
+  return {counts, blanks};
+}
+
+/* essaie de poser `word` en (r,c) direction `dir` : renvoie la liste des
+   lettres à poser depuis le chevalet, ou null si impossible */
+function aiTryWordAt(word, r, c, dir, rackInfo){
+  const endR = dir==="row" ? r : r+word.length-1;
+  const endC = dir==="row" ? c+word.length-1 : c;
+  if(endR>14 || endC>14) return null;
+  // la case juste avant et juste après le mot doivent être vides (bordures de mot)
+  const bR = dir==="row" ? r : r-1, bC = dir==="row" ? c-1 : c;
+  const aR = dir==="row" ? r : r+word.length, aC = dir==="row" ? c+word.length : c;
+  if(bR>=0 && bC>=0 && board[bR][bC]) return null;
+  if(aR<=14 && aC<=14 && board[aR][aC]) return null;
+
+  const counts = Object.assign({}, rackInfo.counts);
+  let blanks = rackInfo.blanks;
+  const spots = [];
+  for(let i=0;i<word.length;i++){
+    const rr = dir==="row" ? r : r+i;
+    const cc = dir==="row" ? c+i : c;
+    const L = word[i];
+    const cell = board[rr][cc];
+    if(cell){
+      if(cell.letter.toUpperCase()!==L) return null;
+    } else {
+      if(counts[L]>0){ counts[L]--; spots.push({row:rr,col:cc,letter:L,isBlank:false}); }
+      else if(blanks>0){ blanks--; spots.push({row:rr,col:cc,letter:L,isBlank:true}); }
+      else return null;
+    }
+  }
+  if(!spots.length) return null; // rien posé depuis le chevalet
+  return spots;
+}
+
+function aiBuildPlacements(p, spots){
+  const used = new Set();
+  const placements = [];
+  for(const s of spots){
+    const tile = p.rack.find(t=>!used.has(t.id) && (s.isBlank ? t.letter==="?" : t.letter===s.letter));
+    if(!tile) return null;
+    used.add(tile.id);
+    placements.push({row:s.row, col:s.col, tileId:tile.id, letter:s.letter, isBlank:s.isBlank});
+  }
+  return placements;
+}
+
+function aiFindMoves(p, sampleSize){
+  const rackInfo = aiRackCounts(p.rack);
+  const words = sampleSize ? shuffle(AI_WORDS).slice(0, sampleSize) : AI_WORDS;
+  const moves = [];
+  for(const word of words){
+    for(const dir of ["row","col"]){
+      // premier coup : seules les positions passant par le centre (7,7) sont légales
+      let rMin=0, rMax=14, cMin=0, cMax=14;
+      if(!firstMovePlayed){
+        if(dir==="row"){ rMin=rMax=7; cMin=Math.max(0,7-word.length+1); cMax=7; }
+        else { cMin=cMax=7; rMin=Math.max(0,7-word.length+1); rMax=7; }
+      }
+      for(let r=rMin;r<=rMax;r++){
+        for(let c=cMin;c<=cMax;c++){
+          const spots = aiTryWordAt(word, r, c, dir, rackInfo);
+          if(!spots) continue;
+          const placements = aiBuildPlacements(p, spots);
+          if(!placements) continue;
+          const res = computeMove(placements);
+          if(!res.ok) continue;
+          if(!res.words.every(w=>AI_SET.has(w.word.toUpperCase()))) continue;
+          moves.push({placements, score:res.score});
+          if(moves.length>=400) return moves;
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function aiTakeTurn(p){
+  const pIdx = players.indexOf(p);
+  setTimeout(async ()=>{
+    if(gameOver || players[currentPlayerIndex]!==p) return;
+    const lvl = AI_LEVELS[p.ai];
+    const moves = aiFindMoves(p, lvl ? lvl.sample : 0);
+    if(moves.length){
+      moves.sort((a,b)=>b.score-a.score);
+      let pick;
+      if(p.ai==="hard") pick = moves[0];
+      else if(p.ai==="medium") pick = moves[Math.floor(Math.random()*Math.max(1, Math.ceil(moves.length*0.4)))];
+      else pick = moves[Math.floor(Math.random()*moves.length)];
+      const res = await applyPlay(pIdx, pick.placements, {skipDict:true});
+      if(res.ok){ if(!gameOver) nextTurn(); else renderAll(); return; }
+    }
+    // aucun coup trouvé : échange quelques lettres, sinon passe
+    if(bag.length>=3 && p.rack.length>0){
+      const ids = shuffle(p.rack.map(t=>t.id)).slice(0, Math.min(3, bag.length, p.rack.length));
+      const r = applyExchange(pIdx, ids);
+      if(r.ok){ if(!gameOver) nextTurn(); else renderAll(); return; }
+    }
+    applyPass(pIdx);
+    if(!gameOver) nextTurn(); else renderAll();
+  }, 900+Math.random()*700);
+}
+
+/* ============================================================
    RENDU
    ============================================================ */
 function tileHtml(letter, isBlank, value, extraClass){
@@ -812,7 +981,7 @@ function renderPlayers(){
     row.className = "p-entry" + (idx===currentPlayerIndex && !gameOver ? " current" : "");
     row.innerHTML = `
       <div class="p-dot" style="background:${p.color}"></div>
-      <div class="p-name">${p.symbol} ${p.name}${p.rack.length===0 && !gameOver?" (terminé)":""}</div>
+      <div class="p-name">${p.symbol} ${p.name}${p.ai?` <span title="${AI_LEVELS[p.ai].label}">${AI_LEVELS[p.ai].icon}</span>`:""}${p.rack.length===0 && !gameOver?" (terminé)":""}</div>
       <div class="p-score">${p.score} pts</div>
     `;
     list.appendChild(row);
@@ -829,10 +998,11 @@ function renderRack(){
      (toutes les 400ms) et effacerait un message d'erreur avant que le joueur
      ait pu le lire. Le message est nettoyé explicitement quand le joueur
      entame une nouvelle action (sélection, placement, reprise…). */
-  if(myIdx<0 || !players[myIdx]){
+  if(myIdx===null || myIdx<0 || !players[myIdx]){
     area.innerHTML = "";
     panel.classList.add("disabled");
-    modeHint.textContent = "";
+    const curP = players[currentPlayerIndex];
+    modeHint.textContent = (curP && curP.ai && !gameOver) ? `🤖 ${curP.name} réfléchit…` : "";
     document.getElementById("turnControls").style.display = "none";
     return;
   }
@@ -841,7 +1011,11 @@ function renderRack(){
   const canAct = netCanAct() && isMyTurn;
   panel.classList.toggle("disabled", !canAct);
   document.getElementById("turnControls").style.display = canAct ? "flex" : "none";
-  modeHint.textContent = gameOver ? "Partie terminée." : (canAct ? "Cliquez une lettre puis une case, ou sélectionnez des lettres à échanger." : "En attente de votre tour…");
+  const curP = players[currentPlayerIndex];
+  modeHint.textContent = gameOver ? "Partie terminée."
+    : canAct ? "Cliquez une lettre puis une case, ou sélectionnez des lettres à échanger."
+    : (curP && curP.ai) ? `🤖 ${curP.name} réfléchit…`
+    : "En attente de votre tour…";
 
   const availableTiles = p.rack.filter(t=>!pendingPlacements.some(pl=>pl.tileId===t.id));
   area.innerHTML = availableTiles.map(t=>{
@@ -1272,7 +1446,7 @@ function netSendState(){
     cur: currentPlayerIndex,
     gameOver, firstMovePlayed, consecutivePasses,
     players: players.map(p=>({
-      name:p.name, color:p.color, symbol:p.symbol, side:p.side||null, score:p.score,
+      name:p.name, color:p.color, symbol:p.symbol, ai:p.ai||null, side:p.side||null, score:p.score,
       rackCount:p.rack.length,
       rack: p.side==="guest" ? p.rack.slice() : undefined
     })),
@@ -1371,7 +1545,7 @@ function netApplySnapshot(s){
   if(NET.ended) return;
   if(!NET.started){
     NET.started = true;
-    players = s.players.map(p=>createPlayer(p.name,p.color,p.symbol,p.side));
+    players = s.players.map(p=>createPlayer(p.name,p.color,p.symbol,p.ai,p.side));
     document.getElementById("netHome").style.display = "none";
     document.getElementById("setup").style.display = "none";
     document.getElementById("game").classList.add("active");
@@ -1384,7 +1558,7 @@ function netApplySnapshot(s){
   bag = new Array(s.bagCount).fill("?"); // pour affichage du compteur uniquement
   s.players.forEach((sp,i)=>{
     const p = players[i]; if(!p) return;
-    p.name=sp.name; p.color=sp.color; p.symbol=sp.symbol; p.side=sp.side; p.score=sp.score;
+    p.name=sp.name; p.color=sp.color; p.symbol=sp.symbol; p.ai=sp.ai; p.side=sp.side; p.score=sp.score;
     if(sp.rack){ p.rack = sp.rack.slice(); }
     else { p.rack = new Array(sp.rackCount).fill(0).map(()=>({id:-1,letter:"?"})); }
   });
