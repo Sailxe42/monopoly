@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stratego HTML</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#1c2733;
+    --panel-bg:#fffdf7;
+    --accent:#3d5a80;
+    --text:#1a1a1a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:radial-gradient(circle at 30% 10%, #2c3e50, #141d26 75%);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+    padding-top:46px;
+  }
+  .btn{
+    cursor:pointer;border:none;border-radius:8px;padding:10px 16px;
+    font-size:15px;font-weight:600;background:var(--accent);color:#fff;
+    transition:filter .15s, transform .1s;
+  }
+  .btn:hover{filter:brightness(1.15);}
+  .btn:active{transform:scale(.96);}
+  .btn.secondary{background:#555;}
+  .btn:disabled{background:#aaa;cursor:not-allowed;filter:none;}
+  .hint{font-size:12px;color:#666;}
+
+  /* ---------- ACCUEIL / RÉSEAU ---------- */
+  #netHome, #setup{
+    background:var(--panel-bg);border-radius:12px;padding:28px 32px;
+    max-width:520px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+  #netHome h1, #setup h1{margin-top:0;text-align:center;}
+  .net-big-btn{display:block;width:100%;margin:10px 0;font-size:16px;padding:14px;}
+  #netCode{font-size:38px;font-weight:800;letter-spacing:8px;text-align:center;margin:10px 0;color:var(--accent);user-select:all;}
+  .net-status{font-size:13px;color:#555;min-height:18px;text-align:center;}
+  #netSetupInfo{
+    display:none;background:#e3f2fd;border:1px solid #90caf9;color:#0d47a1;
+    border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px;font-weight:600;
+  }
+  #netJoinReadyPanel .player-row{justify-content:center;margin-top:10px;}
+  #netJoinReadyPanel .player-row input[type=text]{flex:0 1 160px;}
+  .player-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;row-gap:6px;}
+  .player-row input[type=text]{flex:1;min-width:120px;padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
+  .player-row input[type=color]{width:34px;height:32px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;}
+  .player-row select.ptype{font-size:12px;padding:4px 3px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;max-width:130px;}
+  .net-reconnect-banner{
+    position:fixed;top:0;left:0;right:0;z-index:300;background:#7a1f1f;color:#fff;text-align:center;
+    padding:10px 14px;font-size:13.5px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3);
+  }
+  .net-reconnect-banner button{margin-left:10px;background:#fff;color:#7a1f1f;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:12.5px;}
+  .cross-link{position:fixed;top:10px;right:12px;font-size:12px;z-index:10;}
+  .cross-link a{color:#fff;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;text-decoration:none;font-weight:600;}
+  #rulesBox{border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:14px 0;font-size:12px;color:#444;line-height:1.5;}
+  #rulesBox summary{cursor:pointer;font-weight:700;color:#222;}
+
+  /* ---------- JEU ---------- */
+  #game{display:none;width:100%;max-width:1100px;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap;}
+  #game.active{display:flex;}
+
+  #boardWrap{flex-shrink:0;}
+  #board{
+    display:grid;
+    grid-template-columns:repeat(10,1fr);
+    grid-template-rows:repeat(10,1fr);
+    width:min(90vmin,600px);
+    height:min(90vmin,600px);
+    background:#8a9a5b;
+    background:linear-gradient(160deg,#96a86a,#7c8f52);
+    border:3px solid #2c3e2d;
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .str-cell{
+    position:relative;
+    border:1px solid rgba(0,0,0,.18);
+    display:flex;align-items:center;justify-content:center;
+    cursor:default;
+    user-select:none;
+  }
+  .str-cell.lake{
+    background:linear-gradient(160deg,#4f9ec4,#2e6f96);
+    cursor:default;
+  }
+  .str-cell.myzone{background:rgba(255,255,255,.06);}
+  .str-cell.targetable{cursor:pointer;}
+  .str-cell.dest::after{
+    content:"";
+    position:absolute;width:26%;height:26%;
+    border-radius:50%;
+    background:rgba(255,235,59,.85);
+    box-shadow:0 0 6px rgba(0,0,0,.4);
+    pointer-events:none;
+  }
+  .str-cell.dest-attack::after{
+    background:rgba(231,76,60,.9);
+    width:60%;height:60%;
+    border-radius:8px;
+    opacity:.45;
+  }
+  .str-cell.flash{animation:cellFlash 1s ease;}
+  @keyframes cellFlash{
+    0%,55%{box-shadow:inset 0 0 0 3px #ffb300;}
+    100%{box-shadow:none;}
+  }
+
+  .str-piece{
+    width:84%;height:84%;
+    border-radius:6px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-weight:800;
+    color:#fff;
+    box-shadow:0 2px 4px rgba(0,0,0,.45);
+    border:2px solid rgba(255,255,255,.75);
+    font-size:clamp(10px,3.2vmin,20px);
+    line-height:1;
+    position:relative;
+  }
+  .str-piece .r-icon{font-size:.62em;opacity:.9;}
+  .str-piece.hidden-piece{border-style:dashed;}
+  .str-piece.sel{outline:3px solid #ffb300;transform:scale(1.06);}
+  .str-piece .revealed-mark{
+    position:absolute;top:-1px;right:1px;font-size:.42em;opacity:.9;
+  }
+
+  /* ---------- SIDE ---------- */
+  #side{width:330px;display:flex;flex-direction:column;gap:10px;}
+  .panel{background:var(--panel-bg);border-radius:10px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  #turnTitle{font-weight:800;font-size:15px;text-align:center;}
+  #phaseHint{font-size:12.5px;color:#555;text-align:center;margin-top:4px;min-height:16px;}
+  #placementControls{display:none;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;}
+  .p-entry{display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:6px;margin-bottom:4px;}
+  .p-entry.current{background:#fff3cd;}
+  .p-dot{width:14px;height:14px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  .p-name{flex:1;font-weight:600;font-size:14px;}
+  .p-count{font-size:12.5px;font-weight:700;color:#555;}
+  .graveyard{font-size:11.5px;color:#666;margin:2px 0 6px 22px;line-height:1.5;min-height:14px;}
+  #log{max-height:170px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;}
+  #log div{padding:3px 2px;border-bottom:1px solid #eee;}
+
+  #victory-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;overflow:hidden;}
+  #victory-overlay.active{display:flex;}
+  #victory-box{position:relative;z-index:2;background:#fff;border-radius:18px;padding:34px 46px;text-align:center;max-width:min(92vw,480px);box-shadow:0 14px 60px rgba(0,0,0,.5);}
+  .confetti{position:absolute;top:-24px;z-index:1;border-radius:2px;animation:confettiFall linear infinite;}
+  @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);}}
+
+  @media(max-width:480px){
+    body{padding:8px;padding-top:44px;}
+    .cross-link{top:6px;right:6px;font-size:10.5px;}
+    .cross-link a{padding:4px 8px;}
+    #setup, #netHome{padding:20px 18px;}
+    .player-row input[type=text]{flex:1 1 100%;order:1;}
+    .player-row input[type=color]{order:2;}
+    .player-row select.ptype{order:3;}
+    #victory-box{padding:24px 20px;}
+  }
+  @media(max-width:820px){ #side{width:100%;max-width:600px;} }
+</style>
+</head>
+<body>
+
+<div class="cross-link"><a href="index.html">🏠 Menu des jeux</a></div>
+
+<!-- ===================== ACCUEIL / RÉSEAU ===================== -->
+<div id="netHome">
+  <h1>⚔️ Stratego</h1>
+  <div id="netChoice">
+    <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer contre l'ordinateur</button>
+    <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
+    <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
+    <p class="hint" style="margin-top:12px;text-align:center;">Les pièces sont secrètes : à 2 joueurs, la partie se joue forcément à distance (chacun son écran).</p>
+  </div>
+  <div id="netHostPanel" style="display:none;text-align:center;">
+    <p style="margin-bottom:0;">Code de la partie :</p>
+    <div id="netCode">·····</div>
+    <p class="net-status" id="netHostStatus"></p>
+  </div>
+  <div id="netJoinPanel" style="display:none;">
+    <div class="player-row">
+      <input type="text" id="netNameInput" placeholder="Ton prénom" maxlength="20">
+    </div>
+    <div class="player-row">
+      <input type="text" id="netCodeInput" placeholder="Code de la partie (ABCDE)" maxlength="8" style="text-transform:uppercase;">
+    </div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn" id="netConnectBtn">Rejoindre</button>
+    </div>
+    <p class="net-status" id="netJoinStatus"></p>
+    <div id="netJoinReadyPanel" style="display:none;">
+      <p class="net-status" style="font-weight:600;color:var(--accent);">Personnalise ta couleur :</p>
+      <div class="player-row">
+        <input type="color" id="netGuestColor" value="#2980b9" title="Couleur">
+        <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
+      </div>
+      <p class="net-status">✅ Connecté(e) ! En attente que l'autre joueur lance la partie…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" style="display:none;">
+  <h1>⚔️ Stratego</h1>
+  <div id="netSetupInfo"></div>
+  <div id="playerInputs"></div>
+
+  <details id="rulesBox">
+    <summary>📖 Règles rapides</summary>
+    <p>Chacun place ses 40 pièces (grades cachés de l'adversaire) puis tente de capturer le <b>drapeau</b> ennemi. Une pièce se déplace d'une case (l'<b>éclaireur 2</b> se déplace en ligne droite comme une tour). Attaquer révèle les deux pièces : le grade le plus fort gagne, égalité = les deux sont éliminées.</p>
+    <p>⚡ Spécial : l'<b>espion (1)</b> élimine le Maréchal (10) s'il l'attaque en premier. Seuls les <b>démineurs (3)</b> désamorcent les bombes 💣 — toute autre pièce qui attaque une bombe est détruite. Les bombes et le drapeau ne bougent jamais.</p>
+    <p>🏆 Victoire : capturer le drapeau adverse, ou bloquer l'adversaire (plus aucun coup possible). Une pièce qui survit à un combat reste révélée.</p>
+  </details>
+
+  <div style="text-align:center;">
+    <button class="btn" id="startBtn">Démarrer la partie</button>
+  </div>
+</div>
+
+<!-- ===================== JEU ===================== -->
+<div id="game">
+  <div id="boardWrap">
+    <div id="board"></div>
+  </div>
+
+  <div id="side">
+    <div class="panel">
+      <div id="turnTitle"></div>
+      <div id="phaseHint"></div>
+      <div id="placementControls">
+        <button class="btn secondary" id="shuffleBtn">🔀 Mélanger</button>
+        <button class="btn" id="readyBtn">✅ Prêt !</button>
+      </div>
+    </div>
+
+    <div class="panel" id="players-panel">
+      <h3 style="margin-top:0;">Joueurs</h3>
+      <div id="playersList"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0;">Journal</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VICTOIRE ===================== -->
+<div id="victory-overlay">
+  <div id="victory-box"></div>
+</div>
+
+<script>
+/* ============================================================
+   PIÈCES — armée classique de 40 pièces
+   ============================================================ */
+const RANKS = {
+  "10":{name:"Maréchal",   icon:"⭐", count:1},
+  "9" :{name:"Général",    icon:"🎖", count:1},
+  "8" :{name:"Colonel",    icon:"🪖", count:2},
+  "7" :{name:"Major",      icon:"🪖", count:3},
+  "6" :{name:"Capitaine",  icon:"🪖", count:4},
+  "5" :{name:"Lieutenant", icon:"🪖", count:4},
+  "4" :{name:"Sergent",    icon:"🪖", count:4},
+  "3" :{name:"Démineur",   icon:"⛏", count:5},
+  "2" :{name:"Éclaireur",  icon:"🏃", count:8},
+  "1" :{name:"Espion",     icon:"🕵️", count:1},
+  "B" :{name:"Bombe",      icon:"💣", count:6},
+  "F" :{name:"Drapeau",    icon:"🚩", count:1},
+};
+function rankLabel(rank){
+  const d = RANKS[rank];
+  return rank==="B"||rank==="F" ? d.name : `${d.name} (${rank})`;
+}
+function rankValue(rank){
+  if(rank==="F") return 100;
+  if(rank==="B") return 5;
+  if(rank==="1") return 7;   // l'espion vaut cher (tueur de Maréchal)
+  if(rank==="3") return 5;   // les démineurs sont précieux en fin de partie
+  return parseInt(rank);
+}
+function buildPool(){
+  const pool = [];
+  Object.keys(RANKS).forEach(r=>{ for(let i=0;i<RANKS[r].count;i++) pool.push(r); });
+  return pool; // 40 pièces
+}
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+/* lacs infranchissables au centre */
+function isLake(r,c){
+  return (r===4||r===5) && (c===2||c===3||c===6||c===7);
+}
+/* zone de placement : joueur 0 en bas (lignes 6-9), joueur 1 en haut (lignes 0-3) */
+function zoneRows(pIdx){ return pIdx===0 ? [6,7,8,9] : [0,1,2,3]; }
+function inZone(pIdx,r){ return pIdx===0 ? r>=6 : r<=3; }
+
+const AI_LEVELS = {
+  easy:  {label:"IA facile",    icon:"🙂", random:0.55},
+  medium:{label:"IA moyenne",   icon:"🤖", random:0.18},
+  hard:  {label:"IA difficile", icon:"😈", random:0.05},
+};
+const DEFAULT_COLORS = ["#c0392b","#2980b9"];
+
+/* ============================================================
+   ÉTAT
+   ============================================================ */
+let board = [];              // 10x10 : null | {owner, rank, revealed}
+let players = [];            // [{name,color,ai,side}]
+let phase = "placement";     // placement | play | over
+let readyFlags = [false,false];
+let currentPlayerIndex = 0;
+let selectedCell = null;     // {r,c}
+let possibleMoves = [];      // [{r,c}]
+let captured = [[],[]];      // captured[i] = pièces PERDUES par le joueur i
+let gameOver = false;
+let winnerIdx = null;
+let logHistory = [];
+
+const NET = {
+  mode:null, mySide:null, peer:null, conn:null,
+  guestName:"Joueur 2", started:false, ended:false,
+  syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
+};
+
+function log(msg){
+  logHistory.push(msg);
+  if(logHistory.length>300) logHistory.splice(0, logHistory.length-300);
+  const logEl = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = msg;
+  logEl.appendChild(div);
+  logEl.scrollTop = 0;
+  netScheduleSync();
+}
+
+function emptyBoard(){
+  return Array.from({length:10}, ()=>Array.from({length:10}, ()=>null));
+}
+
+function myPlayerIndex(){
+  if(NET.mode==="host") return players.findIndex(p=>p.side==="host");
+  if(NET.mode==="guest") return players.findIndex(p=>p.side==="guest");
+  return 0; // en local, l'humain est toujours le joueur 0
+}
+/* l'invité voit le plateau retourné (ses pièces en bas) */
+function toView(r,c){
+  return myPlayerIndex()===1 ? {r:9-r, c:9-c} : {r,c};
+}
+
+/* ============================================================
+   SETUP UI
+   ============================================================ */
+const playerInputsDiv = document.getElementById("playerInputs");
+
+function renderPlayerInputs(){
+  playerInputsDiv.innerHTML = "";
+  const row0 = document.createElement("div");
+  row0.className = "player-row";
+  row0.innerHTML = `
+    <input type="color" id="pcolor0" value="${DEFAULT_COLORS[0]}" title="Couleur">
+    <input type="text" id="pname0" placeholder="Votre nom" value="Joueur 1">
+    <span style="font-size:11px;color:#555;font-weight:600;">👤 vous</span>
+  `;
+  playerInputsDiv.appendChild(row0);
+
+  const row1 = document.createElement("div");
+  row1.className = "player-row";
+  if(NET.mode==="host"){
+    row1.innerHTML = `
+      <input type="color" id="pcolor1" value="${DEFAULT_COLORS[1]}" title="Couleur">
+      <input type="text" id="pname1" value="${NET.guestName}">
+      <span style="font-size:11px;color:#0d47a1;font-weight:600;">🌐 en ligne</span>
+    `;
+  } else {
+    row1.innerHTML = `
+      <input type="color" id="pcolor1" value="${DEFAULT_COLORS[1]}" title="Couleur">
+      <input type="text" id="pname1" value="Ordinateur">
+      <select class="ptype" id="ptype1" title="Difficulté de l'IA">
+        <option value="easy">🙂 IA facile</option>
+        <option value="medium" selected>🤖 IA moyenne</option>
+        <option value="hard">😈 IA difficile</option>
+      </select>
+    `;
+  }
+  playerInputsDiv.appendChild(row1);
+
+  if(NET.mode==="host"){
+    ["pname1","pcolor1"].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.addEventListener("input", netBroadcastSetup);
+    });
+    netBroadcastSetup();
+  }
+}
+renderPlayerInputs();
+
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  const name0 = (document.getElementById("pname0").value || "Joueur 1").trim();
+  const color0 = document.getElementById("pcolor0").value || DEFAULT_COLORS[0];
+  const name1 = (document.getElementById("pname1").value || "Joueur 2").trim();
+  const color1 = document.getElementById("pcolor1").value || DEFAULT_COLORS[1];
+  const ai = NET.mode==="host" ? null : (document.getElementById("ptype1").value || "medium");
+  players = [
+    {name:name0, color:color0, ai:null, side: NET.mode==="host" ? "host" : null},
+    {name:name1, color:color1, ai, side: NET.mode==="host" ? "guest" : null},
+  ];
+  board = emptyBoard();
+  phase = "placement";
+  readyFlags = [false,false];
+  currentPlayerIndex = 0;
+  captured = [[],[]];
+  gameOver = false;
+  winnerIdx = null;
+  selectedCell = null;
+  possibleMoves = [];
+  // placement initial aléatoire pour les deux camps (modifiable ensuite)
+  applyShuffle(0);
+  applyShuffle(1);
+  if(players[1].ai){
+    aiArrange();          // l'IA organise son camp intelligemment
+    readyFlags[1] = true; // et elle est prête d'office
+  }
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("game").classList.add("active");
+  log("Partie de Stratego lancée ! Placez vos pièces : cliquez deux pièces pour les échanger.");
+  if(NET.mode==="host"){ NET.started = true; }
+  renderAll();
+  if(NET.mode==="host"){ netSendState(); }
+});
+
+/* ============================================================
+   PLACEMENT
+   ============================================================ */
+function applyShuffle(pIdx){
+  if(phase!=="placement" || readyFlags[pIdx]) return;
+  const pool = shuffle(buildPool());
+  const rows = zoneRows(pIdx);
+  let k = 0;
+  rows.forEach(r=>{
+    for(let c=0;c<10;c++){
+      board[r][c] = {owner:pIdx, rank:pool[k++], revealed:false};
+    }
+  });
+}
+
+function applySwap(pIdx, a, b){
+  if(phase!=="placement" || readyFlags[pIdx]) return;
+  if(!inZone(pIdx,a.r) || !inZone(pIdx,b.r)) return;
+  const pa = board[a.r][a.c], pb = board[b.r][b.c];
+  if(!pa || !pb || pa.owner!==pIdx || pb.owner!==pIdx) return;
+  board[a.r][a.c] = pb;
+  board[b.r][b.c] = pa;
+}
+
+function applyReady(pIdx){
+  if(phase!=="placement" || readyFlags[pIdx]) return;
+  readyFlags[pIdx] = true;
+  log(`${players[pIdx].name} est prêt !`);
+  if(readyFlags[0] && readyFlags[1]){
+    phase = "play";
+    currentPlayerIndex = 0;
+    log(`⚔️ Que la bataille commence — ${players[0].name} joue en premier.`);
+    startTurn();
+    return;
+  }
+  renderAll();
+}
+
+/* placement de l'IA : drapeau au fond entouré de bombes, éclaireurs devant */
+function aiArrange(){
+  const pIdx = 1;
+  const rows = zoneRows(pIdx);          // [0,1,2,3] — ligne 0 = fond, ligne 3 = front
+  const backRow = rows[0], frontRow = rows[3];
+  const zone = Array.from({length:4}, ()=>Array.from({length:10}, ()=>null));
+  const zr = r=>r-rows[0];
+
+  const flagC = 1+Math.floor(Math.random()*8);
+  zone[zr(backRow)][flagC] = "F";
+  let bombs = RANKS["B"].count;
+  // bombes autour du drapeau
+  [[backRow,flagC-1],[backRow,flagC+1],[backRow+1,flagC]].forEach(([r,c])=>{
+    if(bombs>0 && c>=0 && c<=9 && !zone[zr(r)][c]){ zone[zr(r)][c] = "B"; bombs--; }
+  });
+  const rest = [];
+  buildPool().forEach(rk=>{
+    if(rk==="F") return;
+    if(rk==="B"){ if(bombs>0){ rest.push(rk); bombs--; } return; }
+    rest.push(rk);
+  });
+  // note : les bombes déjà posées ont été décomptées ; rest contient le solde
+  const scouts = rest.filter(r=>r==="2");
+  const others = shuffle(rest.filter(r=>r!=="2"));
+  // éclaireurs plutôt au front
+  const frontCells = [];
+  for(let c=0;c<10;c++) if(!zone[zr(frontRow)][c]) frontCells.push({r:frontRow,c});
+  shuffle(frontCells).slice(0, scouts.length).forEach((cell,i)=>{ zone[zr(cell.r)][cell.c] = scouts[i]; });
+  let leftoverScouts = scouts.length - Math.min(scouts.length, frontCells.length);
+  const remaining = others.concat(scouts.slice(scouts.length-leftoverScouts));
+  let k = 0;
+  rows.forEach(r=>{
+    for(let c=0;c<10;c++){
+      if(!zone[zr(r)][c]) zone[zr(r)][c] = remaining[k++];
+    }
+  });
+  rows.forEach(r=>{
+    for(let c=0;c<10;c++){
+      board[r][c] = {owner:pIdx, rank:zone[zr(r)][c], revealed:false};
+    }
+  });
+}
+
+/* ============================================================
+   MOUVEMENTS
+   ============================================================ */
+function pieceMovesAt(r,c){
+  const cell = board[r][c];
+  if(!cell || cell.rank==="B" || cell.rank==="F") return [];
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  const moves = [];
+  if(cell.rank==="2"){
+    // éclaireur : ligne droite, s'arrête au premier obstacle
+    for(const [dr,dc] of dirs){
+      let rr=r+dr, cc=c+dc;
+      while(rr>=0 && rr<=9 && cc>=0 && cc<=9 && !isLake(rr,cc)){
+        const t = board[rr][cc];
+        if(!t){ moves.push({r:rr,c:cc}); }
+        else { if(t.owner!==cell.owner) moves.push({r:rr,c:cc}); break; }
+        rr+=dr; cc+=dc;
+      }
+    }
+  } else {
+    for(const [dr,dc] of dirs){
+      const rr=r+dr, cc=c+dc;
+      if(rr<0||rr>9||cc<0||cc>9||isLake(rr,cc)) continue;
+      const t = board[rr][cc];
+      if(!t || t.owner!==cell.owner) moves.push({r:rr,c:cc});
+    }
+  }
+  return moves;
+}
+
+function hasAnyMove(pIdx){
+  for(let r=0;r<10;r++) for(let c=0;c<10;c++){
+    const cell = board[r][c];
+    if(cell && cell.owner===pIdx && pieceMovesAt(r,c).length) return true;
+  }
+  return false;
+}
+
+/* renvoie "win" | "lose" | "tie" du point de vue de l'attaquant */
+function combatOutcome(att, def){
+  if(def==="F") return "flag";
+  if(def==="B") return att==="3" ? "win" : "lose";
+  if(att==="1" && def==="10") return "win";
+  const a = parseInt(att), d = parseInt(def);
+  if(a>d) return "win";
+  if(a<d) return "lose";
+  return "tie";
+}
+
+function applyMove(pIdx, from, to){
+  if(phase!=="play" || gameOver) return {ok:false};
+  if(pIdx!==currentPlayerIndex) return {ok:false};
+  const cell = board[from.r] && board[from.r][from.c];
+  if(!cell || cell.owner!==pIdx) return {ok:false};
+  if(!pieceMovesAt(from.r,from.c).some(m=>m.r===to.r && m.c===to.c)) return {ok:false};
+
+  const target = board[to.r][to.c];
+  const p = players[pIdx];
+  const flashCells = [to];
+
+  if(!target){
+    board[to.r][to.c] = cell;
+    board[from.r][from.c] = null;
+  } else {
+    const opp = players[target.owner];
+    const outcome = combatOutcome(cell.rank, target.rank);
+    if(outcome==="flag"){
+      board[to.r][to.c] = cell;
+      board[from.r][from.c] = null;
+      cell.revealed = true;
+      captured[target.owner].push("F");
+      gameOver = true;
+      winnerIdx = pIdx;
+      phase = "over";
+      log(`🚩 ${p.name} capture le drapeau de ${opp.name} avec ${rankLabel(cell.rank)} — VICTOIRE !`);
+      renderAll();
+      showVictory();
+      return {ok:true};
+    }
+    if(outcome==="win"){
+      captured[target.owner].push(target.rank);
+      board[to.r][to.c] = cell;
+      board[from.r][from.c] = null;
+      cell.revealed = true;
+      log(`⚔️ ${rankLabel(cell.rank)} de ${p.name} ${target.rank==="B"?"désamorce la Bombe":"bat "+rankLabel(target.rank)} de ${opp.name}.`);
+    } else if(outcome==="lose"){
+      captured[pIdx].push(cell.rank);
+      board[from.r][from.c] = null;
+      target.revealed = true;
+      log(`⚔️ ${rankLabel(cell.rank)} de ${p.name} attaque ${rankLabel(target.rank)} de ${opp.name}… et est éliminé !`);
+    } else {
+      captured[pIdx].push(cell.rank);
+      captured[target.owner].push(target.rank);
+      board[from.r][from.c] = null;
+      board[to.r][to.c] = null;
+      log(`⚔️ ${rankLabel(cell.rank)} contre ${rankLabel(target.rank)} : égalité, les deux sont éliminés !`);
+    }
+  }
+
+  // adversaire bloqué = défaite
+  const oppIdx = 1-pIdx;
+  if(!hasAnyMove(oppIdx)){
+    gameOver = true;
+    winnerIdx = pIdx;
+    phase = "over";
+    log(`🏆 ${players[oppIdx].name} ne peut plus bouger — ${p.name} remporte la partie !`);
+    renderAll();
+    showVictory();
+    return {ok:true};
+  }
+
+  currentPlayerIndex = oppIdx;
+  startTurn(flashCells);
+  return {ok:true};
+}
+
+function startTurn(flashCells){
+  selectedCell = null;
+  possibleMoves = [];
+  renderAll();
+  (flashCells||[]).forEach(({r,c})=>{
+    const v = toView(r,c);
+    const el = document.querySelector(`.str-cell[data-vr="${v.r}"][data-vc="${v.c}"]`);
+    if(el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"), 1000); }
+  });
+  const p = players[currentPlayerIndex];
+  if(p && p.ai && phase==="play" && !gameOver && NET.mode!=="guest") aiTakeTurn(p);
+}
+
+/* ============================================================
+   IA
+   ============================================================ */
+function aiAllMoves(pIdx){
+  const moves = [];
+  for(let r=0;r<10;r++) for(let c=0;c<10;c++){
+    const cell = board[r][c];
+    if(cell && cell.owner===pIdx){
+      pieceMovesAt(r,c).forEach(m=>moves.push({from:{r,c}, to:m}));
+    }
+  }
+  return moves;
+}
+
+function aiScoreMove(pIdx, mv){
+  const cell = board[mv.from.r][mv.from.c];
+  const target = board[mv.to.r][mv.to.c];
+  let score = Math.random()*2;
+  if(target){
+    if(target.revealed){
+      const outcome = combatOutcome(cell.rank, target.rank);
+      if(outcome==="flag") score += 1000;
+      else if(outcome==="win") score += 25 + rankValue(target.rank)*2;
+      else if(outcome==="tie") score += rankValue(target.rank) - rankValue(cell.rank);
+      else score -= 30;
+    } else {
+      // cible inconnue : sonder avec les petites pièces, protéger les grosses
+      const v = rankValue(cell.rank);
+      if(cell.rank==="2") score += 5;
+      else if(cell.rank==="3"||cell.rank==="4") score += 2.5;
+      else if(cell.rank==="1") score -= 15;
+      else score += 4 - v; // plus la pièce est précieuse, moins on tente
+    }
+  } else {
+    // avancer vers le camp ennemi (l'IA est le joueur 1, l'ennemi est en bas)
+    const forward = mv.to.r - mv.from.r;
+    score += forward*1.6;
+    // fuir une pièce révélée plus forte adjacente à la case de départ
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    for(const [dr,dc] of dirs){
+      const rr=mv.from.r+dr, cc=mv.from.c+dc;
+      if(rr<0||rr>9||cc<0||cc>9) continue;
+      const n = board[rr][cc];
+      if(n && n.owner!==pIdx && n.revealed && combatOutcome(n.rank, cell.rank)==="win"){
+        score += 5; // bouger cette pièce menacée est une bonne idée
+      }
+    }
+  }
+  return score;
+}
+
+function aiTakeTurn(p){
+  const pIdx = players.indexOf(p);
+  setTimeout(()=>{
+    if(gameOver || players[currentPlayerIndex]!==p || phase!=="play") return;
+    const moves = aiAllMoves(pIdx);
+    if(!moves.length) return; // sera détecté comme bloqué au prochain coup adverse
+    const lvl = AI_LEVELS[p.ai] || AI_LEVELS.medium;
+    let mv;
+    if(Math.random() < lvl.random){
+      mv = moves[Math.floor(Math.random()*moves.length)];
+    } else {
+      let best = -Infinity;
+      for(const m of moves){
+        const s = aiScoreMove(pIdx, m);
+        if(s>best){ best = s; mv = m; }
+      }
+    }
+    applyMove(pIdx, mv.from, mv.to);
+  }, 800+Math.random()*600);
+}
+
+/* ============================================================
+   RENDU
+   ============================================================ */
+function renderBoard(){
+  const boardEl = document.getElementById("board");
+  boardEl.innerHTML = "";
+  const myIdx = myPlayerIndex();
+  const canPlace = phase==="placement" && !readyFlags[myIdx];
+  const canPlay = phase==="play" && !gameOver && currentPlayerIndex===myIdx && !(players[myIdx]&&players[myIdx].ai);
+
+  for(let vr=0;vr<10;vr++){
+    for(let vc=0;vc<10;vc++){
+      // coordonnées réelles (l'invité voit le plateau retourné)
+      const real = myIdx===1 ? {r:9-vr, c:9-vc} : {r:vr, c:vc};
+      const r = real.r, c = real.c;
+      const el = document.createElement("div");
+      el.className = "str-cell";
+      el.dataset.vr = vr; el.dataset.vc = vc;
+      if(isLake(r,c)){ el.classList.add("lake"); boardEl.appendChild(el); continue; }
+      if(phase==="placement" && inZone(myIdx,r)) el.classList.add("myzone");
+
+      const cell = board[r][c];
+      if(cell){
+        const mine = cell.owner===myIdx;
+        const show = mine || cell.revealed;
+        const piece = document.createElement("div");
+        piece.className = "str-piece"+(show?"":" hidden-piece");
+        piece.style.background = players[cell.owner].color;
+        if(show){
+          piece.innerHTML = (cell.rank==="B"||cell.rank==="F")
+            ? `<span>${RANKS[cell.rank].icon}</span>`
+            : `<span>${cell.rank}</span><span class="r-icon">${RANKS[cell.rank].icon}</span>`;
+          if(!mine && cell.revealed) piece.innerHTML += `<span class="revealed-mark">👁</span>`;
+        } else {
+          piece.textContent = "?";
+        }
+        if(selectedCell && selectedCell.r===r && selectedCell.c===c) piece.classList.add("sel");
+        el.appendChild(piece);
+      }
+
+      const isDest = possibleMoves.some(m=>m.r===r && m.c===c);
+      if(isDest){
+        el.classList.add(cell ? "dest-attack" : "dest");
+        el.classList.add("targetable");
+      }
+      if((canPlace && cell && cell.owner===myIdx) || (canPlay && cell && cell.owner===myIdx) || isDest){
+        el.classList.add("targetable");
+        el.onclick = ()=>onCellClick(r,c);
+      }
+      boardEl.appendChild(el);
+    }
+  }
+}
+
+function onCellClick(r,c){
+  const myIdx = myPlayerIndex();
+  if(phase==="placement"){
+    if(readyFlags[myIdx]) return;
+    const cell = board[r][c];
+    if(!cell || cell.owner!==myIdx) return;
+    if(selectedCell && (selectedCell.r!==r || selectedCell.c!==c)){
+      const a = selectedCell, b = {r,c};
+      selectedCell = null;
+      if(NET.mode==="guest"){ netSend({t:"action", kind:"swap", a, b}); }
+      else { applySwap(myIdx, a, b); }
+      renderAll();
+    } else {
+      selectedCell = (selectedCell && selectedCell.r===r && selectedCell.c===c) ? null : {r,c};
+      renderAll();
+    }
+    return;
+  }
+  if(phase!=="play" || gameOver || currentPlayerIndex!==myIdx) return;
+  const cell = board[r][c];
+  const isDest = possibleMoves.some(m=>m.r===r && m.c===c);
+  if(isDest && selectedCell){
+    const from = selectedCell, to = {r,c};
+    selectedCell = null;
+    possibleMoves = [];
+    if(NET.mode==="guest"){ netSend({t:"action", kind:"move", from, to}); renderAll(); }
+    else { applyMove(myIdx, from, to); }
+    return;
+  }
+  if(cell && cell.owner===myIdx){
+    if(selectedCell && selectedCell.r===r && selectedCell.c===c){
+      selectedCell = null; possibleMoves = [];
+    } else {
+      selectedCell = {r,c};
+      possibleMoves = pieceMovesAt(r,c);
+    }
+    renderAll();
+  }
+}
+
+function renderPlayers(){
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+  players.forEach((p,idx)=>{
+    const alive = [];
+    for(let r=0;r<10;r++) for(let c=0;c<10;c++){
+      if(board[r][c] && board[r][c].owner===idx) alive.push(1);
+    }
+    const row = document.createElement("div");
+    row.className = "p-entry" + (phase==="play" && idx===currentPlayerIndex && !gameOver ? " current" : "");
+    row.innerHTML = `
+      <div class="p-dot" style="background:${p.color}"></div>
+      <div class="p-name">${p.name}${p.ai?` <span title="${AI_LEVELS[p.ai].label}">${AI_LEVELS[p.ai].icon}</span>`:""}${phase==="placement"?(readyFlags[idx]?" ✅":" ⏳"):""}</div>
+      <div class="p-count">${alive.length} pièces</div>
+    `;
+    list.appendChild(row);
+    const grave = document.createElement("div");
+    grave.className = "graveyard";
+    const counts = {};
+    captured[idx].forEach(rk=>{ counts[rk]=(counts[rk]||0)+1; });
+    const parts = Object.keys(counts).sort((a,b)=>rankValue(b)-rankValue(a))
+      .map(rk=>`${RANKS[rk].icon}${rk==="B"||rk==="F"?"":rk}×${counts[rk]}`);
+    grave.textContent = parts.length ? "Perdues : "+parts.join("  ") : "";
+    list.appendChild(grave);
+  });
+}
+
+function renderStatus(){
+  const title = document.getElementById("turnTitle");
+  const hint = document.getElementById("phaseHint");
+  const placeCtrl = document.getElementById("placementControls");
+  const myIdx = myPlayerIndex();
+  if(phase==="placement"){
+    title.textContent = "🛠 Placement des pièces";
+    if(readyFlags[myIdx]){
+      hint.textContent = "En attente de l'autre joueur…";
+      placeCtrl.style.display = "none";
+    } else {
+      hint.textContent = "Cliquez deux de vos pièces pour les échanger, puis validez.";
+      placeCtrl.style.display = "flex";
+    }
+  } else if(phase==="play"){
+    const cur = players[currentPlayerIndex];
+    title.textContent = gameOver ? "Partie terminée" : `Tour de ${cur.name}${cur.ai?" "+AI_LEVELS[cur.ai].icon:""}`;
+    hint.textContent = gameOver ? "" :
+      (currentPlayerIndex===myIdx ? "Cliquez une de vos pièces puis sa destination." :
+       (cur.ai ? `🤖 ${cur.name} réfléchit…` : "En attente de votre tour…"));
+    placeCtrl.style.display = "none";
+  } else {
+    title.textContent = "Partie terminée";
+    hint.textContent = "";
+    placeCtrl.style.display = "none";
+  }
+}
+
+function renderAll(){
+  renderStatus();
+  renderPlayers();
+  renderBoard();
+  netScheduleSync();
+}
+
+document.getElementById("shuffleBtn").addEventListener("click", ()=>{
+  const myIdx = myPlayerIndex();
+  selectedCell = null;
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"shuffle"}); return; }
+  applyShuffle(myIdx);
+  renderAll();
+});
+document.getElementById("readyBtn").addEventListener("click", ()=>{
+  const myIdx = myPlayerIndex();
+  selectedCell = null;
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"ready"}); return; }
+  applyReady(myIdx);
+});
+
+/* ============================================================
+   VICTOIRE
+   ============================================================ */
+function showVictory(){
+  const ov = document.getElementById("victory-overlay");
+  if(ov.classList.contains("active")) return;
+  const winner = players[winnerIdx];
+  const box = document.getElementById("victory-box");
+  box.innerHTML = `
+    <div style="font-size:64px;">🏆</div>
+    <h1>${winner ? winner.name+" remporte la bataille !" : "Partie terminée"}</h1>
+    <p>${captured[1-winnerIdx].length} pièce(s) ennemie(s) éliminée(s)</p>
+    <button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>
+  `;
+  const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12"];
+  if(winner) palette.push(winner.color, winner.color);
+  for(let k=0;k<90;k++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random()*100)+"vw";
+    c.style.background = palette[Math.floor(Math.random()*palette.length)];
+    c.style.width = (6+Math.random()*8)+"px";
+    c.style.height = (10+Math.random()*12)+"px";
+    c.style.animationDuration = (2.6+Math.random()*3)+"s";
+    c.style.animationDelay = (Math.random()*3)+"s";
+    ov.appendChild(c);
+  }
+  ov.classList.add("active");
+  netScheduleSync();
+}
+
+/* ============================================================
+   MODE EN LIGNE — PeerJS (même architecture que les autres jeux)
+   ============================================================ */
+function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
+function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } }
+
+document.getElementById("netLocalBtn").onclick = ()=>{
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+};
+document.getElementById("netHostBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netHostPanel").style.display = "block";
+  netHost(0);
+};
+document.getElementById("netJoinBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netJoinPanel").style.display = "block";
+};
+document.getElementById("netConnectBtn").onclick = ()=>{
+  const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
+  const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
+  if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  document.getElementById("netConnectBtn").disabled = true;
+  netJoin(code, name);
+};
+
+function netHost(attempt){
+  NET.mode = "host"; NET.mySide = "host";
+  const code = netGenCode();
+  netStatus("netHostStatus","Création de la partie…");
+  const peer = new Peer("str-"+code);
+  NET.peer = peer;
+  peer.on("open", ()=>{
+    document.getElementById("netCode").textContent = code;
+    netStatus("netHostStatus","En attente de l'autre joueur… Envoie-lui ce code !");
+  });
+  peer.on("error", (e)=>{
+    if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
+    else netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+  });
+  peer.on("connection", (c)=>{
+    if(NET.conn && NET.conn.open){ try{ c.close(); }catch(err){} return; }
+    NET.conn = c;
+    c.on("data", netHostOnData);
+    c.on("close", netOnConnLost);
+    c.on("error", netOnConnLost);
+  });
+}
+
+function netShowSetupAsHost(){
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  const info = document.getElementById("netSetupInfo");
+  info.style.display = "block";
+  info.style.background = ""; info.style.color = "";
+  info.textContent = `🌐 Partie en ligne — ${NET.guestName} est connecté(e) ! Vous êtes le joueur 1, ${NET.guestName} le joueur 2.`;
+  renderPlayerInputs();
+}
+setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 400);
+
+function netHostOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="hello"){
+    NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+    if(NET.started){
+      netHideBanner();
+      log(`🔌 ${NET.guestName} s'est reconnecté(e) à la partie.`);
+      netSendState();
+    } else {
+      netShowSetupAsHost();
+    }
+  } else if(msg.t==="setupGuest"){
+    netApplyGuestSetupChange(msg);
+  } else if(msg.t==="action"){
+    netHandleGuestAction(msg);
+  }
+}
+
+function netBroadcastSetup(){
+  if(NET.mode!=="host" || NET.started || !NET.conn || !NET.conn.open) return;
+  const colorEl = document.getElementById("pcolor1");
+  const nameEl = document.getElementById("pname1");
+  if(!colorEl || !nameEl) return;
+  netSend({t:"setup", guestColor:colorEl.value, guestName:nameEl.value});
+}
+function netApplyGuestSetupChange(msg){
+  if(NET.started) return;
+  const nameEl = document.getElementById("pname1");
+  const colorEl = document.getElementById("pcolor1");
+  if(!nameEl || !colorEl) return;
+  NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+  nameEl.value = NET.guestName;
+  if(msg.color) colorEl.value = msg.color;
+  netBroadcastSetup();
+}
+
+function netHandleGuestAction(msg){
+  if(!NET.started || gameOver) return;
+  const gIdx = players.findIndex(p=>p.side==="guest");
+  if(gIdx<0) return;
+  if(msg.kind==="swap"){
+    if(msg.a && msg.b){ applySwap(gIdx, {r:msg.a.r|0, c:msg.a.c|0}, {r:msg.b.r|0, c:msg.b.c|0}); renderAll(); }
+  } else if(msg.kind==="shuffle"){
+    applyShuffle(gIdx); renderAll();
+  } else if(msg.kind==="ready"){
+    applyReady(gIdx);
+  } else if(msg.kind==="move"){
+    if(msg.from && msg.to) applyMove(gIdx, {r:msg.from.r|0, c:msg.from.c|0}, {r:msg.to.r|0, c:msg.to.c|0});
+  }
+}
+
+/* ---------- synchronisation hôte -> invité ---------- */
+function netScheduleSync(){
+  if(NET.mode!=="host" || !NET.conn) return;
+  if(NET.syncTimer) return;
+  NET.syncTimer = setTimeout(()=>{ NET.syncTimer=null; netSendState(); }, 40);
+}
+/* le camp adverse n'est jamais envoyé en clair : ses grades non révélés partent en "?" */
+function maskedBoardForGuest(){
+  const gIdx = players.findIndex(p=>p.side==="guest");
+  return board.map(row=>row.map(cell=>{
+    if(!cell) return null;
+    if(cell.owner===gIdx || cell.revealed) return {owner:cell.owner, rank:cell.rank, revealed:cell.revealed};
+    return {owner:cell.owner, rank:"?", revealed:false};
+  }));
+}
+function netSendState(){
+  if(NET.mode!=="host" || !NET.started || NET.ended || !NET.conn || !NET.conn.open) return;
+  const victOn = document.getElementById("victory-overlay").classList.contains("active");
+  netSend({
+    t:"state",
+    phase, ready:readyFlags.slice(), cur:currentPlayerIndex,
+    gameOver, winnerIdx,
+    players: players.map(p=>({name:p.name, color:p.color, ai:p.ai||null, side:p.side||null})),
+    board: maskedBoardForGuest(),
+    captured: [captured[0].slice(), captured[1].slice()],
+    log: logHistory.slice(-140),
+    victory: victOn ? {active:true, html:document.getElementById("victory-box").innerHTML} : {active:false}
+  });
+}
+
+/* ---------- invité ---------- */
+function netJoin(code, name){
+  NET.mode = "guest"; NET.mySide = "guest";
+  NET.joinCode = code; NET.guestName = name;
+  netConnectAsGuest(false);
+}
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
+  const peer = new Peer();
+  NET.peer = peer;
+  let settled = false;
+  const fail = (msg)=>{
+    if(settled) return; settled = true;
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect) netScheduleGuestRetry();
+    else { netStatus("netJoinStatus", msg); document.getElementById("netConnectBtn").disabled = false; }
+  };
+  peer.on("error", (e)=>{
+    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+  });
+  peer.on("open", ()=>{
+    const c = peer.connect("str-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    c.on("open", ()=>{
+      clearTimeout(to); settled = true; NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName});
+      if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Personnalise ta couleur ci-dessous.");
+      else log("🔌 Reconnecté(e) à la partie.");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+  });
+}
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts = (NET.reconnectAttempts||0)+1;
+  netShowReconnectBanner();
+  if(NET.reconnectAttempts>30){ netReconnectFailed(); return; }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="state") netApplySnapshot(msg);
+  else if(msg.t==="setup") netApplySetupMsg(msg);
+}
+
+function netApplySetupMsg(msg){
+  if(NET.started) return;
+  document.getElementById("netJoinReadyPanel").style.display = "block";
+  const colorEl = document.getElementById("netGuestColor");
+  if(document.activeElement !== colorEl) colorEl.value = msg.guestColor;
+  const nameEl = document.getElementById("netGuestNameLive");
+  if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+}
+let netGuestSetupTimer = null;
+function netSendGuestSetup(){
+  if(NET.mode!=="guest") return;
+  clearTimeout(netGuestSetupTimer);
+  netGuestSetupTimer = setTimeout(()=>{
+    netSend({
+      t:"setupGuest",
+      name: document.getElementById("netGuestNameLive").value,
+      color: document.getElementById("netGuestColor").value
+    });
+  }, 120);
+}
+["netGuestColor","netGuestNameLive"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("input", netSendGuestSetup);
+  el.addEventListener("change", netSendGuestSetup);
+});
+
+function netApplySnapshot(s){
+  if(NET.ended) return;
+  if(!NET.started){
+    NET.started = true;
+    document.getElementById("netHome").style.display = "none";
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("game").classList.add("active");
+  }
+  players = s.players.map(p=>({name:p.name, color:p.color, ai:p.ai, side:p.side}));
+  phase = s.phase;
+  readyFlags = s.ready.slice();
+  currentPlayerIndex = s.cur;
+  gameOver = s.gameOver;
+  winnerIdx = s.winnerIdx;
+  board = s.board.map(row=>row.map(cell=>cell ? {owner:cell.owner, rank:cell.rank, revealed:cell.revealed} : null));
+  captured = [s.captured[0].slice(), s.captured[1].slice()];
+  // la sélection locale reste valide seulement si la pièce est toujours là
+  if(selectedCell){
+    const cell = board[selectedCell.r] && board[selectedCell.r][selectedCell.c];
+    const myIdx = myPlayerIndex();
+    if(!cell || cell.owner!==myIdx){ selectedCell = null; possibleMoves = []; }
+    else if(phase==="play"){ possibleMoves = pieceMovesAt(selectedCell.r, selectedCell.c); }
+  }
+  renderAll();
+  if(s.victory && s.victory.active){
+    const vo = document.getElementById("victory-overlay");
+    if(!vo.classList.contains("active")){
+      document.getElementById("victory-box").innerHTML = s.victory.html;
+      const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12"];
+      for(let k=0;k<90;k++){
+        const c = document.createElement("div");
+        c.className = "confetti";
+        c.style.left = (Math.random()*100)+"vw";
+        c.style.background = palette[Math.floor(Math.random()*palette.length)];
+        c.style.width = (6+Math.random()*8)+"px";
+        c.style.height = (10+Math.random()*12)+"px";
+        c.style.animationDuration = (2.6+Math.random()*3)+"s";
+        c.style.animationDelay = (Math.random()*3)+"s";
+        vo.appendChild(c);
+      }
+      vo.classList.add("active");
+    }
+  }
+  const logEl = document.getElementById("log");
+  const key = s.log.length+"|"+(s.log[0]||"")+"|"+(s.log[s.log.length-1]||"");
+  if(logEl.dataset.key !== key){
+    logEl.dataset.key = key;
+    logEl.innerHTML = "";
+    s.log.forEach(m=>{ const d=document.createElement("div"); d.textContent=m; logEl.appendChild(d); });
+  }
+}
+
+/* ---------- déconnexion / reconnexion ---------- */
+function netShowBanner(html){
+  let b = document.getElementById("netBanner");
+  if(!b){ b = document.createElement("div"); b.id="netBanner"; b.className="net-reconnect-banner"; document.body.appendChild(b); }
+  b.innerHTML = html;
+}
+function netHideBanner(){ const b = document.getElementById("netBanner"); if(b) b.remove(); }
+function netOnConnLost(){
+  if(NET.mode==="host") netHostOnDisconnect();
+  else if(NET.mode==="guest") netGuestOnDisconnect();
+}
+function netHostOnDisconnect(){
+  NET.conn = null;
+  if(!NET.started){
+    const info = document.getElementById("netSetupInfo");
+    if(info && document.getElementById("setup").style.display!=="none"){
+      info.style.display = "block"; info.style.background="#fdecea"; info.style.color="#7a1f1f";
+      info.textContent = `🔌 ${NET.guestName||"L'autre joueur"} s'est déconnecté(e) avant le début. Renvoie-lui le lien et le code pour qu'il/elle revienne.`;
+    } else {
+      netStatus("netHostStatus","Le joueur s'est déconnecté avant le début. Attends qu'il/elle revienne avec le même code.");
+    }
+    return;
+  }
+  netShowBanner(`🔌 ${netEsc(NET.guestName)} s'est déconnecté(e). En attente de reconnexion… <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  const btn = document.getElementById("netHostGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+function netGuestOnDisconnect(){
+  if(NET.reconnecting || NET.ended) return;
+  NET.conn = null; NET.reconnectAttempts = 0;
+  try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
+  netScheduleGuestRetry();
+}
+function netShowReconnectBanner(){
+  netShowBanner(`🔌 Connexion perdue. Reconnexion en cours… (tentative ${NET.reconnectAttempts}/30) <button id="netRetryNowBtn">Réessayer maintenant</button>`);
+  const btn = document.getElementById("netRetryNowBtn");
+  if(btn) btn.onclick = ()=>{ netConnectAsGuest(true); };
+}
+function netReconnectFailed(){
+  NET.reconnecting = false; NET.ended = true;
+  netShowBanner(`❌ Impossible de se reconnecter — l'autre joueur a peut-être fermé la partie. <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+  const btn = document.getElementById("netGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+</script>
+</body>
+</html>
