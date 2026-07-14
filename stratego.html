@@ -82,6 +82,18 @@
     font-size:clamp(10px,3.2vmin,20px);
   }
   .anim-hide{opacity:0 !important;}
+  /* glisser-déposer pendant le placement */
+  .str-cell.myzone{touch-action:none;}
+  .str-cell.myzone .str-piece{cursor:grab;}
+  .drag-clone{
+    position:fixed;z-index:999;pointer-events:none;margin:0;
+    transform:scale(1.12);
+    box-shadow:0 10px 22px rgba(0,0,0,.55);
+    opacity:.95;
+  }
+  .str-piece.drag-src-piece{opacity:.35;}
+  .str-cell.drag-over{box-shadow:inset 0 0 0 3px #ffb300;}
+  .str-cell.drag-over .str-piece{transform:scale(.92);}
   /* trace du dernier coup : case de départ (pointillés) et d'arrivée (halo) */
   .str-cell.last-from::before{
     content:"";position:absolute;inset:12%;
@@ -521,7 +533,7 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   }
   document.getElementById("setup").style.display = "none";
   document.getElementById("game").classList.add("active");
-  log("Partie de Stratego lancée ! Placez vos pièces : cliquez deux pièces pour les échanger.");
+  log("Partie de Stratego lancée ! Placez vos pièces : glissez-déposez (ou cliquez deux pièces) pour les échanger.");
   if(NET.mode==="host"){ NET.started = true; }
   renderAll();
   if(NET.mode==="host"){ netSendState(); }
@@ -771,11 +783,15 @@ function cellElAt(r,c){
 /* fait glisser un clone de la pièce de la case de départ à l'arrivée */
 function animateMove(from, to, piece){
   const wrap = document.getElementById("boardWrap");
-  const fromEl = cellElAt(from.r, from.c);
-  const toEl = cellElAt(to.r, to.c);
-  if(!wrap || !fromEl || !toEl || !players[piece.owner]) return;
+  if(!wrap || !players[piece.owner]) return;
   animHide = [{r:from.r,c:from.c},{r:to.r,c:to.c}];
   renderBoard(); // masque les pièces de départ/arrivée pendant le vol
+  // IMPORTANT : requêter les cases APRÈS renderBoard — il reconstruit le
+  // plateau, et les anciens éléments détachés ont des rects à zéro
+  // (c'était la cause de la « téléportation »)
+  const fromEl = cellElAt(from.r, from.c);
+  const toEl = cellElAt(to.r, to.c);
+  if(!fromEl || !toEl){ animHide = null; renderBoard(); return; }
   const wr = wrap.getBoundingClientRect();
   const fr = fromEl.getBoundingClientRect();
   const tr = toEl.getBoundingClientRect();
@@ -797,16 +813,22 @@ function animateMove(from, to, piece){
       : "?";
   }
   wrap.appendChild(clone);
-  requestAnimationFrame(()=>{
-    clone.style.transform = `translate(${tr.left-fr.left}px, ${tr.top-fr.top}px)`;
-  });
+  // durée proportionnelle à la distance (l'éclaireur traverse le plateau)
+  const dx = tr.left-fr.left, dy = tr.top-fr.top;
+  const dur = Math.min(650, 280 + Math.hypot(dx,dy)*0.6);
+  clone.style.transition = `transform ${Math.round(dur)}ms ease`;
+  // reflow forcé entre les deux écritures de style : garantit que la
+  // transition démarre (technique FLIP), là où requestAnimationFrame
+  // seul laissait parfois la pièce se téléporter
+  clone.getBoundingClientRect();
+  clone.style.transform = `translate(${dx}px, ${dy}px)`;
   setTimeout(()=>{
     clone.remove();
     animHide = null;
     renderBoard();
     const el = cellElAt(to.r, to.c);
     if(el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"), 900); }
-  }, 420);
+  }, dur+90);
 }
 
 function startTurn(anim){
@@ -937,6 +959,8 @@ function renderBoard(){
         }
         if(selectedCell && selectedCell.r===r && selectedCell.c===c) piece.classList.add("sel");
         if(animHide && animHide.some(a=>a.r===r && a.c===c)) piece.classList.add("anim-hide");
+        // un re-rendu pendant un glisser-déposer ne doit pas faire réapparaître la pièce
+        if(drag && drag.started && drag.from.r===r && drag.from.c===c) piece.classList.add("drag-src-piece");
         el.appendChild(piece);
       }
 
@@ -955,12 +979,124 @@ function renderBoard(){
         el.classList.add("targetable");
         el.onclick = ()=>onCellClick(r,c);
       }
+      if(canPlace && cell && cell.owner===myIdx){
+        el.onpointerdown = e=>onPlacePointerDown(e, r, c);
+      }
       boardEl.appendChild(el);
     }
   }
 }
 
+/* ============================================================
+   GLISSER-DÉPOSER (phase de placement)
+   ============================================================ */
+let drag = null;              // {from:{r,c}, startX, startY, started, clone, over}
+let suppressClickUntil = 0;   // évite que le drop déclenche aussi un clic-échange
+
+function viewToReal(vr,vc){
+  return myPlayerIndex()===1 ? {r:9-vr, c:9-vc} : {r:vr, c:vc};
+}
+/* case (réelle) sous le pointeur, ou null */
+function cellUnderPointer(e){
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const cellEl = el && el.closest ? el.closest(".str-cell") : null;
+  if(!cellEl) return null;
+  return {el:cellEl, ...viewToReal(+cellEl.dataset.vr, +cellEl.dataset.vc)};
+}
+
+function onPlacePointerDown(e, r, c){
+  const myIdx = myPlayerIndex();
+  if(phase!=="placement" || readyFlags[myIdx] || drag) return;
+  if(e.button!==undefined && e.button!==0) return;
+  const cell = board[r][c];
+  if(!cell || cell.owner!==myIdx) return;
+  drag = {from:{r,c}, startX:e.clientX, startY:e.clientY, started:false, clone:null, over:null};
+  window.addEventListener("pointermove", onPlacePointerMove);
+  window.addEventListener("pointerup", onPlacePointerUp);
+  window.addEventListener("pointercancel", onPlacePointerCancel);
+}
+
+function onPlacePointerMove(e){
+  if(!drag) return;
+  if(!drag.started){
+    // petit seuil : en dessous, ça reste un simple clic (échange par 2 clics)
+    if(Math.hypot(e.clientX-drag.startX, e.clientY-drag.startY) < 6) return;
+    drag.started = true;
+    selectedCell = null;
+    const srcCell = cellElAt(drag.from.r, drag.from.c);
+    const srcPiece = srcCell && srcCell.querySelector(".str-piece");
+    if(!srcPiece){ endDrag(); return; }
+    const rect = srcCell.getBoundingClientRect();
+    const clone = srcPiece.cloneNode(true);
+    clone.classList.add("drag-clone");
+    clone.classList.remove("sel");
+    const pr = srcPiece.getBoundingClientRect();
+    clone.style.width = pr.width+"px";
+    clone.style.height = pr.height+"px";
+    document.body.appendChild(clone);
+    drag.clone = clone;
+    drag.cloneW = pr.width; drag.cloneH = pr.height;
+    srcPiece.classList.add("drag-src-piece");
+  }
+  e.preventDefault();
+  drag.clone.style.left = (e.clientX - drag.cloneW/2)+"px";
+  drag.clone.style.top  = (e.clientY - drag.cloneH/2)+"px";
+  // surbrillance de la case cible valide sous le pointeur
+  const myIdx = myPlayerIndex();
+  const hit = cellUnderPointer(e);
+  const valid = hit && inZone(myIdx, hit.r) && board[hit.r][hit.c] &&
+                board[hit.r][hit.c].owner===myIdx &&
+                !(hit.r===drag.from.r && hit.c===drag.from.c);
+  if(drag.over){ drag.over.classList.remove("drag-over"); drag.over = null; }
+  if(valid){ drag.over = hit.el; hit.el.classList.add("drag-over"); }
+}
+
+function onPlacePointerUp(e){
+  if(!drag) return;
+  if(!drag.started){ endDrag(); return; } // simple clic : géré par onCellClick
+  suppressClickUntil = Date.now()+200;
+  const myIdx = myPlayerIndex();
+  const hit = cellUnderPointer(e);
+  const valid = hit && inZone(myIdx, hit.r) && board[hit.r][hit.c] &&
+                board[hit.r][hit.c].owner===myIdx &&
+                !(hit.r===drag.from.r && hit.c===drag.from.c);
+  const from = drag.from;
+  endDrag();
+  if(valid){
+    const a = {r:from.r, c:from.c}, b = {r:hit.r, c:hit.c};
+    if(NET.mode==="guest"){ netSend({t:"action", kind:"swap", a, b}); }
+    else { applySwap(myIdx, a, b); }
+    selectedCell = null;
+    renderAll();
+    [a,b].forEach(p=>{
+      const el = cellElAt(p.r, p.c);
+      if(el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"), 900); }
+    });
+  } else {
+    renderAll(); // la pièce revient simplement à sa place
+  }
+}
+
+function onPlacePointerCancel(){
+  if(!drag) return;
+  endDrag();
+  renderAll();
+}
+
+function endDrag(){
+  if(drag && drag.clone) drag.clone.remove();
+  if(drag && drag.over) drag.over.classList.remove("drag-over");
+  const srcCell = drag && cellElAt(drag.from.r, drag.from.c);
+  const srcPiece = srcCell && srcCell.querySelector(".str-piece");
+  if(srcPiece) srcPiece.classList.remove("drag-src-piece");
+  drag = null;
+  window.removeEventListener("pointermove", onPlacePointerMove);
+  window.removeEventListener("pointerup", onPlacePointerUp);
+  window.removeEventListener("pointercancel", onPlacePointerCancel);
+}
+
 function onCellClick(r,c){
+  if(Date.now() < suppressClickUntil) return;
   const myIdx = myPlayerIndex();
   if(phase==="placement"){
     if(readyFlags[myIdx]) return;
@@ -1038,7 +1174,7 @@ function renderStatus(){
       hint.textContent = "En attente de l'autre joueur…";
       placeCtrl.style.display = "none";
     } else {
-      hint.textContent = "Cliquez deux de vos pièces pour les échanger, puis validez.";
+      hint.textContent = "Glissez-déposez vos pièces pour les échanger (ou cliquez-en deux), puis validez.";
       placeCtrl.style.display = "flex";
     }
   } else if(phase==="play"){
