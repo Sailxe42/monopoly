@@ -670,10 +670,15 @@ function combatOutcome(att, def){
 }
 
 /* 🧠 MÉMOIRE : une pièce révélée par un combat ne le reste qu'un tour —
-   l'adversaire a un coup pour la regarder, puis elle se retourne. */
-function revealPiece(pc){
+   celui qui découvre l'info a un coup pour la regarder, puis elle se
+   retourne. Le nombre de demi-coups avant expiration dépend de qui doit
+   la voir : si c'est ma pièce qu'on révèle à l'adversaire, il joue juste
+   après (2 demi-coups suffisent). Si c'est la pièce adverse qu'on me
+   révèle après une attaque perdue, mon prochain tour n'arrive qu'après
+   le coup de l'adversaire (il faut donc 3 demi-coups). */
+function revealPiece(pc, halfMoves=2){
   pc.revealed = true;
-  pc.revealExpire = moveCounter + 2;
+  pc.revealExpire = moveCounter + halfMoves;
 }
 function expireReveals(){
   for(let r=0;r<10;r++) for(let c=0;c<10;c++){
@@ -723,7 +728,7 @@ function applyMove(pIdx, from, to){
     } else if(outcome==="lose"){
       captured[pIdx].push(cell.rank);
       board[from.r][from.c] = null;
-      revealPiece(target);
+      revealPiece(target, 3);
       log(`⚔️ ${rankLabel(cell.rank)} de ${p.name} attaque ${rankLabel(target.rank)} de ${opp.name}… et est éliminé !`);
     } else {
       captured[pIdx].push(cell.rank);
@@ -1031,6 +1036,10 @@ function onPlacePointerMove(e){
     clone.classList.add("drag-clone");
     clone.classList.remove("sel");
     const pr = srcPiece.getBoundingClientRect();
+    // position:fixed en inline : le clone hérite aussi de .str-piece qui
+    // pose position:relative avec la même spécificité CSS ; sans ceci le
+    // clone reste dans le flux du document (élargit la page, scrollbar).
+    clone.style.position = "fixed";
     clone.style.width = pr.width+"px";
     clone.style.height = pr.height+"px";
     document.body.appendChild(clone);
