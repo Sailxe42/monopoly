@@ -591,7 +591,7 @@ function playCard(pIdx, handIdx, targetIdx){
   } else if(def.type==="safety"){
     p.safeties.add(cardId);
     if(def.guards.includes(p.status)){
-      if(p.battleCardId) discard.push(p.battleCardId);
+      if(p.battleCardId && !p.safeties.has(p.battleCardId)) discard.push(p.battleCardId);
       p.status = "go";
       p.battleCardId = cardId;
     } else if(p.status==="needsGo" && cardId==="s_priority"){
@@ -612,7 +612,7 @@ function playCard(pIdx, handIdx, targetIdx){
       p.speedCardId = null;
       discard.push(cardId);
     } else {
-      if(p.battleCardId) discard.push(p.battleCardId);
+      if(p.battleCardId && !p.safeties.has(p.battleCardId)) discard.push(p.battleCardId);
       p.status = "go";
       p.battleCardId = cardId;
     }
@@ -623,7 +623,7 @@ function playCard(pIdx, handIdx, targetIdx){
       t.speedLimited = true;
       t.speedCardId = cardId;
     } else {
-      if(t.battleCardId) discard.push(t.battleCardId);
+      if(t.battleCardId && !t.safeties.has(t.battleCardId)) discard.push(t.battleCardId);
       t.status = def.hazard;
       t.battleCardId = cardId;
     }
