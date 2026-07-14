@@ -140,6 +140,15 @@
   .mb-card.mb-back{background:repeating-linear-gradient(45deg,#c0392b,#c0392b 6px,#a93226 6px,#a93226 12px);color:#fff;border-color:#7a1f1f;}
   .mb-back-logo{font-size:9px;font-weight:800;text-shadow:1px 1px 0 #000;}
 
+  .mb-card.mb-img{
+    width:58px;height:auto;aspect-ratio:150/336;padding:0;
+    background-color:#f7f4ec;background-size:contain;background-repeat:no-repeat;background-position:center;
+    border:1px solid #999;box-shadow:0 1px 4px rgba(0,0,0,.3);
+  }
+  .mb-card.mb-img.mb-small{width:38px;}
+  .mb-card.mb-img .mb-value,.mb-card.mb-img .mb-unit,.mb-card.mb-img .mb-icon,.mb-card.mb-img .mb-label{display:none;}
+  #styleBtn{padding:6px 10px;font-size:12.5px;}
+
   #centerPiles{display:flex;align-items:center;justify-content:center;gap:22px;background:var(--panel-bg);border-radius:10px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,.22);}
   .pile-block{text-align:center;}
   .pile-block .pile-label{font-size:11px;font-weight:700;color:#555;margin-bottom:4px;}
@@ -189,6 +198,8 @@
     .mb-card{width:52px;height:72px;}
     .mb-card .mb-value{font-size:17px;}
     .mb-card .mb-icon{font-size:15px;}
+    .mb-card.mb-img{width:50px;height:auto;}
+    .mb-card.mb-img.mb-small{width:32px;}
     .race-car-label{font-size:8px;}
     #victory-box{padding:24px 20px;}
   }
@@ -282,6 +293,7 @@
       <span>🂠 Pioche : <b id="deckCount">0</b></span>
       <span>🗑 Défausse : <span id="discardTop">—</span></span>
     </div>
+    <button class="btn secondary" id="styleBtn">🎨 Style : Images</button>
   </div>
 
   <div id="raceTrack">
@@ -364,6 +376,12 @@ function shuffle(arr){
 function safetyCardFor(hazard){
   return Object.keys(CARD_DEFS).find(k=>CARD_DEFS[k].type==="safety" && CARD_DEFS[k].guards.includes(hazard));
 }
+
+/* ============================================================
+   ILLUSTRATIONS — planche asset/1000Born.png découpée en cartes
+   individuelles (asset/cards-mb/<id>.png, même nom que CARD_DEFS)
+   ============================================================ */
+let cardStyle = localStorage.getItem("mbCardStyle") || "img"; // "img" | "classic"
 
 const AI_LEVELS = {
   easy:{label:"IA facile", icon:"🙂", smart:0.30},
@@ -743,7 +761,10 @@ function cardHtml(cardId, opts){
   opts = opts || {};
   const def = CARD_DEFS[cardId];
   if(!def) return "";
-  const cls = "mb-card mb-"+def.type+(opts.small?" mb-small":"");
+  const cls = "mb-card mb-"+def.type+(opts.small?" mb-small":"")+(cardStyle==="img"?" mb-img":"");
+  if(cardStyle==="img"){
+    return `<div class="${cls}" style="background-image:url('asset/cards-mb/${cardId}.png')" title="${def.label}"></div>`;
+  }
   let body;
   if(def.type==="distance"){
     body = `<div class="mb-value">${def.value}</div><div class="mb-unit">km</div>`;
@@ -753,8 +774,20 @@ function cardHtml(cardId, opts){
   return `<div class="${cls}">${body}</div>`;
 }
 function cardBackHtml(small){
-  return `<div class="mb-card mb-back${small?" mb-small":""}"><div class="mb-back-logo">1000<br>BORNES</div></div>`;
+  const cls = "mb-card mb-back"+(small?" mb-small":"")+(cardStyle==="img"?" mb-img":"");
+  if(cardStyle==="img"){
+    return `<div class="${cls}" style="background-image:url('asset/cards-mb/back.png')"></div>`;
+  }
+  return `<div class="${cls}"><div class="mb-back-logo">1000<br>BORNES</div></div>`;
 }
+function toggleCardStyle(){
+  cardStyle = cardStyle==="img" ? "classic" : "img";
+  localStorage.setItem("mbCardStyle", cardStyle);
+  document.getElementById("styleBtn").textContent = cardStyle==="img" ? "🎨 Style : Images" : "🎨 Style : Classique";
+  renderAll();
+}
+document.getElementById("styleBtn").addEventListener("click", toggleCardStyle);
+document.getElementById("styleBtn").textContent = cardStyle==="img" ? "🎨 Style : Images" : "🎨 Style : Classique";
 
 function statusText(p){
   const parts = [];
