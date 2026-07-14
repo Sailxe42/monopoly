@@ -69,7 +69,26 @@
   #game{display:none;width:100%;max-width:1100px;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap;}
   #game.active{display:flex;}
 
-  #boardWrap{flex-shrink:0;}
+  #boardWrap{flex-shrink:0;position:relative;}
+  /* clone volant pour l'animation de déplacement */
+  .anim-clone{
+    position:absolute;z-index:40;
+    transition:transform .38s ease;
+    pointer-events:none;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;color:#fff;border-radius:6px;
+    border:2px solid rgba(255,255,255,.75);
+    box-shadow:0 4px 10px rgba(0,0,0,.5);
+    font-size:clamp(10px,3.2vmin,20px);
+  }
+  .anim-hide{opacity:0 !important;}
+  /* trace du dernier coup : case de départ (pointillés) et d'arrivée (halo) */
+  .str-cell.last-from::before{
+    content:"";position:absolute;inset:12%;
+    border:2px dashed rgba(255,235,59,.9);
+    border-radius:6px;pointer-events:none;
+  }
+  .str-cell.last-to{box-shadow:inset 0 0 0 3px rgba(255,235,59,.55);}
   #board{
     display:grid;
     grid-template-columns:repeat(10,1fr);
@@ -132,7 +151,25 @@
   .str-piece.sel{outline:3px solid #ffb300;transform:scale(1.06);}
   .str-piece .revealed-mark{
     position:absolute;top:-1px;right:1px;font-size:.42em;opacity:.9;
+    text-shadow:0 0 3px #000;
   }
+  /* mode portraits : rectangle vertical dans la case carrée, pour voir
+     tête + buste au lieu d'un carré trop zoomé. Le ratio 94/65 doit rester
+     synchronisé avec IMG_PIECE_RATIO côté JS. */
+  .str-piece.img-piece{
+    width:65%;height:94%;
+    background-repeat:no-repeat;
+    border-width:2px;
+    overflow:hidden;
+  }
+  .str-piece.img-piece .rank-badge{
+    position:absolute;bottom:0;right:0;
+    font-size:.52em;font-weight:800;
+    background:rgba(0,0,0,.62);color:#fff;
+    padding:0 3px;border-radius:4px 0 4px 0;
+    line-height:1.35;
+  }
+  #styleBtn{margin-top:8px;font-size:12px;padding:6px 10px;}
 
   /* ---------- SIDE ---------- */
   #side{width:330px;display:flex;flex-direction:column;gap:10px;}
@@ -218,7 +255,8 @@
     <summary>📖 Règles rapides</summary>
     <p>Chacun place ses 40 pièces (grades cachés de l'adversaire) puis tente de capturer le <b>drapeau</b> ennemi. Une pièce se déplace d'une case (l'<b>éclaireur 2</b> se déplace en ligne droite comme une tour). Attaquer révèle les deux pièces : le grade le plus fort gagne, égalité = les deux sont éliminées.</p>
     <p>⚡ Spécial : l'<b>espion (1)</b> élimine le Maréchal (10) s'il l'attaque en premier. Seuls les <b>démineurs (3)</b> désamorcent les bombes 💣 — toute autre pièce qui attaque une bombe est détruite. Les bombes et le drapeau ne bougent jamais.</p>
-    <p>🏆 Victoire : capturer le drapeau adverse, ou bloquer l'adversaire (plus aucun coup possible). Une pièce qui survit à un combat reste révélée.</p>
+    <p>🏆 Victoire : capturer le drapeau adverse, ou bloquer l'adversaire (plus aucun coup possible).</p>
+    <p>🧠 <b>Mémoire :</b> une pièce révélée par un combat ne le reste qu'<b>un tour</b>, puis se retourne face cachée — à vous de retenir qui est qui ! Les cases du dernier coup restent marquées (départ en pointillés, arrivée en surbrillance).</p>
   </details>
 
   <div style="text-align:center;">
@@ -239,6 +277,9 @@
       <div id="placementControls">
         <button class="btn secondary" id="shuffleBtn">🔀 Mélanger</button>
         <button class="btn" id="readyBtn">✅ Prêt !</button>
+      </div>
+      <div style="text-align:center;">
+        <button class="btn secondary" id="styleBtn">🎨 Style : Portraits</button>
       </div>
     </div>
 
@@ -280,6 +321,42 @@ const RANKS = {
 function rankLabel(rank){
   const d = RANKS[rank];
   return rank==="B"||rank==="F" ? d.name : `${d.name} (${rank})`;
+}
+
+/* ============================================================
+   PORTRAITS — planche asset/stratego.png (1536×1024)
+   Deux rangées : armée bleue en haut, rouge en bas. Coordonnées des
+   cases mesurées au pixel (analyse canvas) — décalage bleu→rouge : 508px.
+   Joueur 1 (en bas) = armée rouge, joueur 2 = armée bleue.
+   ============================================================ */
+const SPRITE_SHEET = {img:"asset/stratego.png", W:1536, H:1024, blueTop:70, redTop:578, bandH:339};
+const SPRITE_COLS = {
+  "10":[8,151], "9":[163,133], "8":[299,132], "7":[434,127],
+  "6":[565,122], "5":[691,124], "4":[818,118], "3":[939,134],
+  "2":[1077,116], "1":[1197,116], "B":[1323,99], "F":[1425,103],
+};
+let pieceStyle = localStorage.getItem("strategoStyle") || "img"; // "img" | "classic"
+
+/* ratio hauteur/largeur de .str-piece.img-piece (la case est carrée) —
+   doit rester synchronisé avec width/height du CSS .str-piece.img-piece */
+const IMG_PIECE_RATIO = 94/65;
+/* décalage vertical du cadrage (depuis le haut de bande) pour la bombe et
+   le drapeau, mesuré sur la planche pour cadrer l'objet entier */
+const SPRITE_BF_TOP = {B:170, F:88};
+
+/* style CSS inline pour afficher le portrait (rectangle vertical) d'une pièce */
+function spriteCss(rank, ownerIdx){
+  const col = SPRITE_COLS[rank];
+  if(!col) return "";
+  const [x, w] = col;
+  const top = ownerIdx===0 ? SPRITE_SHEET.redTop : SPRITE_SHEET.blueTop;
+  const cropH = w * IMG_PIECE_RATIO;
+  // personnages : cadrage ancré en haut de bande (tête + buste)
+  const y = top + (SPRITE_BF_TOP[rank] || 0);
+  const sizePct = SPRITE_SHEET.W / w * 100;
+  const posX = x / (SPRITE_SHEET.W - w) * 100;
+  const posY = y / (SPRITE_SHEET.H - cropH) * 100;
+  return `background-image:url('${SPRITE_SHEET.img}');background-size:${sizePct}% auto;background-position:${posX}% ${posY}%;`;
 }
 function rankValue(rank){
   if(rank==="F") return 100;
@@ -331,6 +408,9 @@ let captured = [[],[]];      // captured[i] = pièces PERDUES par le joueur i
 let gameOver = false;
 let winnerIdx = null;
 let logHistory = [];
+let lastMove = null;    // {from,to} — trace du dernier coup joué
+let moveCounter = 0;    // compte les coups joués (sert à l'expiration des révélations)
+let animHide = null;    // cases dont la pièce est masquée pendant l'animation
 
 const NET = {
   mode:null, mySide:null, peer:null, conn:null,
@@ -429,6 +509,9 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   winnerIdx = null;
   selectedCell = null;
   possibleMoves = [];
+  lastMove = null;
+  moveCounter = 0;
+  animHide = null;
   // placement initial aléatoire pour les deux camps (modifiable ensuite)
   applyShuffle(0);
   applyShuffle(1);
@@ -574,6 +657,22 @@ function combatOutcome(att, def){
   return "tie";
 }
 
+/* 🧠 MÉMOIRE : une pièce révélée par un combat ne le reste qu'un tour —
+   l'adversaire a un coup pour la regarder, puis elle se retourne. */
+function revealPiece(pc){
+  pc.revealed = true;
+  pc.revealExpire = moveCounter + 2;
+}
+function expireReveals(){
+  for(let r=0;r<10;r++) for(let c=0;c<10;c++){
+    const pc = board[r][c];
+    if(pc && pc.revealed && pc.revealExpire!==undefined && moveCounter>=pc.revealExpire){
+      pc.revealed = false;
+      delete pc.revealExpire;
+    }
+  }
+}
+
 function applyMove(pIdx, from, to){
   if(phase!=="play" || gameOver) return {ok:false};
   if(pIdx!==currentPlayerIndex) return {ok:false};
@@ -583,7 +682,9 @@ function applyMove(pIdx, from, to){
 
   const target = board[to.r][to.c];
   const p = players[pIdx];
-  const flashCells = [to];
+  // apparence de la pièce AVANT le coup (pour l'animation, selon le point de vue de chacun)
+  const preView = {owner:cell.owner, rank:cell.rank, revealed:!!cell.revealed};
+  let ended = false;
 
   if(!target){
     board[to.r][to.c] = cell;
@@ -594,26 +695,23 @@ function applyMove(pIdx, from, to){
     if(outcome==="flag"){
       board[to.r][to.c] = cell;
       board[from.r][from.c] = null;
-      cell.revealed = true;
+      cell.revealed = true; // fin de partie : reste visible
       captured[target.owner].push("F");
       gameOver = true;
       winnerIdx = pIdx;
       phase = "over";
+      ended = true;
       log(`🚩 ${p.name} capture le drapeau de ${opp.name} avec ${rankLabel(cell.rank)} — VICTOIRE !`);
-      renderAll();
-      showVictory();
-      return {ok:true};
-    }
-    if(outcome==="win"){
+    } else if(outcome==="win"){
       captured[target.owner].push(target.rank);
       board[to.r][to.c] = cell;
       board[from.r][from.c] = null;
-      cell.revealed = true;
+      revealPiece(cell);
       log(`⚔️ ${rankLabel(cell.rank)} de ${p.name} ${target.rank==="B"?"désamorce la Bombe":"bat "+rankLabel(target.rank)} de ${opp.name}.`);
     } else if(outcome==="lose"){
       captured[pIdx].push(cell.rank);
       board[from.r][from.c] = null;
-      target.revealed = true;
+      revealPiece(target);
       log(`⚔️ ${rankLabel(cell.rank)} de ${p.name} attaque ${rankLabel(target.rank)} de ${opp.name}… et est éliminé !`);
     } else {
       captured[pIdx].push(cell.rank);
@@ -624,32 +722,98 @@ function applyMove(pIdx, from, to){
     }
   }
 
+  lastMove = {from:{r:from.r,c:from.c}, to:{r:to.r,c:to.c}};
+  moveCounter++;
+  expireReveals();
+
+  // animation côté invité : la pièce telle qu'ELLE la voyait avant le coup
+  if(NET.mode==="host"){
+    const gIdx = players.findIndex(pp=>pp.side==="guest");
+    const showToGuest = preView.owner===gIdx || preView.revealed;
+    netSend({t:"anim", from, to, piece:{owner:preView.owner, rank: showToGuest?preView.rank:"?"}});
+  }
+
   // adversaire bloqué = défaite
-  const oppIdx = 1-pIdx;
-  if(!hasAnyMove(oppIdx)){
-    gameOver = true;
-    winnerIdx = pIdx;
-    phase = "over";
-    log(`🏆 ${players[oppIdx].name} ne peut plus bouger — ${p.name} remporte la partie !`);
+  if(!ended){
+    const oppIdx = 1-pIdx;
+    if(!hasAnyMove(oppIdx)){
+      gameOver = true;
+      winnerIdx = pIdx;
+      phase = "over";
+      ended = true;
+      log(`🏆 ${players[oppIdx].name} ne peut plus bouger — ${p.name} remporte la partie !`);
+    }
+  }
+
+  if(ended){
     renderAll();
+    animateMove(from, to, localAnimPiece(preView));
     showVictory();
     return {ok:true};
   }
-
-  currentPlayerIndex = oppIdx;
-  startTurn(flashCells);
+  currentPlayerIndex = 1-pIdx;
+  startTurn({from, to, piece:localAnimPiece(preView)});
   return {ok:true};
 }
 
-function startTurn(flashCells){
+/* la pièce telle que le joueur LOCAL la voyait avant le coup */
+function localAnimPiece(preView){
+  const my = myPlayerIndex();
+  const show = preView.owner===my || preView.revealed;
+  return {owner:preView.owner, rank: show?preView.rank:"?"};
+}
+
+function cellElAt(r,c){
+  const v = toView(r,c);
+  return document.querySelector(`.str-cell[data-vr="${v.r}"][data-vc="${v.c}"]`);
+}
+
+/* fait glisser un clone de la pièce de la case de départ à l'arrivée */
+function animateMove(from, to, piece){
+  const wrap = document.getElementById("boardWrap");
+  const fromEl = cellElAt(from.r, from.c);
+  const toEl = cellElAt(to.r, to.c);
+  if(!wrap || !fromEl || !toEl || !players[piece.owner]) return;
+  animHide = [{r:from.r,c:from.c},{r:to.r,c:to.c}];
+  renderBoard(); // masque les pièces de départ/arrivée pendant le vol
+  const wr = wrap.getBoundingClientRect();
+  const fr = fromEl.getBoundingClientRect();
+  const tr = toEl.getBoundingClientRect();
+  const clone = document.createElement("div");
+  const show = piece.rank!=="?";
+  clone.className = "anim-clone"+(show?"":" hidden-piece");
+  clone.style.background = players[piece.owner].color;
+  clone.style.width = (fr.width*0.84)+"px";
+  clone.style.height = (fr.height*0.84)+"px";
+  clone.style.left = (fr.left-wr.left + fr.width*0.08)+"px";
+  clone.style.top = (fr.top-wr.top + fr.height*0.08)+"px";
+  if(show && pieceStyle==="img"){
+    clone.style.cssText += spriteCss(piece.rank, piece.owner) + "background-repeat:no-repeat;";
+    clone.style.borderColor = players[piece.owner].color;
+    clone.innerHTML = "";
+  } else {
+    clone.innerHTML = show
+      ? ((piece.rank==="B"||piece.rank==="F") ? `<span>${RANKS[piece.rank].icon}</span>` : `<span>${piece.rank}</span>`)
+      : "?";
+  }
+  wrap.appendChild(clone);
+  requestAnimationFrame(()=>{
+    clone.style.transform = `translate(${tr.left-fr.left}px, ${tr.top-fr.top}px)`;
+  });
+  setTimeout(()=>{
+    clone.remove();
+    animHide = null;
+    renderBoard();
+    const el = cellElAt(to.r, to.c);
+    if(el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"), 900); }
+  }, 420);
+}
+
+function startTurn(anim){
   selectedCell = null;
   possibleMoves = [];
   renderAll();
-  (flashCells||[]).forEach(({r,c})=>{
-    const v = toView(r,c);
-    const el = document.querySelector(`.str-cell[data-vr="${v.r}"][data-vc="${v.c}"]`);
-    if(el){ el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"), 1000); }
-  });
+  if(anim) animateMove(anim.from, anim.to, anim.piece);
   const p = players[currentPlayerIndex];
   if(p && p.ai && phase==="play" && !gameOver && NET.mode!=="guest") aiTakeTurn(p);
 }
@@ -755,15 +919,31 @@ function renderBoard(){
         piece.className = "str-piece"+(show?"":" hidden-piece");
         piece.style.background = players[cell.owner].color;
         if(show){
-          piece.innerHTML = (cell.rank==="B"||cell.rank==="F")
-            ? `<span>${RANKS[cell.rank].icon}</span>`
-            : `<span>${cell.rank}</span><span class="r-icon">${RANKS[cell.rank].icon}</span>`;
+          if(pieceStyle==="img"){
+            piece.classList.add("img-piece");
+            piece.style.cssText += spriteCss(cell.rank, cell.owner);
+            piece.style.borderColor = players[cell.owner].color;
+            piece.innerHTML = (cell.rank==="B"||cell.rank==="F")
+              ? `<span class="rank-badge">${RANKS[cell.rank].icon}</span>`
+              : `<span class="rank-badge">${cell.rank}</span>`;
+          } else {
+            piece.innerHTML = (cell.rank==="B"||cell.rank==="F")
+              ? `<span>${RANKS[cell.rank].icon}</span>`
+              : `<span>${cell.rank}</span><span class="r-icon">${RANKS[cell.rank].icon}</span>`;
+          }
           if(!mine && cell.revealed) piece.innerHTML += `<span class="revealed-mark">👁</span>`;
         } else {
           piece.textContent = "?";
         }
         if(selectedCell && selectedCell.r===r && selectedCell.c===c) piece.classList.add("sel");
+        if(animHide && animHide.some(a=>a.r===r && a.c===c)) piece.classList.add("anim-hide");
         el.appendChild(piece);
+      }
+
+      // trace du dernier coup joué (départ en pointillés, arrivée en halo)
+      if(phase!=="placement" && lastMove){
+        if(lastMove.from.r===r && lastMove.from.c===c) el.classList.add("last-from");
+        if(lastMove.to.r===r && lastMove.to.c===c) el.classList.add("last-to");
       }
 
       const isDest = possibleMoves.some(m=>m.r===r && m.c===c);
@@ -895,6 +1075,19 @@ document.getElementById("readyBtn").addEventListener("click", ()=>{
   if(NET.mode==="guest"){ netSend({t:"action", kind:"ready"}); return; }
   applyReady(myIdx);
 });
+
+/* bascule Portraits / Classique — purement visuel et local à chaque écran */
+function updateStyleBtn(){
+  document.getElementById("styleBtn").textContent =
+    pieceStyle==="img" ? "🎨 Style : Portraits" : "🎨 Style : Classique";
+}
+document.getElementById("styleBtn").addEventListener("click", ()=>{
+  pieceStyle = pieceStyle==="img" ? "classic" : "img";
+  localStorage.setItem("strategoStyle", pieceStyle);
+  updateStyleBtn();
+  renderAll();
+});
+updateStyleBtn();
 
 /* ============================================================
    VICTOIRE
@@ -1066,7 +1259,7 @@ function netSendState(){
   netSend({
     t:"state",
     phase, ready:readyFlags.slice(), cur:currentPlayerIndex,
-    gameOver, winnerIdx,
+    gameOver, winnerIdx, lastMove,
     players: players.map(p=>({name:p.name, color:p.color, ai:p.ai||null, side:p.side||null})),
     board: maskedBoardForGuest(),
     captured: [captured[0].slice(), captured[1].slice()],
@@ -1124,6 +1317,7 @@ function netScheduleGuestRetry(){
 function netGuestOnData(msg){
   if(!msg || typeof msg!=="object") return;
   if(msg.t==="state") netApplySnapshot(msg);
+  else if(msg.t==="anim"){ if(msg.from && msg.to && msg.piece) animateMove(msg.from, msg.to, msg.piece); }
   else if(msg.t==="setup") netApplySetupMsg(msg);
 }
 
@@ -1167,6 +1361,7 @@ function netApplySnapshot(s){
   currentPlayerIndex = s.cur;
   gameOver = s.gameOver;
   winnerIdx = s.winnerIdx;
+  lastMove = s.lastMove || null;
   board = s.board.map(row=>row.map(cell=>cell ? {owner:cell.owner, rank:cell.rank, revealed:cell.revealed} : null));
   captured = [s.captured[0].slice(), s.captured[1].slice()];
   // la sélection locale reste valide seulement si la pièce est toujours là
