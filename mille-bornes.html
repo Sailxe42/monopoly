@@ -504,9 +504,10 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
   }
   deck = buildDeck();
   discard = [];
-  players.forEach(p=>{ for(let k=0;k<6;k++) p.hand.push(deck.pop()); });
+  players.forEach(p=>{ p.hand = []; p.safeties = new Set(); p.battleCardId = null; p.speedCardId = null; for(let k=0;k<6;k++) p.hand.push(deck.pop()); });
   currentPlayerIndex = 0;
   gameOver = false;
+  verifyCardStock("afterDeal");
   document.getElementById("setup").style.display = "none";
   document.getElementById("game").classList.add("active");
   const activeRules = [];
@@ -574,6 +575,52 @@ function hasAnyLegalTarget(p, cardId){
   return players.some((t,i)=> i!==pIdx && canPlayCard(p, cardId, i));
 }
 
+/* ============================================================
+   GESTION DU STOCK DE CARTES — pile pioche / pile défausse
+   ------------------------------------------------------------
+   Règle d'or : une fois qu'une botte (carte "safety") a été jouée,
+   elle rejoint p.safeties et n'en ressort PLUS JAMAIS avant une
+   nouvelle partie. Elle ne doit donc jamais être réinjectée dans
+   deck/discard/battleCardId/speedCardId. discardBattleCard() est
+   l'unique point de passage pour défausser l'ancienne carte de
+   bataille : il refuse explicitement de défausser une botte, même
+   si un futur appelant se trompe — filet de sécurité structurel.
+   ============================================================ */
+function discardBattleCard(owner){
+  const id = owner.battleCardId;
+  if(!id) return;
+  if(CARD_DEFS[id] && CARD_DEFS[id].type==="safety"){
+    console.error(`Intégrité pioche : tentative bloquée de défausser la botte ${id} (elle reste acquise).`);
+    return;
+  }
+  discard.push(id);
+}
+function discardSpeedCard(owner){
+  const id = owner.speedCardId;
+  if(!id) return;
+  discard.push(id);
+  owner.speedCardId = null;
+}
+function verifyCardStock(tag){
+  if(NET.mode==="guest") return; // le client invité n'a pas toute l'information (mains adverses masquées)
+  const counts = {};
+  Object.keys(CARD_DEFS).forEach(id=>counts[id]=0);
+  const bump = id=>{ if(id!=null && id!=="?" && counts[id]!==undefined) counts[id]++; };
+  deck.forEach(bump);
+  discard.forEach(bump);
+  players.forEach(p=>{
+    p.hand.forEach(bump);
+    p.safeties.forEach(bump);
+    bump(p.battleCardId);
+    bump(p.speedCardId);
+  });
+  Object.keys(CARD_DEFS).forEach(id=>{
+    if(counts[id] !== CARD_DEFS[id].count){
+      console.error(`⚠️ Intégrité pioche rompue (${tag}) : ${id} présent ${counts[id]}× (attendu ${CARD_DEFS[id].count}×).`);
+    }
+  });
+}
+
 /* renvoie {ok:true, extraTurn} ou {ok:false} */
 function playCard(pIdx, handIdx, targetIdx){
   const p = players[pIdx];
@@ -589,30 +636,29 @@ function playCard(pIdx, handIdx, targetIdx){
     discard.push(cardId);
     log(`${p.symbol} ${p.name} avance de ${def.value} km (total ${p.km} km).`);
   } else if(def.type==="safety"){
-    p.safeties.add(cardId);
     if(def.guards.includes(p.status)){
-      if(p.battleCardId && !p.safeties.has(p.battleCardId)) discard.push(p.battleCardId);
+      // coup fourré : l'aléa en cours est annulé et défaussé, la botte
+      // elle-même ne transite JAMAIS par la pioche/défausse
+      discardBattleCard(p);
       p.status = "go";
-      p.battleCardId = cardId;
+      p.battleCardId = null;
     } else if(p.status==="needsGo" && cardId==="s_priority"){
       p.status = "go";
-      p.battleCardId = cardId;
     }
+    p.safeties.add(cardId);
     if(def.guards.includes("limit") && p.speedLimited){
-      if(p.speedCardId) discard.push(p.speedCardId);
+      discardSpeedCard(p);
       p.speedLimited = false;
-      p.speedCardId = null;
     }
     log(`${p.symbol} ${p.name} joue une botte : ${def.label} ! Il/elle rejoue.`);
     extraTurn = true;
   } else if(def.type==="remedy"){
     if(def.fixes==="limit"){
-      if(p.speedCardId) discard.push(p.speedCardId);
+      discardSpeedCard(p);
       p.speedLimited = false;
-      p.speedCardId = null;
       discard.push(cardId);
     } else {
-      if(p.battleCardId && !p.safeties.has(p.battleCardId)) discard.push(p.battleCardId);
+      discardBattleCard(p);
       p.status = "go";
       p.battleCardId = cardId;
     }
@@ -623,7 +669,7 @@ function playCard(pIdx, handIdx, targetIdx){
       t.speedLimited = true;
       t.speedCardId = cardId;
     } else {
-      if(t.battleCardId && !t.safeties.has(t.battleCardId)) discard.push(t.battleCardId);
+      discardBattleCard(t);
       t.status = def.hazard;
       t.battleCardId = cardId;
     }
@@ -634,6 +680,7 @@ function playCard(pIdx, handIdx, targetIdx){
     gameOver = true;
     log(`🏁 ${p.symbol} ${p.name} atteint ${targetKm} km et remporte la partie !`);
   }
+  verifyCardStock("afterPlay");
   return {ok:true, extraTurn};
 }
 
@@ -644,6 +691,7 @@ function discardCard(pIdx, handIdx){
     discard.push(cardId);
     log(`${p.symbol} ${p.name} défausse ${CARD_DEFS[cardId].label}.`);
   }
+  verifyCardStock("afterDiscard");
 }
 
 function drawForCurrentPlayer(){
@@ -655,6 +703,7 @@ function drawForCurrentPlayer(){
     log("🂠 La pioche est reformée à partir de la défausse.");
   }
   if(deck.length) p.hand.push(deck.pop());
+  verifyCardStock("afterDraw");
 }
 
 function startTurn(){
