@@ -216,7 +216,7 @@
     <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer sur cet ordinateur</button>
     <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
     <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
-    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code à l'autre.</p>
+    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code aux autres (jusqu'à 4 joueurs). Un joueur déconnecté peut revenir en retapant le code affiché en haut de la partie.</p>
   </div>
   <div id="netHostPanel" style="display:none;text-align:center;">
     <p style="margin-bottom:0;">Code de la partie :</p>
@@ -241,7 +241,7 @@
         <select id="netGuestSymbol" title="Symbole"></select>
         <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
       </div>
-      <p class="net-status">✅ Connecté(e) ! En attente que l'autre joueur lance la partie…</p>
+      <p class="net-status">✅ Connecté(e) ! En attente que l'hôte lance la partie…</p>
     </div>
   </div>
 </div>
@@ -405,10 +405,16 @@ let gameOver = false;
 let logHistory = [];
 
 const NET = {
-  mode:null, mySide:null, peer:null, conn:null,
+  mode:null,
+  mySide:null,          // 'host' pour l'hôte, 'g0'/'g1'/'g2'... pour un invité
+  peer:null,
+  conn:null,            // (invité) connexion vers l'hôte
+  conns:[],             // (hôte) liste des invités : {c, side, slot, name}
+  code:null,            // code de la partie (affiché en jeu pour revenir)
   guestName:"Joueur 2", started:false, ended:false,
   syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
 };
+const NET_MAX_GUESTS = 3; // 4 joueurs max, dont l'hôte
 
 function log(msg){
   logHistory.push(msg);
@@ -433,6 +439,13 @@ function symbolOptionsHtml(selectedIdx){
 
 function renderPlayerInputs(){
   const n = parseInt(numPlayersSel.value);
+  /* on garde les valeurs déjà saisies (utile quand un invité rejoint en cours de config) */
+  const saved = [];
+  document.querySelectorAll("#playerInputs .player-row").forEach((row,i)=>{
+    const c = document.getElementById("pcolor"+i), s = document.getElementById("psymbol"+i),
+          nm = document.getElementById("pname"+i), t = document.getElementById("ptype"+i);
+    if(c && s && nm && t) saved[i] = {color:c.value, symbol:s.value, name:nm.value, type:t.value};
+  });
   playerInputsDiv.innerHTML = "";
   for(let i=0;i<n;i++){
     const row = document.createElement("div");
@@ -449,19 +462,29 @@ function renderPlayerInputs(){
       </select>
     `;
     playerInputsDiv.appendChild(row);
+    if(saved[i]){
+      document.getElementById("pcolor"+i).value = saved[i].color;
+      const symSel = document.getElementById("psymbol"+i);
+      if(Array.from(symSel.options).some(o=>o.value===saved[i].symbol)) symSel.value = saved[i].symbol;
+      document.getElementById("pname"+i).value = saved[i].name;
+      document.getElementById("ptype"+i).value = saved[i].type;
+    }
   }
+  /* partie en ligne : joueur 1 = hôte, chaque invité connecté occupe une
+     rangée (slot 0 -> joueur 2, slot 1 -> joueur 3...), le reste = IA */
   if(NET.mode==="host"){
     for(let i=0;i<n;i++){
       const typeSel = document.getElementById("ptype"+i);
       const nameInput = document.getElementById("pname"+i);
+      const entry = NET.conns.find(e=>e.slot===i-1);
       if(i===0){
         typeSel.style.display = "none";
         const tag = document.createElement("span");
         tag.style.cssText = "font-size:11px;color:#555;flex-shrink:0;font-weight:600;";
         tag.textContent = "👤 vous";
         typeSel.parentNode.appendChild(tag);
-      } else if(i===1){
-        nameInput.value = NET.guestName;
+      } else if(entry){
+        nameInput.value = entry.name;
         typeSel.style.display = "none";
         const tag = document.createElement("span");
         tag.style.cssText = "font-size:11px;color:#0d47a1;flex-shrink:0;font-weight:600;";
@@ -470,13 +493,15 @@ function renderPlayerInputs(){
       } else {
         const humanOpt = typeSel.querySelector('option[value=""]');
         if(humanOpt) humanOpt.remove();
-        typeSel.value = "medium";
+        if(!saved[i] || !saved[i].type) typeSel.value = "medium";
+      }
+      if(i>0){
+        ["pname"+i,"pcolor"+i,"psymbol"+i].forEach(id=>{
+          const el = document.getElementById(id);
+          if(el) el.addEventListener("input", netBroadcastSetup);
+        });
       }
     }
-    ["pname1","pcolor1","psymbol1"].forEach(id=>{
-      const el = document.getElementById(id);
-      if(el) el.addEventListener("input", netBroadcastSetup);
-    });
     netBroadcastSetup();
   }
 }
@@ -495,7 +520,15 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
     const ai = document.getElementById("ptype"+i).value || null;
     players.push(createPlayer(name,color,symbol,ai,null));
   }
-  if(NET.mode==="host"){ players[0].side="host"; players[0].ai=null; players[1].side="guest"; players[1].ai=null; }
+  if(NET.mode==="host"){
+    players[0].side="host"; players[0].ai=null;
+    NET.conns.forEach(e=>{
+      const p = players[e.slot+1];
+      if(p && e.c && e.c.open){ p.side = e.side; p.ai = null; }
+    });
+    /* rangée d'un invité parti avant le début : reprise par une IA */
+    players.forEach(p=>{ if(!p.side && !p.ai) p.ai = "medium"; });
+  }
   if(document.getElementById("randomOrder").checked){
     for(let i=players.length-1;i>0;i--){
       const j = Math.floor(Math.random()*(i+1));
@@ -853,7 +886,7 @@ function statusText(p){
 /* index du joueur dont on doit afficher la main sur CET écran */
 function myVisibleHandIndex(){
   if(NET.mode==="host") return players.findIndex(p=>p.side==="host");
-  if(NET.mode==="guest") return players.findIndex(p=>p.side==="guest");
+  if(NET.mode==="guest") return players.findIndex(p=>p.side===NET.mySide);
   const p = players[currentPlayerIndex];
   return (p && !p.ai) ? currentPlayerIndex : null;
 }
@@ -1096,7 +1129,23 @@ function netGenCode(){
   let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
   return c;
 }
-function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } }
+function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } } /* invité -> hôte */
+function netSendTo(entry, obj){ if(entry && entry.c && entry.c.open){ try{ entry.c.send(obj); }catch(e){} } }
+function netBroadcast(obj){ NET.conns.forEach(e=>netSendTo(e, obj)); }
+/* petit badge fixe avec le code de la partie, pour qu'un joueur parti
+   puisse revenir en retapant ce code dans « Rejoindre » */
+function netShowCodeBadge(){
+  if(!NET.code) return;
+  let b = document.getElementById("netCodeBadge");
+  if(!b){
+    b = document.createElement("div");
+    b.id = "netCodeBadge";
+    b.style.cssText = "position:fixed;top:6px;left:8px;z-index:900;background:rgba(0,0,0,.65);color:#fff;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;letter-spacing:1px;";
+    document.body.appendChild(b);
+  }
+  b.textContent = "🔑 Code : "+NET.code;
+  b.title = "Code de la partie — un joueur déconnecté peut revenir en entrant ce code dans « Rejoindre une partie en ligne »";
+}
 
 document.getElementById("netLocalBtn").onclick = ()=>{
   document.getElementById("netHome").style.display = "none";
@@ -1115,6 +1164,7 @@ document.getElementById("netConnectBtn").onclick = ()=>{
   const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
   const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
   if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  NET.rejected = false;
   document.getElementById("netConnectBtn").disabled = true;
   netJoin(code, name);
 };
@@ -1127,20 +1177,26 @@ function netHost(attempt){
   const peer = new Peer("mb-"+code);
   NET.peer = peer;
   peer.on("open", ()=>{
+    NET.code = code;
     document.getElementById("netCode").textContent = code;
-    netStatus("netHostStatus","En attente de l'autre joueur… Envoie-lui ce code !");
+    netStatus("netHostStatus",`En attente des autres joueurs (jusqu'à ${NET_MAX_GUESTS})… Envoie-leur ce code !`);
   });
   peer.on("error", (e)=>{
     if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
-    else netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+    else if(e.type!=="peer-unavailable") netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
   });
   peer.on("connection", (c)=>{
-    if(NET.conn && NET.conn.open){ try{ c.close(); }catch(err){} return; }
-    NET.conn = c;
-    c.on("data", netHostOnData);
-    c.on("close", netOnConnLost);
-    c.on("error", netOnConnLost);
+    c.on("data", (msg)=>netHostOnData(c, msg));
+    c.on("close", ()=>netHostConnLost(c));
+    c.on("error", ()=>netHostConnLost(c));
   });
+}
+
+function netFreeSlot(){
+  for(let s=0;s<NET_MAX_GUESTS;s++){
+    if(!NET.conns.some(e=>e.slot===s)) return s;
+  }
+  return -1;
 }
 
 function netShowSetupAsHost(){
@@ -1149,58 +1205,96 @@ function netShowSetupAsHost(){
   const info = document.getElementById("netSetupInfo");
   info.style.display = "block";
   info.style.background = ""; info.style.color = "";
-  info.textContent = `🌐 Partie en ligne — ${NET.guestName} est connecté(e) ! Vous êtes le joueur 1, ${NET.guestName} le joueur 2.`;
-  numPlayersSel.value = "2";
+  const names = NET.conns.map(e=>e.name).join(", ") || "personne";
+  info.textContent = `🌐 Partie en ligne — connecté(s) : ${names} (${NET.conns.length}/${NET_MAX_GUESTS} invités). Vous êtes le joueur 1. D'autres joueurs peuvent encore rejoindre avec le code ${NET.code||""}. Ajoutez des IA si vous voulez.`;
+  const minPlayers = NET.conns.length+1;
+  let wanted = NET.setupShown ? Math.max(parseInt(numPlayersSel.value)||2, minPlayers) : Math.max(2, minPlayers);
+  NET.setupShown = true;
+  numPlayersSel.value = String(Math.min(wanted, 4));
   renderPlayerInputs();
+  netShowCodeBadge();
 }
 setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 400);
 
-function netHostOnData(msg){
+function netHostOnData(c, msg){
   if(!msg || typeof msg!=="object") return;
+  let entry = NET.conns.find(e=>e.c===c);
   if(msg.t==="hello"){
-    NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
+    const name = netEsc(msg.name).slice(0,20) || "Joueur";
+    if(entry){ entry.name = name; return; }
     if(NET.started){
-      netHideBanner();
-      log(`🔌 ${NET.guestName} s'est reconnecté(e) à la partie.`);
-      netSendState();
+      netHostHandleRejoin(c, name);
     } else {
+      const slot = netFreeSlot();
+      if(slot<0){ try{ c.send({t:"full"}); }catch(e){} setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300); return; }
+      entry = {c, slot, side:"g"+slot, name};
+      NET.conns.push(entry);
+      netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
       netShowSetupAsHost();
     }
-  } else if(msg.t==="setupGuest"){
-    netApplyGuestSetupChange(msg);
+    return;
+  }
+  if(!entry) return;
+  if(msg.t==="setupGuest"){
+    netApplyGuestSetupChange(entry, msg);
   } else if(msg.t==="action"){
-    netHandleGuestAction(msg);
+    netHandleGuestAction(msg, entry.side);
   }
 }
 
+/* partie déjà lancée : on remet le nouvel arrivant sur le siège du joueur
+   déconnecté qui porte le même prénom (ou le seul siège libre) */
+function netHostHandleRejoin(c, name){
+  const takenSides = new Set(NET.conns.map(e=>e.side));
+  const candidates = players.filter(p=>p.side && p.side!=="host" && !takenSides.has(p.side));
+  let p = candidates.find(x=>x.name.trim().toLowerCase()===String(name).trim().toLowerCase());
+  if(!p && candidates.length===1) p = candidates[0];
+  if(!p){
+    try{ c.send({t:"noSeat", names:candidates.map(x=>x.name)}); }catch(e){}
+    setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300);
+    return;
+  }
+  const entry = {c, slot:parseInt(p.side.slice(1),10), side:p.side, name:p.name};
+  NET.conns.push(entry);
+  netUpdateDiscoBanner();
+  log(`🔌 ${p.name} s'est reconnecté(e) à la partie.`);
+  netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+  netSendState();
+}
+
 function netBroadcastSetup(){
-  if(NET.mode!=="host" || NET.started || !NET.conn || !NET.conn.open) return;
-  const colorEl = document.getElementById("pcolor1");
-  const symbolEl = document.getElementById("psymbol1");
-  const nameEl = document.getElementById("pname1");
-  if(!colorEl || !symbolEl || !nameEl) return;
-  netSend({
-    t:"setup", target:parseInt(document.getElementById("targetSel").value),
-    guestColor:colorEl.value, guestSymbol:symbolEl.value, guestName:nameEl.value
+  if(NET.mode!=="host" || NET.started || !NET.conns.length) return;
+  NET.conns.forEach(entry=>{
+    const i = entry.slot+1;
+    const colorEl = document.getElementById("pcolor"+i);
+    const symbolEl = document.getElementById("psymbol"+i);
+    const nameEl = document.getElementById("pname"+i);
+    if(!colorEl || !symbolEl || !nameEl) return;
+    netSendTo(entry, {
+      t:"setup", target:parseInt(document.getElementById("targetSel").value),
+      guestColor:colorEl.value, guestSymbol:symbolEl.value, guestName:nameEl.value,
+      code:NET.code
+    });
   });
 }
-function netApplyGuestSetupChange(msg){
+function netApplyGuestSetupChange(entry, msg){
   if(NET.started) return;
-  const nameEl = document.getElementById("pname1");
-  const colorEl = document.getElementById("pcolor1");
-  const symbolEl = document.getElementById("psymbol1");
+  const i = entry.slot+1;
+  const nameEl = document.getElementById("pname"+i);
+  const colorEl = document.getElementById("pcolor"+i);
+  const symbolEl = document.getElementById("psymbol"+i);
   if(!nameEl || !colorEl || !symbolEl) return;
-  NET.guestName = netEsc(msg.name).slice(0,20) || "Joueur 2";
-  nameEl.value = NET.guestName;
+  entry.name = netEsc(msg.name).slice(0,20) || ("Joueur "+(i+1));
+  nameEl.value = entry.name;
   if(msg.color) colorEl.value = msg.color;
   if(msg.symbol && Array.from(symbolEl.options).some(o=>o.value===msg.symbol)) symbolEl.value = msg.symbol;
   netBroadcastSetup();
 }
 
-function netHandleGuestAction(msg){
+function netHandleGuestAction(msg, side){
   if(!NET.started || gameOver) return;
   const p = players[currentPlayerIndex];
-  if(!p || p.side!=="guest") return;
+  if(!p || p.side!==side) return;
   const pIdx = currentPlayerIndex;
   if(msg.kind==="play"){
     const res = playCard(pIdx, msg.handIdx, msg.targetIdx);
@@ -1211,34 +1305,40 @@ function netHandleGuestAction(msg){
   }
 }
 
-/* ---------- synchronisation hôte -> invité ---------- */
+/* ---------- synchronisation hôte -> invités ---------- */
 function netScheduleSync(){
-  if(NET.mode!=="host" || !NET.conn) return;
+  if(NET.mode!=="host") return;
   if(NET.syncTimer) return;
   NET.syncTimer = setTimeout(()=>{ NET.syncTimer=null; netSendState(); }, 40);
 }
 function netSendState(){
-  if(NET.mode!=="host" || !NET.started || NET.ended || !NET.conn || !NET.conn.open) return;
+  if(NET.mode!=="host" || !NET.started || NET.ended) return;
   const victOn = document.getElementById("victory-overlay").classList.contains("active");
+  /* chaque invité ne reçoit QUE sa propre main */
+  const basePlayers = players.map(p=>({
+    name:p.name, color:p.color, symbol:p.symbol, ai:p.ai, side:p.side||null,
+    km:p.km, status:p.status, speedLimited:p.speedLimited,
+    battleCardId:p.battleCardId, speedCardId:p.speedCardId,
+    safeties:[...p.safeties], handCount:p.hand.length
+  }));
   const snap = {
     t:"state", targetKm, deckCount:deck.length, discardTop: discard[discard.length-1]||null,
-    cur: currentPlayerIndex, gameOver,
-    players: players.map((p,i)=>({
-      name:p.name, color:p.color, symbol:p.symbol, ai:p.ai, side:p.side||null,
-      km:p.km, status:p.status, speedLimited:p.speedLimited,
-      battleCardId:p.battleCardId, speedCardId:p.speedCardId,
-      safeties:[...p.safeties], handCount:p.hand.length,
-      hand: p.side==="guest" ? p.hand.slice() : undefined
-    })),
+    cur: currentPlayerIndex, gameOver, code:NET.code,
     log: logHistory.slice(-120),
     victory: victOn ? {active:true, html:document.getElementById("victory-box").innerHTML} : {active:false}
   };
-  netSend(snap);
+  NET.conns.forEach(entry=>{
+    const pl = basePlayers.map((bp,i)=>
+      players[i].side===entry.side ? Object.assign({}, bp, {hand:players[i].hand.slice()}) : bp
+    );
+    netSendTo(entry, Object.assign({}, snap, {players:pl}));
+  });
 }
 
 /* ---------- invité ---------- */
 function netJoin(code, name){
-  NET.mode = "guest"; NET.mySide = "guest";
+  NET.mode = "guest";
+  NET.mySide = null; // attribué par l'hôte dans le message "welcome" (g0, g1, g2)
   NET.joinCode = code; NET.guestName = name;
   const symSel = document.getElementById("netGuestSymbol");
   symSel.innerHTML = CAR_SYMBOLS.map(t=>`<option value="${t}">${t}</option>`).join("");
@@ -1286,12 +1386,38 @@ function netScheduleGuestRetry(){
 
 function netGuestOnData(msg){
   if(!msg || typeof msg!=="object") return;
-  if(msg.t==="state") netApplySnapshot(msg);
+  if(msg.t==="welcome"){
+    NET.mySide = msg.side;
+    NET.code = msg.code || NET.joinCode;
+    netShowCodeBadge();
+  } else if(msg.t==="full"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    netStatus("netJoinStatus","❌ La partie est pleine (4 joueurs max).");
+    document.getElementById("netConnectBtn").disabled = false;
+  } else if(msg.t==="noSeat"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    const names = Array.isArray(msg.names) ? msg.names.filter(Boolean) : [];
+    const txt = names.length
+      ? "❌ Partie en cours. Pour reprendre une place, utilise exactement le prénom d'un joueur déconnecté : "+names.join(", ")+"."
+      : "❌ Partie déjà en cours et aucun siège libre.";
+    if(NET.started){
+      netShowBanner(netEsc(txt)+` <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+      const btn = document.getElementById("netGiveUpBtn");
+      if(btn) btn.onclick = ()=>location.reload();
+    } else {
+      netStatus("netJoinStatus", txt);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
+  } else if(msg.t==="state") netApplySnapshot(msg);
   else if(msg.t==="setup") netApplySetupMsg(msg);
 }
 
 function netApplySetupMsg(msg){
   if(NET.started) return;
+  if(msg.code && !NET.code) NET.code = msg.code;
+  netShowCodeBadge();
   document.getElementById("netJoinReadyPanel").style.display = "block";
   const symSel = document.getElementById("netGuestSymbol");
   if(document.activeElement !== symSel) symSel.value = msg.guestSymbol;
@@ -1320,8 +1446,10 @@ function netSendGuestSetup(){
 
 function netApplySnapshot(s){
   if(NET.ended) return;
+  if(s.code && s.code!==NET.code){ NET.code = s.code; netShowCodeBadge(); }
   if(!NET.started){
     NET.started = true;
+    netShowCodeBadge();
     targetKm = s.targetKm;
     players = s.players.map(p=>createPlayer(p.name,p.color,p.symbol,p.ai,p.side));
     document.getElementById("netHome").style.display = "none";
@@ -1387,27 +1515,38 @@ function netShowBanner(html){
 }
 function netHideBanner(){ const b = document.getElementById("netBanner"); if(b) b.remove(); }
 function netOnConnLost(){
-  if(NET.mode==="host") netHostOnDisconnect();
-  else if(NET.mode==="guest") netGuestOnDisconnect();
+  if(NET.mode==="guest") netGuestOnDisconnect();
 }
-function netHostOnDisconnect(){
-  NET.conn = null;
+function netHostConnLost(c){
+  const idx = NET.conns.findIndex(e=>e.c===c);
+  if(idx<0) return;
+  const entry = NET.conns[idx];
+  NET.conns.splice(idx,1);
   if(!NET.started){
-    const info = document.getElementById("netSetupInfo");
-    if(info && document.getElementById("setup").style.display!=="none"){
-      info.style.display = "block"; info.style.background="#fdecea"; info.style.color="#7a1f1f";
-      info.textContent = `🔌 ${NET.guestName||"L'autre joueur"} s'est déconnecté(e) avant le début. Renvoie-lui le lien et le code pour qu'il/elle revienne.`;
+    if(document.getElementById("setup").style.display!=="none"){
+      netShowSetupAsHost();
+      const info = document.getElementById("netSetupInfo");
+      info.textContent = `🔌 ${entry.name} s'est déconnecté(e) avant le début (le code ${NET.code} lui permet de revenir). `+info.textContent;
     } else {
-      netStatus("netHostStatus","Le joueur s'est déconnecté avant le début. Attends qu'il/elle revienne avec le même code.");
+      netStatus("netHostStatus", `${entry.name} s'est déconnecté(e). Il/elle peut revenir avec le même code.`);
     }
     return;
   }
-  netShowBanner(`🔌 ${netEsc(NET.guestName)} s'est déconnecté(e). En attente de reconnexion… <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  log(`🔌 ${entry.name} s'est déconnecté(e). Pour revenir : « Rejoindre une partie en ligne » avec le code ${NET.code} et le même prénom.`);
+  netUpdateDiscoBanner();
+}
+/* bannière côté hôte : liste des joueurs en ligne actuellement déconnectés */
+function netUpdateDiscoBanner(){
+  if(NET.mode!=="host" || !NET.started) return;
+  const connected = new Set(NET.conns.map(e=>e.side));
+  const missing = players.filter(p=>p.side && p.side!=="host" && !connected.has(p.side));
+  if(!missing.length){ netHideBanner(); return; }
+  netShowBanner(`🔌 ${missing.map(p=>netEsc(p.name)).join(", ")} ${missing.length>1?"sont déconnecté(e)s":"s'est déconnecté(e)"}. Pour revenir : « Rejoindre une partie en ligne » avec le code <b>${NET.code}</b> et le même prénom. La partie continue en attendant. <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
   const btn = document.getElementById("netHostGiveUpBtn");
   if(btn) btn.onclick = ()=>location.reload();
 }
 function netGuestOnDisconnect(){
-  if(NET.reconnecting || NET.ended) return;
+  if(NET.reconnecting || NET.ended || NET.rejected) return;
   NET.conn = null; NET.reconnectAttempts = 0;
   try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
   netScheduleGuestRetry();

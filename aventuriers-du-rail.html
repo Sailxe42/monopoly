@@ -1,0 +1,1925 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aventurier du Rail — Harry Potter</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --parch:#f0e2c0; --parch2:#e6d3a8; --ink:#2c1c0e; --accent:#8d1f1f; --gold:#c9971f;
+    --panel:#241a10; --panel2:#31241666;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:Georgia,"Times New Roman",serif; color:var(--ink);
+    background:radial-gradient(circle at 30% 15%, #3a2a18, #14100a 75%);
+    min-height:100vh; padding:14px;
+  }
+  h1{font-family:Georgia,serif; letter-spacing:1px;}
+  .btn{
+    background:linear-gradient(180deg,#a8281f,#7c1a14); color:#f7ecd2; border:1px solid #d4a94b;
+    border-radius:10px; padding:10px 18px; font-size:15px; font-weight:700; cursor:pointer;
+    font-family:Georgia,serif; box-shadow:0 3px 10px rgba(0,0,0,.4);
+  }
+  .btn:hover{filter:brightness(1.12);}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .btn.secondary{background:linear-gradient(180deg,#4a3520,#33230f);}
+  .btn.gold{background:linear-gradient(180deg,#c9971f,#8d6812); color:#241a08;}
+  .hint{color:#6b5636; font-size:13px;}
+
+  /* ---------- accueil / setup ---------- */
+  #netHome, #setup{
+    max-width:560px; margin:40px auto; background:linear-gradient(170deg,var(--parch),var(--parch2));
+    border:3px solid #7a5a1e; border-radius:16px; padding:28px 30px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 0 60px rgba(122,90,30,.15);
+  }
+  #netHome h1, #setup h1{margin-top:0; text-align:center; color:var(--accent); text-shadow:0 1px 0 #fff6;}
+  .home-art{width:100%; border-radius:10px; border:2px solid #7a5a1e; display:block; margin:0 0 18px;}
+  .net-big-btn{display:block; width:100%; margin:10px 0; font-size:17px; padding:14px;}
+  #netCode{font-size:38px; font-weight:800; letter-spacing:8px; text-align:center; margin:10px 0; color:var(--accent); user-select:all;}
+  .net-status{text-align:center; color:#5d4a26; font-size:14px; min-height:20px;}
+  .player-row{display:flex; gap:10px; align-items:center; justify-content:center; margin:10px 0;}
+  .player-row input[type=text]{
+    flex:1 1 200px; padding:10px; border:1px solid #7a5a1e; border-radius:8px; font-size:15px;
+    background:#fff9ea; font-family:Georgia,serif;
+  }
+  .player-row input[type=color]{width:46px; height:42px; border:1px solid #7a5a1e; border-radius:8px; background:#fff9ea; padding:2px; cursor:pointer;}
+  .player-row .p1-tag{font-size:13px; font-weight:700; color:#5d4a26; white-space:nowrap;}
+  .ai-toggle{display:flex; align-items:center; gap:4px; font-size:13.5px; font-weight:700; color:#5d4a26; white-space:nowrap; cursor:pointer;}
+  .ai-toggle input{width:17px; height:17px; cursor:pointer;}
+  .row-del{
+    background:#8d1f1f; color:#f7ecd2; border:none; border-radius:7px; width:30px; height:34px;
+    font-size:14px; font-weight:700; cursor:pointer; flex:0 0 30px;
+  }
+  .row-del:hover{filter:brightness(1.2);}
+  details.rules{background:#fff9ea; border:1px solid #c9b070; border-radius:10px; padding:10px 14px; margin:16px 0; font-size:13.5px;}
+  details.rules summary{cursor:pointer; font-weight:700; color:var(--accent);}
+  details.rules li{margin:5px 0;}
+  #netSetupInfo{display:none; background:#e7f3e2; border:1px solid #7ba46b; color:#2c5424; border-radius:8px; padding:9px 12px; margin-bottom:12px; font-size:14px; text-align:center;}
+
+  .net-reconnect-banner{
+    position:fixed; top:0; left:0; right:0; z-index:300; background:#7a1f1f; color:#fff;
+    padding:10px 16px; text-align:center; font-size:14px; font-family:Georgia,serif; box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+  .net-reconnect-banner button{margin-left:10px; background:#fff; color:#7a1f1f; border:none; border-radius:6px; padding:4px 10px; font-weight:700; cursor:pointer; font-size:12.5px;}
+
+  .cross-link{text-align:center; margin-bottom:10px;}
+  .cross-link a{color:#d4b36a; font-size:13.5px; text-decoration:none;}
+  .cross-link a:hover{text-decoration:underline;}
+
+  /* ---------- jeu ---------- */
+  #game{display:none; max-width:1400px; margin:0 auto;}
+  #game.active{display:block;}
+  #gameGrid{display:flex; gap:14px; align-items:flex-start;}
+  #boardWrap{
+    flex:1 1 auto; min-width:0; position:relative; background:#1c140b; border:3px solid #7a5a1e; border-radius:12px;
+    padding:6px; box-shadow:0 14px 44px rgba(0,0,0,.6);
+  }
+  #boardSvg{width:100%; height:auto; display:block; border-radius:8px;}
+  #hintsBtn{
+    position:absolute; top:14px; right:14px; z-index:5;
+    background:rgba(36,22,8,.85); color:#f5d98f; border:1px solid #c9971f; border-radius:8px;
+    padding:6px 11px; font-size:13px; font-weight:700; cursor:pointer; font-family:Georgia,serif;
+  }
+  #hintsBtn.on{background:#c9971f; color:#241608;}
+  .route-glow{
+    fill:none; stroke:#ffe066; stroke-width:26; stroke-linecap:round; stroke-linejoin:round;
+    opacity:0; pointer-events:none; transition:opacity .12s;
+  }
+  g.route:hover .route-glow{opacity:.45;}
+  g.route.claimed:hover .route-glow, g.route.locked:hover .route-glow, g.route.dim:hover .route-glow{opacity:0;}
+  .route-slot{fill:transparent; stroke:none; cursor:pointer;}
+  .route-hit{fill:none; stroke:transparent; stroke-width:30; cursor:pointer;}
+  g.route.claimed .route-slot, g.route.claimed .route-hit, g.route.locked .route-slot, g.route.locked .route-hit{cursor:default;}
+  .route-win{fill:rgba(255,246,220,.55); display:none; pointer-events:none;}
+  g.route.claimed .route-win{display:block;}
+  .junction-lbl{font-family:Georgia,serif; font-size:17px; font-weight:700; fill:#f0d189; pointer-events:none;}
+  .junction-plate{fill:#3a1712; opacity:.9; stroke:#c9971f; stroke-width:1.2;}
+  .city-glow{
+    fill:#ffdf6e; fill-opacity:.3; stroke:#ffd23e; stroke-width:5; opacity:0; pointer-events:none;
+    transform-box:fill-box; transform-origin:center;
+  }
+  .city-glow.on{opacity:1; animation:cityPulse 1.1s ease-in-out infinite;}
+  @keyframes cityPulse{
+    0%,100%{transform:scale(1); stroke-opacity:.95;}
+    50%{transform:scale(1.4); stroke-opacity:.35;}
+  }
+
+  #side{
+    flex:0 0 330px; display:flex; flex-direction:column; gap:10px;
+  }
+  .panel{
+    background:linear-gradient(170deg,var(--parch),var(--parch2)); border:2px solid #7a5a1e;
+    border-radius:12px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.45);
+  }
+  .panel h3{margin:0 0 8px; font-size:14px; color:var(--accent); border-bottom:1px solid #c9b070; padding-bottom:5px;}
+  #turnBanner{
+    text-align:center; font-weight:800; font-size:15.5px; padding:9px 10px;
+    background:linear-gradient(170deg,#fff3d4,#f0dfae); border:2px solid var(--gold); border-radius:10px; color:#3a2708;
+  }
+  .pstats{display:flex; flex-direction:column; gap:6px;}
+  .pstat{
+    display:flex; align-items:center; gap:8px; background:#fff9ea; border:1px solid #d8c48c;
+    border-radius:8px; padding:6px 9px; font-size:13.5px;
+  }
+  .pstat.cur{outline:2px solid var(--accent);}
+  .pstat .pdot{width:15px; height:15px; border-radius:50%; border:2px solid #241a08; flex:0 0 15px;}
+  .pstat .pname{font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pstat .pmeta{color:#5d4a26; font-size:12.5px; white-space:nowrap;}
+
+  #drawRow{display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;}
+  .deck-btn{position:relative; border:2px solid #6b4c15; border-radius:8px; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,.35); background:#241a10;}
+  .deck-btn:hover{outline:2px solid #ffd85e;}
+  .deck-btn.off{opacity:.45; cursor:not-allowed; outline:none;}
+  .deck-count{
+    position:absolute; bottom:3px; right:3px; background:#241a08ee; color:#ffe9ad; font-size:11.5px;
+    font-weight:800; border-radius:8px; padding:1px 6px;
+  }
+  #faceUpRow{display:flex; gap:6px; flex-wrap:wrap;}
+  .fu-card{position:relative; border:2px solid #6b4c15; border-radius:8px; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,.35);}
+  .fu-card:hover{outline:2px solid #ffd85e;}
+  .fu-card.off{opacity:.5; cursor:not-allowed; outline:none;}
+
+  #handRow{display:flex; gap:6px; flex-wrap:wrap;}
+  .hand-card{position:relative; border:2px solid #6b4c15; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.3);}
+  .hand-count{
+    position:absolute; top:-7px; right:-7px; background:var(--accent); color:#ffe9ad; font-size:12px;
+    font-weight:800; border-radius:50%; min-width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    border:2px solid #ffe9ad;
+  }
+  .ticket-row{
+    display:flex; align-items:center; gap:7px; background:#fff9ea; border:1px solid #d8c48c;
+    border-radius:8px; padding:5px 8px; font-size:12.8px; margin-bottom:5px;
+  }
+  .ticket-row .tk-pts{margin-left:auto; font-weight:800; color:var(--accent);}
+  .ticket-row.done{background:#e7f3e2; border-color:#7ba46b;}
+  .ticket-row.done .tk-pts{color:#2c7a2c;}
+  .ticket-row .tk-st{font-size:14px;}
+
+  #log{
+    max-height:150px; overflow-y:auto; font-size:12.3px; line-height:1.45; background:#fff9ea;
+    border:1px solid #d8c48c; border-radius:8px; padding:7px 9px;
+  }
+  #log div{padding:1px 0; border-bottom:1px dashed #eadfbc;}
+
+  /* ---------- modales ---------- */
+  .overlay{
+    display:none; position:fixed; inset:0; background:rgba(12,8,3,.75); z-index:200;
+    align-items:center; justify-content:center; padding:16px;
+  }
+  .overlay.active{display:flex;}
+  /* le choix des destinations n'assombrit pas l'écran : le plateau reste visible à gauche */
+  #ticketOverlay{background:transparent; pointer-events:none; justify-content:flex-end; align-items:flex-start;}
+  #ticketOverlay .modal{
+    pointer-events:auto; width:360px; max-width:92vw; margin-top:48px;
+    box-shadow:0 18px 60px rgba(0,0,0,.75), 0 0 0 2000px rgba(12,8,3,.18);
+  }
+  .modal{
+    background:linear-gradient(170deg,var(--parch),var(--parch2)); border:3px solid #7a5a1e; border-radius:14px;
+    padding:20px 22px; max-width:560px; width:100%; max-height:92vh; overflow-y:auto;
+    box-shadow:0 24px 70px rgba(0,0,0,.7);
+  }
+  .modal h2{margin:0 0 6px; color:var(--accent); text-align:center; font-size:21px;}
+  .modal .sub{text-align:center; color:#5d4a26; font-size:13.5px; margin:0 0 14px;}
+  .tk-choice{
+    display:flex; align-items:center; gap:10px; background:#fff9ea; border:2px solid #c9b070;
+    border-radius:10px; padding:10px 12px; margin:8px 0; cursor:pointer; font-size:14.5px;
+  }
+  .tk-choice.sel{border-color:var(--accent); background:#fdeee0; box-shadow:0 0 0 2px #8d1f1f33;}
+  .tk-choice .pts{margin-left:auto; font-size:19px; font-weight:800; color:var(--accent); background:#f5e5c0; border:2px solid #c9971f; border-radius:50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center; flex:0 0 38px;}
+  .color-opt{display:flex; align-items:center; gap:10px; background:#fff9ea; border:2px solid #c9b070; border-radius:10px; padding:9px 12px; margin:8px 0; cursor:pointer; font-size:14.5px; font-weight:700;}
+  .color-opt:hover{border-color:var(--accent);}
+  .color-chip{width:22px; height:22px; border-radius:6px; border:2px solid #241a08;}
+  .modal .actions{text-align:center; margin-top:14px;}
+
+  /* ---------- victoire ---------- */
+  #victory-overlay{z-index:250;}
+  #victory-box{text-align:center;}
+  #victory-box h2{font-size:26px;}
+  #victory-box table{margin:10px auto; border-collapse:collapse; font-size:14px;}
+  #victory-box td, #victory-box th{border:1px solid #b99c58; padding:5px 12px;}
+  #victory-box th{background:#efe0b4;}
+  .confetti{
+    position:absolute; top:-20px; border-radius:3px; opacity:.9;
+    animation:confFall linear infinite;
+  }
+  @keyframes confFall{
+    0%{transform:translateY(-4vh) rotate(0deg);}
+    100%{transform:translateY(108vh) rotate(720deg);}
+  }
+
+  @media(max-width:980px){
+    #gameGrid{flex-direction:column;}
+    #side{flex:1 1 auto; width:100%;}
+    body{padding:8px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="cross-link"><a href="index.html">🏠 Menu des jeux</a></div>
+
+<!-- ===================== ACCUEIL / RÉSEAU ===================== -->
+<div id="netHome">
+  <h1>🚂 Aventurier du Rail<br><span style="font-size:16px;color:#6b4c15;">édition Harry Potter</span></h1>
+  <img class="home-art" src="asset/aventurierRailPlato.png" alt="Plateau Aventurier du Rail Harry Potter">
+  <div id="netChoice">
+    <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer en local (2-5 joueurs, IA au choix)</button>
+    <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne (2-5 joueurs)</button>
+    <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
+    <p class="hint" style="margin-top:12px;text-align:center;">Reliez les lieux magiques en posant vos wagons, complétez vos cartes Destination… et gare aux routes bloquées ! En ligne, un joueur déconnecté peut revenir en retapant le code affiché en haut de la partie.</p>
+  </div>
+  <div id="netHostPanel" style="display:none;text-align:center;">
+    <p style="margin-bottom:0;">Code de la partie :</p>
+    <div id="netCode">·····</div>
+    <p class="net-status" id="netHostStatus"></p>
+  </div>
+  <div id="netJoinPanel" style="display:none;">
+    <div class="player-row">
+      <input type="text" id="netNameInput" placeholder="Ton prénom" maxlength="20">
+    </div>
+    <div class="player-row">
+      <input type="text" id="netCodeInput" placeholder="Code de la partie (ABCDE)" maxlength="8" style="text-transform:uppercase;">
+    </div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn" id="netConnectBtn">Rejoindre</button>
+    </div>
+    <p class="net-status" id="netJoinStatus"></p>
+    <div id="netJoinReadyPanel" style="display:none;">
+      <p class="net-status" style="font-weight:600;color:var(--accent);">Personnalise ta couleur de wagons :</p>
+      <div class="player-row">
+        <input type="color" id="netGuestColor" value="#2e7d5b" title="Couleur">
+        <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
+      </div>
+      <p class="net-status">✅ Connecté(e) ! En attente que l'hôte lance la partie…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" style="display:none;">
+  <h1>🚂 Aventurier du Rail</h1>
+  <div id="netSetupInfo"></div>
+  <div class="player-row">
+    <input type="color" id="pcolor0" value="#c0392b" title="Ta couleur de wagons">
+    <input type="text" id="pname0" placeholder="Ton prénom" maxlength="20" value="Joueur 1">
+    <span class="p1-tag">👤 Toi</span>
+  </div>
+  <div id="extraPlayers"></div>
+  <div style="text-align:center;margin:6px 0;" id="addPlayerWrap">
+    <button class="btn secondary" id="addPlayerBtn" style="font-size:13.5px;padding:7px 14px;">➕ Ajouter un joueur (5 max)</button>
+  </div>
+  <p class="hint" id="hotseatHint" style="text-align:center;">Coche 🤖 pour confier un joueur à l'ordinateur. À plusieurs humains sur le même écran, la main affichée est celle du joueur dont c'est le tour.</p>
+  <details class="rules">
+    <summary>📜 Règles du jeu</summary>
+    <ul>
+      <li>Chaque joueur commence avec <b>40 wagons</b>, 4 cartes Wagon et choisit au moins 2 cartes Destination.</li>
+      <li>À ton tour, fais <b>UNE</b> action : <b>piocher 2 cartes Wagon</b> (une Locomotive visible compte pour les 2), <b>prendre une route</b> en jouant des cartes de sa couleur (les routes roses se paient en cartes Violet, les Locomotives sont des jokers), ou <b>piocher 3 cartes Destination</b> (garde-en au moins 1).</li>
+      <li>Les routes se prennent <b>directement sur la carte</b> : survole une route imprimée pour voir sa longueur, clique pour la prendre. Le bouton 👁 met en évidence les routes encore libres.</li>
+      <li>Points par route : 1&nbsp;=&nbsp;1, 2&nbsp;=&nbsp;2, 3&nbsp;=&nbsp;4, 4&nbsp;=&nbsp;7, 5&nbsp;=&nbsp;10, 6&nbsp;=&nbsp;15, 7&nbsp;=&nbsp;18, 8&nbsp;=&nbsp;21.</li>
+      <li>Sur une <b>route double</b>, un seul des deux tronçons peut être pris à 2-3 joueurs. À 4-5 joueurs les deux tronçons sont ouverts, mais jamais pour le même joueur.</li>
+      <li>Une Destination complétée rapporte ses points en fin de partie ; sinon elle les fait <b>perdre</b> !</li>
+      <li>Le <b>chemin continu le plus long</b> rapporte 10 points de bonus.</li>
+      <li>Quand un joueur n'a plus que 2 wagons ou moins, chacun joue un dernier tour.</li>
+    </ul>
+  </details>
+  <div style="text-align:center;margin-top:16px;">
+    <button class="btn gold" id="startBtn" style="font-size:17px;padding:13px 30px;">🚂 En voiture !</button>
+  </div>
+</div>
+
+<!-- ===================== JEU ===================== -->
+<div id="game">
+  <div id="gameGrid">
+    <div id="boardWrap">
+      <button id="hintsBtn" title="Mettre en évidence les routes encore libres">👁 Routes libres</button>
+      <svg id="boardSvg" viewBox="0 0 1536 1024" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div id="side">
+      <div id="turnBanner">…</div>
+      <div class="panel">
+        <h3>⚔️ Joueurs</h3>
+        <div class="pstats" id="pstats"></div>
+      </div>
+      <div class="panel">
+        <h3>🃏 Pioche — cartes visibles</h3>
+        <div id="faceUpRow"></div>
+        <div id="drawRow" style="margin-top:8px;"></div>
+        <p class="hint" id="drawHint" style="margin:7px 0 0;"></p>
+      </div>
+      <div class="panel">
+        <h3 id="handTitle">✋ Ta main</h3>
+        <div id="handRow"></div>
+      </div>
+      <div class="panel">
+        <h3 id="ticketTitle">🗺️ Tes destinations</h3>
+        <div id="ticketList"></div>
+      </div>
+      <div class="panel">
+        <h3>📖 Journal</h3>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODALES ===================== -->
+<div class="overlay" id="ticketOverlay">
+  <div class="modal">
+    <h2>🗺️ Cartes Destination</h2>
+    <p class="sub" id="ticketSub"></p>
+    <div id="ticketChoices"></div>
+    <div class="actions"><button class="btn gold" id="ticketOkBtn">Valider</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="colorOverlay">
+  <div class="modal">
+    <h2>🎨 Choisis la couleur à jouer</h2>
+    <p class="sub" id="colorSub"></p>
+    <div id="colorChoices"></div>
+    <div class="actions"><button class="btn secondary" id="colorCancelBtn">Annuler</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="victory-overlay">
+  <div class="modal" id="victory-box"></div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   AVENTURIER DU RAIL — édition Harry Potter
+   1 joueur contre l'IA, ou 2 joueurs en ligne (PeerJS)
+   ============================================================ */
+
+/* ---------- données du plateau ----------
+   Les positions correspondent aux noeuds IMPRIMÉS sur asset/aventurierRailPlato.png (1536x1024).
+   Les lieux "j:true" sont des jonctions non étiquetées sur la carte : on leur dessine
+   une petite plaque de nom (lieux de l'univers Harry Potter). */
+const CITIES = {
+  POU:{name:"Poudlard",              x:365, y:215},
+  V93:{name:"Voie 9¾",               x:550, y:159, j:true, lx:-8,  ly:-26},
+  NUR:{name:"Nurmengard",            x:782, y:69,  j:true, lx:-14, ly:-24},
+  FOR:{name:"Forêt Interdite",       x:717, y:212},
+  DUR:{name:"Durmstrang",            x:990, y:145},
+  MAL:{name:"Manoir Malefoy",        x:879, y:268, j:true, lx:64,  ly:-18},
+  BEA:{name:"Beauxbâtons",           x:1036,y:325},
+  HOG:{name:"Hogsmeade",             x:644, y:350},
+  TIS:{name:"Impasse du Tisseur",    x:526, y:310, j:true, lx:-78, ly:16},
+  CAB:{name:"Cabane de Hagrid",      x:414, y:408},
+  LIT:{name:"Little Hangleton",      x:815, y:436, j:true, lx:56,  ly:-22},
+  PRE:{name:"Pré-au-Lard",           x:719, y:471},
+  GQ: {name:"Gué de Queerditch",     x:1059,y:485, j:true, lx:52,  ly:-24},
+  PEX:{name:"Le Poulet Express",     x:1240,y:477},
+  LOU:{name:"Loutry Ste Chaspoule",  x:567, y:495, j:true, lx:-66, ly:34},
+  CDF:{name:"La Coupe de Feu",       x:374, y:581},
+  FDD:{name:"Forêt de Dean",         x:464, y:581, j:true, lx:-4,  ly:42},
+  GRI:{name:"Gringotts",             x:679, y:593},
+  AZK:{name:"Azkaban",               x:1039,y:616},
+  PRI:{name:"Privet Drive",          x:849, y:622, j:true, lx:60,  ly:16},
+  GOD:{name:"Godric's Hollow",       x:1154,y:672},
+  TER:{name:"Le Terrier",            x:305, y:663},
+  DIA:{name:"Diagon Alley",          x:571, y:686, j:true, lx:0,   ly:-30},
+  SHE:{name:"La Chaumière",          x:479, y:725, j:true, lx:-52, ly:26},
+  FLE:{name:"Fleur Delacour",        x:395, y:800, dot:true},
+  STM:{name:"Sainte Mangouste",      x:684, y:803},
+  GRIM:{name:"Square Grimmaurd",     x:804, y:825, j:true, lx:-6,  ly:40},
+  MIN:{name:"Ministère de la Magie", x:1003,y:755},
+  LON:{name:"Londres",               x:1223,y:808}
+};
+
+/* couleurs de cartes / routes */
+const COLORS = ["rouge","orange","jaune","vert","bleu","violet","noir","blanc"];
+const COLOR_HEX = {
+  rouge:"#b8332a", orange:"#d97b26", jaune:"#d8b62f", vert:"#3f7d3a",
+  bleu:"#2e5e9e", violet:"#7b4b9e", noir:"#33333a", blanc:"#e8e2d2",
+  gris:"#b3a58d", rose:"#c95d8f", loco:"#c9971f"
+};
+const COLOR_LBL = {rouge:"Rouge",orange:"Orange",jaune:"Jaune",vert:"Vert",bleu:"Bleu",violet:"Violet",noir:"Noir",blanc:"Blanc",gris:"Grise",rose:"Rose (cartes Violet)",loco:"Locomotive"};
+/* les routes roses du plateau se paient avec des cartes Violet */
+function cardColorOf(route){ return route.color==="rose" ? "violet" : route.color; }
+
+/* routes : relevées sur le plateau imprimé (couleur, nombre de wagons).
+   "via" = points de passage pour suivre la courbe imprimée.
+   "rose" est une couleur de route payable avec des cartes Violet (indiqué en jeu). */
+const ROUTES = [
+  {id:"r1",  a:"POU", b:"V93", len:5, color:"blanc"},
+  {id:"r2",  a:"V93", b:"NUR", len:6, color:"rouge", via:[[655,90]]},
+  {id:"r3",  a:"V93", b:"FOR", len:5, color:"rouge"},
+  {id:"r4",  a:"V93", b:"TIS", len:4, color:"noir"},
+  {id:"r5",  a:"V93", b:"HOG", len:5, color:"rose",  via:[[610,250]]},
+  {id:"r6",  a:"NUR", b:"DUR", len:5, color:"vert",  via:[[888,88]]},
+  {id:"r7",  a:"NUR", b:"MAL", len:5, color:"blanc", via:[[838,165]]},
+  {id:"r8",  a:"FOR", b:"HOG", len:4, color:"jaune"},
+  {id:"r9",  a:"FOR", b:"MAL", len:4, color:"violet"},
+  {id:"r10", a:"DUR", b:"MAL", len:4, color:"bleu"},
+  {id:"r11", a:"DUR", b:"BEA", len:5, color:"rose",  via:[[1030,235]]},
+  {id:"r12", a:"MAL", b:"BEA", len:4, color:"rouge", via:[[958,292]]},
+  {id:"r13", a:"MAL", b:"LIT", len:4, color:"jaune", via:[[838,350]]},
+  {id:"r14", a:"POU", b:"TIS", len:4, color:"violet"},
+  {id:"r15", a:"POU", b:"CAB", len:4, color:"bleu",  via:[[385,310]]},
+  {id:"r16", a:"POU", b:"CDF", len:8, color:"jaune", via:[[285,300],[255,400],[262,490],[305,555]]},
+  {id:"r17", a:"TIS", b:"HOG", len:3, color:"vert"},
+  {id:"r18", a:"TIS", b:"CAB", len:4, color:"orange"},
+  {id:"r19", a:"TIS", b:"LOU", len:4, color:"rouge", via:[[548,402]]},
+  {id:"r20", a:"HOG", b:"LIT", len:4, color:"blanc", via:[[735,382]]},
+  {id:"r21", a:"HOG", b:"PRE", len:4, color:"violet"},
+  {id:"r22", a:"HOG", b:"LOU", len:4, color:"noir"},
+  {id:"r23", a:"CAB", b:"LOU", len:4, color:"jaune"},
+  {id:"r24", a:"CAB", b:"CDF", len:4, color:"violet", via:[[380,490]]},
+  {id:"r25", a:"BEA", b:"LIT", len:5, color:"vert",  via:[[915,390]]},
+  {id:"r26", a:"BEA", b:"GQ",  len:5, color:"rose",  via:[[1052,405]]},
+  {id:"r27", a:"BEA", b:"PEX", len:6, color:"blanc", via:[[1145,390]]},
+  {id:"r28", a:"LIT", b:"PRE", len:3, color:"orange"},
+  {id:"r29", a:"LIT", b:"GQ",  len:6, color:"rouge", via:[[940,468]]},
+  {id:"r30", a:"LIT", b:"PRI", len:5, color:"noir"},
+  {id:"r31", a:"PRE", b:"LOU", len:4, color:"bleu"},
+  {id:"r32", a:"PRE", b:"GRI", len:3, color:"vert"},
+  {id:"r33", a:"GQ",  b:"PEX", len:4, color:"rose"},
+  {id:"r34", a:"GQ",  b:"AZK", len:4, color:"bleu"},
+  {id:"r35", a:"PEX", b:"AZK", len:6, color:"orange", via:[[1140,540]]},
+  {id:"r36", a:"PEX", b:"LON", len:8, color:"blanc", via:[[1300,525],[1370,600],[1400,680],[1370,760]]},
+  {id:"r37", a:"LOU", b:"FDD", len:3, color:"vert"},
+  {id:"r38", a:"LOU", b:"GRI", len:3, color:"vert",  via:[[614,562]]},
+  {id:"r39", a:"CDF", b:"FDD", len:2, color:"bleu"},
+  {id:"r40", a:"CDF", b:"TER", len:3, color:"orange"},
+  {id:"r41", a:"FDD", b:"DIA", len:4, color:"violet"},
+  {id:"r42", a:"FDD", b:"SHE", len:4, color:"rouge"},
+  {id:"r43", a:"TER", b:"SHE", len:4, color:"vert",  via:[[390,703]]},
+  {id:"r44", a:"GRI", b:"DIA", len:3, color:"bleu"},
+  {id:"r45", a:"GRI", b:"PRI", len:4, color:"rose",  via:[[765,618]]},
+  {id:"r47", a:"DIA", b:"SHE", len:2, color:"bleu"},
+  {id:"r48", a:"DIA", b:"STM", len:4, color:"noir"},
+  {id:"r49", a:"SHE", b:"FLE", len:3, color:"rose"},
+  {id:"r50", a:"SHE", b:"STM", len:5, color:"blanc", via:[[580,775]]},
+  {id:"r51", a:"FLE", b:"STM", len:6, color:"orange", via:[[540,822]]},
+  {id:"r52", a:"PRI", b:"AZK", len:5, color:"bleu"},
+  {id:"r53", a:"PRI", b:"MIN", len:5, color:"jaune", via:[[890,715]]},
+  {id:"r54", a:"PRI", b:"GRIM",len:6, color:"rouge", via:[[818,723]]},
+  {id:"r55", a:"AZK", b:"GOD", len:3, color:"vert"},
+  {id:"r56", a:"AZK", b:"MIN", len:4, color:"violet"},
+  {id:"r57", a:"GOD", b:"MIN", len:4, color:"vert"},
+  {id:"r58", a:"GOD", b:"LON", len:4, color:"orange", via:[[1168,748]]},
+  {id:"r59", a:"MIN", b:"GRIM",len:5, color:"bleu",  dbl:"r60"},
+  {id:"r60", a:"MIN", b:"GRIM",len:5, color:"vert",  dbl:"r59", via:[[960,820],[890,858]]},
+  {id:"r61", a:"MIN", b:"LON", len:5, color:"rouge"}
+];
+const ROUTE_BY_ID = {}; ROUTES.forEach(r=>ROUTE_BY_ID[r.id]=r);
+const ROUTE_PTS = {1:1, 2:2, 3:4, 4:7, 5:10, 6:15, 7:18, 8:21};
+
+/* cartes destination (les 8 premières figurent sur le plateau) */
+const TICKETS = [
+  {a:"POU", b:"PRE", pts:8},
+  {a:"V93", b:"DIA", pts:6},
+  {a:"POU", b:"BEA", pts:9},
+  {a:"PRE", b:"GOD", pts:5},
+  {a:"HOG", b:"CAB", pts:4},
+  {a:"PEX", b:"LON", pts:10},
+  {a:"AZK", b:"MIN", pts:7},
+  {a:"STM", b:"DUR", pts:6},
+  {a:"POU", b:"LON", pts:14},
+  {a:"DUR", b:"FLE", pts:12},
+  {a:"CDF", b:"AZK", pts:9},
+  {a:"TER", b:"GOD", pts:11},
+  {a:"FOR", b:"STM", pts:8},
+  {a:"BEA", b:"DIA", pts:9},
+  {a:"CAB", b:"MIN", pts:10},
+  {a:"POU", b:"FLE", pts:8},
+  {a:"PEX", b:"CDF", pts:12},
+  {a:"HOG", b:"LON", pts:9},
+  {a:"GRI", b:"DUR", pts:8},
+  {a:"NUR", b:"GRIM", pts:13}
+];
+
+const START_WAGONS = 40;
+const CARD_TYPES = COLORS.concat(["loco"]);
+
+/* ---------- sprites de la planche de cartes ---------- */
+const SHEET = "asset/aventurierRailCarte.png";
+const SHEET_W = 1536, SHEET_H = 1024;
+const SPR = {}; /* type -> {x,y,w,h} */
+CARD_TYPES.forEach((t,i)=>{ SPR[t] = {x:Math.round(18 + i*166.75), y:36, w:150, h:252}; });
+SPR.backDest  = {x:1348, y:316, w:156, h:290};
+SPR.backWagon = {x:1348, y:628, w:156, h:290};
+
+function spriteDiv(type, dispW, cls){
+  const s = SPR[type];
+  const k = dispW / s.w;
+  const d = document.createElement("div");
+  if(cls) d.className = cls;
+  d.style.width = dispW+"px";
+  d.style.height = Math.round(s.h*k)+"px";
+  d.style.backgroundImage = "url('"+SHEET+"')";
+  d.style.backgroundSize = Math.round(SHEET_W*k)+"px "+Math.round(SHEET_H*k)+"px";
+  d.style.backgroundPosition = (-Math.round(s.x*k))+"px "+(-Math.round(s.y*k))+"px";
+  d.style.backgroundRepeat = "no-repeat";
+  return d;
+}
+
+/* ---------- utilitaires ---------- */
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+function cityName(id){ return CITIES[id].name; }
+function emptyHand(){ const h={}; CARD_TYPES.forEach(t=>h[t]=0); return h; }
+function handTotal(h){ return CARD_TYPES.reduce((s,t)=>s+h[t],0); }
+
+/* ---------- état ---------- */
+let G = null;            /* état complet (hôte / local) */
+let SNAP = null;         /* instantané reçu (invité) */
+let logHistory = [];
+let aiTimer = null;
+
+const NET = {
+  mode:"local", peer:null,
+  conn:null,            /* (invité) connexion vers l'hôte */
+  conns:[],             /* (hôte) liste des invités : {c, slot, side, seat, name, color} */
+  code:null,            /* code de la partie (affiché en jeu pour revenir) */
+  started:false, ended:false,
+  syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
+  guestName:"Joueur 2", guestColor:"#2e7d5b"
+};
+const NET_MAX_GUESTS = 4; /* 5 joueurs max, dont l'hôte */
+
+function log(msg){
+  logHistory.push(msg);
+  if(logHistory.length>200) logHistory = logHistory.slice(-180);
+  renderLog(logHistory);
+  netScheduleSync();
+}
+function renderLog(list){
+  const el = document.getElementById("log");
+  el.innerHTML = "";
+  list.slice(-60).forEach(m=>{ const d=document.createElement("div"); d.textContent=m; el.appendChild(d); });
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- création de partie ---------- */
+function newGame(list){
+  const deck = [];
+  COLORS.forEach(c=>{ for(let i=0;i<12;i++) deck.push(c); });
+  for(let i=0;i<14;i++) deck.push("loco");
+  shuffle(deck);
+  const ticketDeck = shuffle(TICKETS.slice());
+
+  G = {
+    players: list.map(p=>({
+      name:p.name, color:p.color, ai:!!p.ai, side:p.side||null,
+      hand:emptyHand(), tickets:[], wagons:START_WAGONS, score:0
+    })),
+    deck, discard:[], faceUp:[], ticketDeck,
+    owners:{},                 /* routeId -> index joueur */
+    cur:0, drawsLeft:2,
+    pendings:[],               /* choix de destinations en attente */
+    phase:"init",
+    endTriggered:false, finalTurns:null,
+    over:false
+  };
+  for(let p=0;p<G.players.length;p++){
+    for(let i=0;i<4;i++) G.players[p].hand[drawCardRaw()]++;
+  }
+  refillFaceUp();
+  for(let p=0;p<G.players.length;p++){
+    const offer = G.ticketDeck.splice(0,3);
+    G.pendings.push({p, offer, minKeep:2});
+  }
+  log("🚂 La partie commence ! Choisissez vos destinations.");
+}
+
+function drawCardRaw(){
+  if(G.deck.length===0){
+    if(G.discard.length===0) return null;
+    G.deck = shuffle(G.discard.splice(0));
+  }
+  return G.deck.pop();
+}
+function refillFaceUp(){
+  while(G.faceUp.length<5){
+    const c = drawCardRaw();
+    if(c===null) break;
+    G.faceUp.push(c);
+  }
+  /* règle des 3 locomotives visibles */
+  let guard = 0;
+  while(G.faceUp.filter(c=>c==="loco").length>=3 && (G.deck.length+G.discard.length)>0 && guard<6){
+    guard++;
+    G.discard.push(...G.faceUp.splice(0));
+    while(G.faceUp.length<5){
+      const c = drawCardRaw();
+      if(c===null) break;
+      G.faceUp.push(c);
+    }
+  }
+}
+
+/* ---------- logique des routes ---------- */
+function routeBlocked(r, pIdx){
+  if(G.owners[r.id]!==undefined) return true;
+  if(r.dbl){
+    const so = G.owners[r.dbl];
+    if(so!==undefined){
+      if(G.players.length<=3) return true;          /* à 2-3 joueurs : un seul tronçon des routes doubles */
+      if(pIdx!==undefined && so===pIdx) return true; /* on ne prend jamais les deux tronçons soi-même */
+    }
+  }
+  return false;
+}
+function payOptions(pIdx, r){
+  /* renvoie la liste des façons de payer : {color, useColor, useLoco} */
+  const h = G.players[pIdx].hand;
+  const opts = [];
+  const candidates = r.color==="gris" ? COLORS : [cardColorOf(r)];
+  let allLocoAdded = false;
+  candidates.forEach(c=>{
+    if(h[c] + h.loco >= r.len){
+      const useColor = Math.min(h[c], r.len);
+      const useLoco = r.len - useColor;
+      if(useColor===0){
+        if(!allLocoAdded){ opts.push({color:c, useColor:0, useLoco}); allLocoAdded = true; }
+      } else {
+        opts.push({color:c, useColor, useLoco});
+      }
+    }
+  });
+  return opts;
+}
+function claimRoute(pIdx, routeId, color){
+  const r = ROUTE_BY_ID[routeId];
+  if(!r || G.over || G.phase!=="play") return false;
+  if(pIdx!==G.cur || G.drawsLeft!==2 || G.pendings.length) return false;
+  if(routeBlocked(r, pIdx)) return false;
+  const p = G.players[pIdx];
+  if(p.wagons < r.len) return false;
+  const opt = payOptions(pIdx, r).find(o=>o.color===color) || payOptions(pIdx, r)[0];
+  if(!opt) return false;
+  p.hand[opt.color] -= opt.useColor;
+  p.hand.loco -= opt.useLoco;
+  for(let i=0;i<opt.useColor;i++) G.discard.push(opt.color);
+  for(let i=0;i<opt.useLoco;i++) G.discard.push("loco");
+  p.wagons -= r.len;
+  p.score += ROUTE_PTS[r.len];
+  G.owners[r.id] = pIdx;
+  log(`🛤️ ${p.name} prend ${cityName(r.a)} – ${cityName(r.b)} (${r.len} wagons, +${ROUTE_PTS[r.len]} pts).`);
+  updateTicketsDone(pIdx);
+  endTurn();
+  return true;
+}
+function updateTicketsDone(pIdx){
+  const p = G.players[pIdx];
+  p.tickets.forEach(t=>{
+    if(!t.done && citiesConnected(pIdx, t.a, t.b)){
+      t.done = true;
+      log(`✨ ${p.name} a complété une destination !`);
+    }
+  });
+}
+function citiesConnected(pIdx, a, b){
+  const adj = {};
+  ROUTES.forEach(r=>{
+    if(G.owners[r.id]===pIdx){
+      (adj[r.a] = adj[r.a]||[]).push(r.b);
+      (adj[r.b] = adj[r.b]||[]).push(r.a);
+    }
+  });
+  const seen = {}; const stack = [a];
+  while(stack.length){
+    const c = stack.pop();
+    if(c===b) return true;
+    if(seen[c]) continue;
+    seen[c] = true;
+    (adj[c]||[]).forEach(n=>{ if(!seen[n]) stack.push(n); });
+  }
+  return false;
+}
+
+/* ---------- pioche ---------- */
+function drawFaceUp(pIdx, i){
+  if(G.over || G.phase!=="play" || pIdx!==G.cur || G.pendings.length) return false;
+  const c = G.faceUp[i];
+  if(c===undefined) return false;
+  if(c==="loco"){
+    if(G.drawsLeft!==2) return false;
+    G.faceUp.splice(i,1);
+    G.players[pIdx].hand.loco++;
+    refillFaceUp();
+    log(`🃏 ${G.players[pIdx].name} prend la Locomotive visible.`);
+    endTurn();
+  } else {
+    G.faceUp.splice(i,1);
+    G.players[pIdx].hand[c]++;
+    refillFaceUp();
+    G.drawsLeft--;
+    log(`🃏 ${G.players[pIdx].name} prend une carte ${COLOR_LBL[c]} visible.`);
+    if(G.drawsLeft<=0) endTurn(); else renderAll();
+  }
+  return true;
+}
+function drawBlind(pIdx){
+  if(G.over || G.phase!=="play" || pIdx!==G.cur || G.pendings.length) return false;
+  const c = drawCardRaw();
+  if(c===null) return false;
+  G.players[pIdx].hand[c]++;
+  G.drawsLeft--;
+  log(`🎴 ${G.players[pIdx].name} pioche une carte.`);
+  if(G.drawsLeft<=0) endTurn(); else renderAll();
+  return true;
+}
+function drawTickets(pIdx){
+  if(G.over || G.phase!=="play" || pIdx!==G.cur || G.drawsLeft!==2 || G.pendings.length) return false;
+  if(G.ticketDeck.length===0) return false;
+  const offer = G.ticketDeck.splice(0, Math.min(3, G.ticketDeck.length));
+  G.pendings.push({p:pIdx, offer, minKeep:1});
+  log(`🗺️ ${G.players[pIdx].name} pioche des cartes Destination.`);
+  renderAll();
+  return true;
+}
+function keepTickets(pIdx, keepIdxs){
+  const pi = G.pendings.findIndex(pd=>pd.p===pIdx);
+  if(pi<0) return false;
+  const pd = G.pendings[pi];
+  const keep = [...new Set(keepIdxs)].filter(i=>i>=0 && i<pd.offer.length);
+  if(keep.length<Math.min(pd.minKeep, pd.offer.length)) return false;
+  const p = G.players[pIdx];
+  keep.forEach(i=>{
+    const t = pd.offer[i];
+    p.tickets.push({a:t.a, b:t.b, pts:t.pts, done:citiesConnected(pIdx, t.a, t.b)});
+  });
+  pd.offer.forEach((t,i)=>{ if(!keep.includes(i)) G.ticketDeck.push(t); });
+  G.pendings.splice(pi,1);
+  log(`🗺️ ${p.name} garde ${keep.length} destination(s).`);
+  if(G.phase==="init"){
+    if(G.pendings.length===0){
+      G.phase = "play";
+      log(`▶️ C'est à ${G.players[G.cur].name} de jouer.`);
+      renderAll();
+      maybeAiTurn();
+    } else { renderAll(); maybeAiTurn(); }
+  } else {
+    endTurn();
+  }
+  return true;
+}
+
+/* ---------- tours ---------- */
+function endTurn(){
+  const p = G.players[G.cur];
+  if(!G.endTriggered && p.wagons<=2){
+    G.endTriggered = true;
+    G.finalTurns = G.players.length;
+    log(`⏳ ${p.name} n'a presque plus de wagons : dernier tour pour tout le monde !`);
+  }
+  if(G.endTriggered){
+    G.finalTurns--;
+    if(G.finalTurns<0){ finishGame(); return; }
+  }
+  G.cur = (G.cur+1)%G.players.length;
+  G.drawsLeft = 2;
+  /* joueurs totalement bloqués : on passe leur tour (fin si plus personne ne peut agir) */
+  let skipped = 0;
+  while(!playerHasAnyMove(G.cur)){
+    log(`🚫 ${G.players[G.cur].name} ne peut plus rien faire et passe son tour.`);
+    if(G.endTriggered){
+      G.finalTurns--;
+      if(G.finalTurns<0){ finishGame(); return; }
+    }
+    G.cur = (G.cur+1)%G.players.length;
+    skipped++;
+    if(skipped>=G.players.length){ finishGame(); return; }
+  }
+  renderAll();
+  maybeAiTurn();
+}
+function playerHasAnyMove(pIdx){
+  if(G.deck.length+G.discard.length+G.faceUp.length>0) return true;
+  if(G.ticketDeck.length>0) return true;
+  return ROUTES.some(r=>!routeBlocked(r, pIdx) && G.players[pIdx].wagons>=r.len && payOptions(pIdx,r).length>0);
+}
+
+/* ---------- fin de partie ---------- */
+function longestPath(pIdx){
+  const edges = ROUTES.filter(r=>G.owners[r.id]===pIdx);
+  if(edges.length===0) return 0;
+  let best = 0;
+  const used = new Set();
+  function dfs(city, len){
+    if(len>best) best = len;
+    edges.forEach(e=>{
+      if(used.has(e.id)) return;
+      let next = null;
+      if(e.a===city) next = e.b; else if(e.b===city) next = e.a;
+      if(next===null) return;
+      used.add(e.id);
+      dfs(next, len+e.len);
+      used.delete(e.id);
+    });
+  }
+  const cities = new Set(); edges.forEach(e=>{cities.add(e.a); cities.add(e.b);});
+  cities.forEach(c=>dfs(c,0));
+  return best;
+}
+function finishGame(){
+  if(G.over) return;
+  G.over = true;
+  const res = G.players.map((p,i)=>{
+    let tkPlus = 0, tkMinus = 0;
+    p.tickets.forEach(t=>{
+      t.done = t.done || citiesConnected(i, t.a, t.b);
+      if(t.done) tkPlus += t.pts; else tkMinus += t.pts;
+    });
+    return {i, name:p.name, color:p.color, route:p.score, tkPlus, tkMinus, longest:longestPath(i)};
+  });
+  const maxLong = Math.max(...res.map(r=>r.longest));
+  res.forEach(r=>{
+    r.bonus = (r.longest===maxLong && maxLong>0) ? 10 : 0;
+    r.total = r.route + r.tkPlus - r.tkMinus + r.bonus;
+  });
+  res.sort((a,b)=>b.total-a.total);
+  const winner = res[0];
+  const tie = res.length>1 && res[0].total===res[1].total;
+  G.victoryHtml = buildVictoryHtml(res, tie);
+  log(tie ? "🏁 Égalité parfaite !" : `🏆 ${winner.name} remporte la partie avec ${winner.total} points !`);
+  renderAll();
+  showVictory(G.victoryHtml);
+}
+function buildVictoryHtml(res, tie){
+  let h = tie ? "<h2>🤝 Égalité !</h2>" : `<h2>🏆 ${escapeHtml(res[0].name)} gagne !</h2>`;
+  h += "<table><tr><th></th>";
+  res.forEach(r=>{ h += `<th><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${r.color};border:1px solid #241a08;"></span> ${escapeHtml(r.name)}</th>`; });
+  h += "</tr>";
+  const rows = [
+    ["Routes", r=>r.route],
+    ["Destinations réussies", r=>"+"+r.tkPlus],
+    ["Destinations ratées", r=>r.tkMinus? "−"+r.tkMinus : "0"],
+    ["Chemin le plus long", r=>r.longest+" 🚂"+(r.bonus?" (+10)":"")],
+    ["<b>TOTAL</b>", r=>"<b>"+r.total+"</b>"]
+  ];
+  rows.forEach(([lbl,fn])=>{
+    h += `<tr><td style="text-align:left;">${lbl}</td>`;
+    res.forEach(r=>{ h += `<td>${fn(r)}</td>`; });
+    h += "</tr>";
+  });
+  h += "</table>";
+  h += `<div class="actions"><button class="btn gold" onclick="location.reload()">🔄 Rejouer</button></div>`;
+  return h;
+}
+function escapeHtml(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function showVictory(html){
+  const vo = document.getElementById("victory-overlay");
+  if(vo.classList.contains("active")) return;
+  document.getElementById("victory-box").innerHTML = html;
+  const palette = ["#c9971f","#b8332a","#2e5e9e","#3f7d3a","#7b4b9e","#e8e2d2"];
+  for(let k=0;k<90;k++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random()*100)+"vw";
+    c.style.background = palette[Math.floor(Math.random()*palette.length)];
+    c.style.width = (6+Math.random()*8)+"px";
+    c.style.height = (10+Math.random()*12)+"px";
+    c.style.animationDuration = (2.6+Math.random()*3)+"s";
+    c.style.animationDelay = (Math.random()*2.5)+"s";
+    vo.appendChild(c);
+  }
+  vo.classList.add("active");
+}
+
+/* ============================================================
+   IA
+   ============================================================ */
+function shortestPath(pIdx, from, to){
+  /* Dijkstra : routes possédées = 0, libres = longueur, bloquées = interdit */
+  const dist = {}, prev = {};
+  Object.keys(CITIES).forEach(c=>dist[c]=Infinity);
+  dist[from] = 0;
+  const visited = {};
+  for(;;){
+    let u = null, best = Infinity;
+    Object.keys(dist).forEach(c=>{ if(!visited[c] && dist[c]<best){best=dist[c]; u=c;} });
+    if(u===null || u===to) break;
+    visited[u] = true;
+    ROUTES.forEach(r=>{
+      let v = null;
+      if(r.a===u) v = r.b; else if(r.b===u) v = r.a;
+      if(!v || visited[v]) return;
+      let w;
+      if(G.owners[r.id]===pIdx) w = 0;
+      else if(routeBlocked(r, pIdx)) return;
+      else w = r.len;
+      if(dist[u]+w < dist[v]){ dist[v] = dist[u]+w; prev[v] = {city:u, route:r}; }
+    });
+  }
+  if(dist[to]===Infinity) return null;
+  const routes = [];
+  let c = to;
+  while(c!==from){
+    const st = prev[c];
+    if(!st) break;
+    if(G.owners[st.route.id]===undefined) routes.push(st.route);
+    c = st.city;
+  }
+  return {cost:dist[to], routes};
+}
+function maybeAiTurn(){
+  if(NET.mode!=="local" || !G || G.over) return;
+  clearTimeout(aiTimer);
+  const aiPending = G.pendings.find(pd=>G.players[pd.p].ai);
+  if(aiPending){ aiTimer = setTimeout(()=>aiChooseTickets(aiPending), 900); return; }
+  if(G.phase==="play" && G.players[G.cur].ai && !G.pendings.length){
+    aiTimer = setTimeout(aiStep, 950);
+  }
+}
+function aiChooseTickets(pd){
+  const pIdx = pd.p;
+  const evals = pd.offer.map((t,i)=>{
+    const sp = shortestPath(pIdx, t.a, t.b);
+    const feasible = sp && sp.cost<=G.players[pIdx].wagons;
+    return {i, feasible, cost:sp?sp.cost:99, value: feasible ? t.pts - sp.cost*1.15 : -t.pts};
+  }).sort((a,b)=>b.value-a.value);
+  const keep = evals.slice(0, Math.min(pd.minKeep, pd.offer.length)).map(e=>e.i);
+  evals.slice(pd.minKeep).forEach(e=>{
+    if(e.feasible && e.value>1.5 && e.cost<=6) keep.push(e.i);
+  });
+  keepTickets(pIdx, keep);
+}
+function aiWantedRoutes(pIdx){
+  const wanted = new Map();
+  G.players[pIdx].tickets.forEach(t=>{
+    if(t.done) return;
+    const sp = shortestPath(pIdx, t.a, t.b);
+    if(!sp || sp.cost>G.players[pIdx].wagons) return;
+    sp.routes.forEach(r=>wanted.set(r.id, r));
+  });
+  return [...wanted.values()];
+}
+function aiStep(){
+  if(!G || G.over || G.phase!=="play") return;
+  const pIdx = G.cur;
+  const p = G.players[pIdx];
+  if(!p.ai) return;
+
+  const wanted = aiWantedRoutes(pIdx);
+  /* 1. prendre une route utile si possible */
+  const claimableWanted = wanted.filter(r=>!routeBlocked(r, pIdx) && p.wagons>=r.len && payOptions(pIdx,r).length>0)
+                                .sort((a,b)=>b.len-a.len);
+  if(G.drawsLeft===2 && claimableWanted.length){
+    const r = claimableWanted[0];
+    const opt = aiBestPay(pIdx, r);
+    claimRoute(pIdx, r.id, opt.color);
+    return;
+  }
+  /* 2. plus de destinations en cours -> piocher des destinations ou dépenser les wagons */
+  if(G.drawsLeft===2 && wanted.length===0){
+    const incomplete = p.tickets.some(t=>!t.done);
+    if(!incomplete && G.ticketDeck.length>0 && p.wagons>=10 && !G.endTriggered){
+      drawTickets(pIdx);
+      return;
+    }
+    const any = ROUTES.filter(r=>!routeBlocked(r, pIdx) && p.wagons>=r.len && payOptions(pIdx,r).length>0)
+                      .sort((a,b)=>b.len-a.len);
+    if(any.length && (handTotal(p.hand)>=10 || G.endTriggered || any[0].len>=4)){
+      const opt = aiBestPay(pIdx, any[0]);
+      claimRoute(pIdx, any[0].id, opt.color);
+      return;
+    }
+  }
+  /* 3. piocher des cartes utiles */
+  const needCount = {};
+  wanted.forEach(r=>{
+    if(r.color==="gris") return;
+    const cc = cardColorOf(r);
+    const missing = r.len - p.hand[cc];
+    if(missing>0) needCount[cc] = (needCount[cc]||0) + missing;
+  });
+  let idx = -1;
+  for(let i=0;i<G.faceUp.length;i++){
+    const c = G.faceUp[i];
+    if(c!=="loco" && needCount[c]){ idx = i; break; }
+  }
+  if(idx<0 && G.drawsLeft===2){
+    const li = G.faceUp.indexOf("loco");
+    if(li>=0 && Object.keys(needCount).length && Math.random()<0.5) idx = li;
+  }
+  let acted;
+  if(idx>=0) acted = drawFaceUp(pIdx, idx);
+  else {
+    acted = drawBlind(pIdx);
+    if(!acted && G.faceUp.length) acted = drawFaceUp(pIdx, G.faceUp[0]==="loco"&&G.drawsLeft!==2 ? (G.faceUp.length>1?1:0) : 0);
+  }
+  if(!acted){
+    /* rien à piocher : prendre n'importe quelle route abordable ou passer */
+    const any = ROUTES.filter(r=>!routeBlocked(r, pIdx) && p.wagons>=r.len && payOptions(pIdx,r).length>0).sort((a,b)=>b.len-a.len);
+    if(G.drawsLeft===2 && any.length){ claimRoute(pIdx, any[0].id, aiBestPay(pIdx,any[0]).color); }
+    else endTurn();
+    return;
+  }
+  if(!G.over && G.phase==="play" && G.players[G.cur].ai && !G.pendings.length){
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(aiStep, 850);
+  }
+}
+function aiBestPay(pIdx, r){
+  const opts = payOptions(pIdx, r);
+  opts.sort((a,b)=>a.useLoco-b.useLoco || b.useColor-a.useColor);
+  return opts[0];
+}
+
+/* ============================================================
+   RENDU
+   ============================================================ */
+const svgNS = "http://www.w3.org/2000/svg";
+let boardBuilt = false;
+let HINTS = false; /* surbrillance des routes libres (bouton 👁) */
+
+/* échantillonne une polyligne : renvoie {pt, angle} à l'abscisse curviligne t (0..1), avec marges */
+function polyInfo(pts){
+  const segs = [];
+  let total = 0;
+  for(let i=0;i<pts.length-1;i++){
+    const L = Math.hypot(pts[i+1][0]-pts[i][0], pts[i+1][1]-pts[i][1]);
+    segs.push(L); total += L;
+  }
+  return {pts, segs, total};
+}
+function polyAt(info, dist){
+  let d = Math.max(0, Math.min(info.total, dist));
+  for(let i=0;i<info.segs.length;i++){
+    if(d<=info.segs[i] || i===info.segs.length-1){
+      const t = info.segs[i]===0 ? 0 : d/info.segs[i];
+      const [x1,y1] = info.pts[i], [x2,y2] = info.pts[i+1];
+      return {x:x1+(x2-x1)*t, y:y1+(y2-y1)*t, angle:Math.atan2(y2-y1,x2-x1)*180/Math.PI};
+    }
+    d -= info.segs[i];
+  }
+}
+
+function buildBoard(){
+  if(boardBuilt) return;
+  boardBuilt = true;
+  const svg = document.getElementById("boardSvg");
+  svg.innerHTML = "";
+  const img = document.createElementNS(svgNS,"image");
+  img.setAttribute("href", "asset/aventurierRailPlato.png");
+  img.setAttribute("width","1536"); img.setAttribute("height","1024");
+  svg.appendChild(img);
+
+  /* routes : emplacements invisibles calés sur les wagons imprimés */
+  ROUTES.forEach(r=>{
+    const A = CITIES[r.a], B = CITIES[r.b];
+    const pts = [[A.x,A.y]].concat(r.via||[]).concat([[B.x,B.y]]);
+    const info = polyInfo(pts);
+    const inset = 20;
+    const usable = info.total - inset*2;
+    const g = document.createElementNS(svgNS,"g");
+    g.setAttribute("class","route");
+    g.dataset.route = r.id;
+
+    /* halo de survol le long du tracé */
+    const glow = document.createElementNS(svgNS,"polyline");
+    glow.setAttribute("points", pts.map(p=>p.join(",")).join(" "));
+    glow.setAttribute("class","route-glow");
+    g.appendChild(glow);
+
+    for(let i=0;i<r.len;i++){
+      const p = polyAt(info, inset + usable*(i+0.5)/r.len);
+      const w = Math.max(24, Math.min(44, usable/r.len - 5)), h = 17;
+      const car = document.createElementNS(svgNS,"rect");
+      car.setAttribute("x", p.x-w/2); car.setAttribute("y", p.y-h/2);
+      car.setAttribute("width", w); car.setAttribute("height", h);
+      car.setAttribute("rx","4");
+      car.setAttribute("class","route-slot");
+      car.setAttribute("transform",`rotate(${p.angle} ${p.x} ${p.y})`);
+      car.dataset.hintFill = COLOR_HEX[r.color];
+      g.appendChild(car);
+      const win = document.createElementNS(svgNS,"rect");
+      win.setAttribute("x", p.x-w/2+5); win.setAttribute("y", p.y-h/2+3.5);
+      win.setAttribute("width", w-10); win.setAttribute("height", 5);
+      win.setAttribute("rx","2.5");
+      win.setAttribute("class","route-win");
+      win.setAttribute("transform",`rotate(${p.angle} ${p.x} ${p.y})`);
+      g.appendChild(win);
+    }
+    /* zone de clic large le long du tracé */
+    const hit = document.createElementNS(svgNS,"polyline");
+    hit.setAttribute("points", pts.map(p=>p.join(",")).join(" "));
+    hit.setAttribute("class","route-hit");
+    g.appendChild(hit);
+    const title = document.createElementNS(svgNS,"title");
+    g.appendChild(title);
+    g.addEventListener("click", ()=>onRouteClick(r.id));
+    svg.appendChild(g);
+  });
+
+  /* halos lumineux des villes (choix des destinations) */
+  Object.keys(CITIES).forEach(id=>{
+    const c = CITIES[id];
+    const glow = document.createElementNS(svgNS,"circle");
+    glow.setAttribute("cx",c.x); glow.setAttribute("cy",c.y); glow.setAttribute("r","23");
+    glow.setAttribute("class","city-glow");
+    glow.dataset.city = id;
+    svg.appendChild(glow);
+  });
+
+  /* plaques de nom pour les jonctions non étiquetées + pastille Fleur Delacour */
+  Object.keys(CITIES).forEach(id=>{
+    const c = CITIES[id];
+    if(c.dot){
+      const dot = document.createElementNS(svgNS,"circle");
+      dot.setAttribute("cx",c.x); dot.setAttribute("cy",c.y); dot.setAttribute("r","11");
+      dot.setAttribute("fill","#f3ede2"); dot.setAttribute("stroke","#b98a2e"); dot.setAttribute("stroke-width","3.5");
+      dot.setAttribute("pointer-events","none");
+      svg.appendChild(dot);
+    }
+    if(!c.j) return;
+    const g = document.createElementNS(svgNS,"g");
+    g.setAttribute("pointer-events","none");
+    const lx = c.x + (c.lx||0), ly = c.y + (c.ly||-26);
+    const txt = document.createElementNS(svgNS,"text");
+    txt.setAttribute("x", lx); txt.setAttribute("y", ly);
+    txt.setAttribute("text-anchor","middle");
+    txt.setAttribute("class","junction-lbl");
+    txt.textContent = c.name;
+    g.appendChild(txt);
+    svg.appendChild(g);
+    /* plaque derrière le texte, dans le style du plateau */
+    const bb = txt.getBBox();
+    const plate = document.createElementNS(svgNS,"rect");
+    plate.setAttribute("x", bb.x-7); plate.setAttribute("y", bb.y-3);
+    plate.setAttribute("width", bb.width+14); plate.setAttribute("height", bb.height+6);
+    plate.setAttribute("rx","5");
+    plate.setAttribute("class","junction-plate");
+    g.insertBefore(plate, txt);
+  });
+}
+
+/* ---------- vue unifiée (locale / hôte / invité) ---------- */
+function myIndex(){
+  if(NET.mode==="guest") return SNAP ? SNAP.me : 1;
+  if(NET.mode==="host" || !G) return 0;
+  /* local : perspective du joueur humain concerné (chaise tournante à plusieurs humains) */
+  if(G.phase==="init"){
+    const pd = G.pendings.find(x=>!G.players[x.p].ai);
+    if(pd) return pd.p;
+  }
+  if(!G.players[G.cur].ai) return G.cur;
+  /* pendant un tour d'IA : on garde la vue du dernier humain qui a joué */
+  for(let k=1;k<=G.players.length;k++){
+    const i = (G.cur-k+G.players.length)%G.players.length;
+    if(!G.players[i].ai) return i;
+  }
+  return 0;
+}
+function localHumanCount(){
+  if(NET.mode!=="local" || !G) return 1;
+  return G.players.filter(p=>!p.ai).length;
+}
+function currentView(){
+  if(NET.mode==="guest") return SNAP;
+  if(!G) return null;
+  return viewFor(myIndex());
+}
+function viewFor(me){
+  const pd = G.pendings.find(x=>x.p===me) || null;
+  return {
+    me,
+    players: G.players.map((p,i)=>({
+      name:p.name, color:p.color, ai:p.ai, wagons:p.wagons, score:p.score,
+      handCount:handTotal(p.hand), ticketCount:p.tickets.length,
+      hand: i===me ? Object.assign({},p.hand) : null,
+      tickets: i===me ? p.tickets.map(t=>({a:t.a,b:t.b,pts:t.pts,done:t.done})) : null
+    })),
+    owners: Object.assign({}, G.owners),
+    faceUp: G.faceUp.slice(),
+    deckCount: G.deck.length + G.discard.length,
+    ticketDeckCount: G.ticketDeck.length,
+    cur: G.cur, drawsLeft: G.drawsLeft, phase: G.phase,
+    pending: pd ? {offer:pd.offer.slice(), minKeep:pd.minKeep} : null,
+    anyPending: G.pendings.length>0,
+    endTriggered: G.endTriggered, over: G.over,
+    victory: G.over ? G.victoryHtml : null,
+    log: logHistory.slice(-60)
+  };
+}
+
+function renderAll(){
+  const V = currentView();
+  if(!V) return;
+  buildBoard();
+  const me = V.me;
+  const multiLocal = localHumanCount()>1;
+  const meName = V.players[me] ? V.players[me].name : "";
+  const myTurn = !V.over && V.phase==="play" && V.cur===me && !V.anyPending;
+  const canAct = myTurn && V.drawsLeft===2;
+
+  /* bannière de tour */
+  const tb = document.getElementById("turnBanner");
+  if(V.over) tb.textContent = "🏁 Partie terminée";
+  else if(V.phase==="init") tb.textContent = "🗺️ Choix des destinations…";
+  else if(V.anyPending && !V.pending) tb.textContent = "🗺️ Choix de destinations en cours…";
+  else if(myTurn) tb.textContent = V.drawsLeft===2
+      ? (multiLocal ? `▶️ À ${meName} de jouer !` : "▶️ À toi de jouer !")
+      : (multiLocal ? `🃏 ${meName}, pioche encore 1 carte` : "🃏 Pioche encore 1 carte");
+  else tb.textContent = "⏳ Tour de " + V.players[V.cur].name + (V.players[V.cur].ai?" 🤖":"");
+  tb.style.borderColor = myTurn ? "#8d1f1f" : "var(--gold)";
+
+  /* titres des panneaux (chaise tournante) */
+  document.getElementById("handTitle").textContent = multiLocal ? `✋ Main de ${meName}` : "✋ Ta main";
+  document.getElementById("ticketTitle").textContent = multiLocal ? `🗺️ Destinations de ${meName}` : "🗺️ Tes destinations";
+
+  /* joueurs */
+  const ps = document.getElementById("pstats");
+  ps.innerHTML = "";
+  V.players.forEach((p,i)=>{
+    const d = document.createElement("div");
+    d.className = "pstat"+(V.cur===i && !V.over ? " cur":"");
+    d.innerHTML = `<span class="pdot" style="background:${p.color}"></span>
+      <span class="pname">${escapeHtml(p.name)}${(!multiLocal && i===me)?" (toi)":""}</span>
+      <span class="pmeta">🚃${p.wagons} · 🃏${p.handCount} · 🗺️${p.ticketCount} · ⭐${p.score}</span>`;
+    ps.appendChild(d);
+  });
+
+  /* cartes visibles */
+  const fu = document.getElementById("faceUpRow");
+  fu.innerHTML = "";
+  V.faceUp.forEach((c,i)=>{
+    const el = spriteDiv(c, 55, "fu-card");
+    const locoBlocked = c==="loco" && V.drawsLeft!==2;
+    if(!myTurn || locoBlocked) el.classList.add("off");
+    el.title = COLOR_LBL[c] + (c==="loco" ? " (compte pour les 2 pioches)":"");
+    el.onclick = ()=>{ if(myTurn && !locoBlocked) actionDrawFaceUp(i); };
+    fu.appendChild(el);
+  });
+
+  /* pioches */
+  const dr = document.getElementById("drawRow");
+  dr.innerHTML = "";
+  const deckEl = spriteDiv("backWagon", 55, "deck-btn");
+  deckEl.title = "Piocher une carte Wagon";
+  const dc = document.createElement("span"); dc.className="deck-count"; dc.textContent = V.deckCount;
+  deckEl.appendChild(dc);
+  if(!myTurn || V.deckCount===0) deckEl.classList.add("off");
+  deckEl.onclick = ()=>{ if(myTurn && V.deckCount>0) actionDrawBlind(); };
+  dr.appendChild(deckEl);
+  const tkEl = spriteDiv("backDest", 55, "deck-btn");
+  tkEl.title = "Piocher 3 cartes Destination (garde au moins 1)";
+  const tc = document.createElement("span"); tc.className="deck-count"; tc.textContent = V.ticketDeckCount;
+  tkEl.appendChild(tc);
+  if(!canAct || V.ticketDeckCount===0) tkEl.classList.add("off");
+  tkEl.onclick = ()=>{ if(canAct && V.ticketDeckCount>0) actionDrawTickets(); };
+  dr.appendChild(tkEl);
+  document.getElementById("drawHint").textContent =
+    myTurn ? (V.drawsLeft===2 ? "Pioche 2 cartes, prends une route sur la carte, ou pioche des destinations."
+                              : "Encore une carte à piocher (locomotive visible interdite).")
+           : "";
+
+  /* main */
+  const hr = document.getElementById("handRow");
+  hr.innerHTML = "";
+  const myHand = V.players[me].hand || emptyHand();
+  CARD_TYPES.forEach(t=>{
+    if(myHand[t]>0){
+      const el = spriteDiv(t, 52, "hand-card");
+      el.title = COLOR_LBL[t];
+      const b = document.createElement("span"); b.className = "hand-count"; b.textContent = myHand[t];
+      el.appendChild(b);
+      hr.appendChild(el);
+    }
+  });
+  if(hr.children.length===0) hr.innerHTML = '<span class="hint">Aucune carte.</span>';
+
+  /* destinations */
+  const tl = document.getElementById("ticketList");
+  tl.innerHTML = "";
+  (V.players[me].tickets||[]).forEach(t=>{
+    const d = document.createElement("div");
+    d.className = "ticket-row"+(t.done?" done":"");
+    d.innerHTML = `<span class="tk-st">${t.done?"✅":"🧭"}</span>
+      <span>${cityName(t.a)} ↔ ${cityName(t.b)}</span><span class="tk-pts">${t.pts}</span>`;
+    d.onmouseenter = ()=>{ if(!V.pending) setCityGlows(new Set([t.a, t.b])); };
+    d.onmouseleave = ()=>{ if(!V.pending) setCityGlows(new Set()); };
+    tl.appendChild(d);
+  });
+  if(tl.children.length===0) tl.innerHTML = '<span class="hint">Aucune destination pour l\'instant.</span>';
+
+  /* plateau : routes (invisibles tant qu'elles ne sont pas prises — la carte imprimée sert de visuel) */
+  document.getElementById("hintsBtn").classList.toggle("on", HINTS);
+  document.querySelectorAll("#boardSvg g.route").forEach(g=>{
+    const r = ROUTE_BY_ID[g.dataset.route];
+    const owner = V.owners[r.id];
+    const siblingOwner = r.dbl!==undefined && r.dbl!==null ? V.owners[r.dbl] : undefined;
+    const lockedForMe = owner===undefined && siblingOwner!==undefined &&
+                        (V.players.length<=3 || siblingOwner===me);
+    g.classList.toggle("claimed", owner!==undefined);
+    g.classList.toggle("locked", lockedForMe);
+    g.classList.toggle("dim", !myTurn || V.drawsLeft!==2);
+    g.querySelectorAll(".route-slot").forEach(s=>{
+      /* styles inline : prioritaires sur la règle CSS .route-slot */
+      if(owner!==undefined){
+        s.style.fill = V.players[owner].color;
+        s.style.stroke = "#1d1408";
+        s.style.strokeWidth = "2.2";
+        s.style.fillOpacity = "1";
+      } else if(HINTS && !lockedForMe){
+        s.style.fill = s.dataset.hintFill;
+        s.style.stroke = "#241a08";
+        s.style.strokeWidth = "1";
+        s.style.fillOpacity = "0.4";
+      } else {
+        s.style.fill = "transparent";
+        s.style.stroke = "none";
+        s.style.fillOpacity = "1";
+      }
+    });
+    const title = g.querySelector("title");
+    title.textContent = `${cityName(r.a)} – ${cityName(r.b)} · ${r.len} wagon(s) · ${COLOR_LBL[r.color]}` +
+      (owner!==undefined ? ` · pris par ${V.players[owner].name}` : (lockedForMe ? " · bloquée (route double)" : ""));
+  });
+
+  /* modale destinations */
+  const tOv = document.getElementById("ticketOverlay");
+  if(V.pending && !V.over){
+    showTicketModal(V.pending, multiLocal ? meName : null);
+  } else {
+    if(tOv.classList.contains("active")) setCityGlows(new Set());
+    tOv.classList.remove("active");
+  }
+
+  renderLog(V.log || logHistory);
+  if(V.over && V.victory) showVictory(V.victory);
+  netScheduleSync();
+}
+
+/* ---------- modale destinations ---------- */
+let ticketSel = new Set();
+let ticketPendingKey = "";
+let ticketHover = -1;
+function setCityGlows(ids){
+  document.querySelectorAll("#boardSvg .city-glow").forEach(c=>{
+    c.classList.toggle("on", ids.has(c.dataset.city));
+  });
+}
+function updateTicketGlows(pending){
+  const ids = new Set();
+  ticketSel.forEach(i=>{ const t = pending.offer[i]; if(t){ ids.add(t.a); ids.add(t.b); } });
+  if(ticketHover>=0 && pending.offer[ticketHover]){
+    ids.add(pending.offer[ticketHover].a); ids.add(pending.offer[ticketHover].b);
+  }
+  setCityGlows(ids);
+}
+function showTicketModal(pending, forName){
+  const ov = document.getElementById("ticketOverlay");
+  const key = (forName||"")+"|"+JSON.stringify(pending.offer)+"|"+pending.minKeep;
+  if(ov.classList.contains("active") && ticketPendingKey===key) { updateTicketOk(pending); return; }
+  ticketPendingKey = key;
+  ticketSel = new Set();
+  ticketHover = -1;
+  document.getElementById("ticketSub").textContent =
+    (forName ? `${forName}, c'est ton choix ! ` : "") +
+    `Garde au moins ${Math.min(pending.minKeep, pending.offer.length)} carte(s). Survole une destination : les deux lieux s'illuminent sur la carte. Une destination non complétée fait perdre ses points !`;
+  const box = document.getElementById("ticketChoices");
+  box.innerHTML = "";
+  pending.offer.forEach((t,i)=>{
+    const d = document.createElement("div");
+    d.className = "tk-choice";
+    d.innerHTML = `<span style="font-size:20px;">🧭</span><span><b>${cityName(t.a)}</b> ↔ <b>${cityName(t.b)}</b></span><span class="pts">${t.pts}</span>`;
+    d.onclick = ()=>{
+      if(ticketSel.has(i)) ticketSel.delete(i); else ticketSel.add(i);
+      d.classList.toggle("sel", ticketSel.has(i));
+      updateTicketOk(pending);
+      updateTicketGlows(pending);
+    };
+    d.onmouseenter = ()=>{ ticketHover = i; updateTicketGlows(pending); };
+    d.onmouseleave = ()=>{ if(ticketHover===i) ticketHover = -1; updateTicketGlows(pending); };
+    box.appendChild(d);
+  });
+  updateTicketOk(pending);
+  updateTicketGlows(pending);
+  document.getElementById("ticketOkBtn").onclick = ()=>{
+    if(ticketSel.size < Math.min(pending.minKeep, pending.offer.length)) return;
+    ov.classList.remove("active");
+    setCityGlows(new Set());
+    actionKeepTickets([...ticketSel]);
+  };
+  ov.classList.add("active");
+}
+function updateTicketOk(pending){
+  const need = Math.min(pending.minKeep, pending.offer.length);
+  const btn = document.getElementById("ticketOkBtn");
+  btn.disabled = ticketSel.size < need;
+  btn.textContent = ticketSel.size < need ? `Choisis encore ${need-ticketSel.size} carte(s)` : `Garder ${ticketSel.size} carte(s)`;
+}
+
+/* ---------- clic sur une route ---------- */
+function onRouteClick(routeId){
+  const V = currentView();
+  if(!V || V.over || V.phase!=="play" || V.anyPending) return;
+  const me = V.me;
+  if(V.cur!==me || V.drawsLeft!==2) return;
+  const r = ROUTE_BY_ID[routeId];
+  if(V.owners[r.id]!==undefined) return;
+  if(r.dbl){
+    const so = V.owners[r.dbl];
+    if(so!==undefined && (V.players.length<=3 || so===me)){
+      flashHint("Route double : ce tronçon est bloqué."); return;
+    }
+  }
+  const p = V.players[me];
+  if(p.wagons < r.len){ flashHint("Pas assez de wagons ("+r.len+" nécessaires)."); return; }
+  const opts = payOptionsFromHand(p.hand, r);
+  if(opts.length===0){ flashHint("Pas assez de cartes "+(r.color==="gris"?"d'une même couleur":COLOR_LBL[r.color])+" (+ locomotives)."); return; }
+  if(opts.length===1){ actionClaim(routeId, opts[0].color); return; }
+  showColorModal(r, opts);
+}
+function payOptionsFromHand(hand, r){
+  const opts = [];
+  const candidates = r.color==="gris" ? COLORS : [cardColorOf(r)];
+  let allLoco = false;
+  candidates.forEach(c=>{
+    if(hand[c] + hand.loco >= r.len){
+      const useColor = Math.min(hand[c], r.len);
+      if(useColor===0){ if(!allLoco){opts.push({color:c, useColor:0, useLoco:r.len}); allLoco=true;} }
+      else opts.push({color:c, useColor, useLoco:r.len-useColor});
+    }
+  });
+  return opts;
+}
+function showColorModal(r, opts){
+  const ov = document.getElementById("colorOverlay");
+  document.getElementById("colorSub").textContent =
+    `${cityName(r.a)} ↔ ${cityName(r.b)} — ${r.len} wagon(s), route ${COLOR_LBL[r.color].toLowerCase()}.`;
+  const box = document.getElementById("colorChoices");
+  box.innerHTML = "";
+  opts.forEach(o=>{
+    const d = document.createElement("div");
+    d.className = "color-opt";
+    const parts = [];
+    if(o.useColor) parts.push(o.useColor+" "+COLOR_LBL[o.color]);
+    if(o.useLoco) parts.push(o.useLoco+" Locomotive"+(o.useLoco>1?"s":""));
+    d.innerHTML = `<span class="color-chip" style="background:${COLOR_HEX[o.useColor?o.color:"loco"]}"></span> ${parts.join(" + ")}`;
+    d.onclick = ()=>{ ov.classList.remove("active"); actionClaim(r.id, o.color); };
+    box.appendChild(d);
+  });
+  document.getElementById("colorCancelBtn").onclick = ()=>ov.classList.remove("active");
+  ov.classList.add("active");
+}
+let hintTimer = null;
+function flashHint(msg){
+  const el = document.getElementById("drawHint");
+  el.textContent = "⚠️ " + msg;
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(renderAll, 2500);
+}
+
+/* ---------- actions (local ou réseau) ---------- */
+function actionDrawFaceUp(i){
+  if(NET.mode==="guest") netSend({t:"action", kind:"drawFaceUp", i});
+  else { drawFaceUp(myIndex(), i); }
+}
+function actionDrawBlind(){
+  if(NET.mode==="guest") netSend({t:"action", kind:"drawBlind"});
+  else { drawBlind(myIndex()); }
+}
+function actionDrawTickets(){
+  if(NET.mode==="guest") netSend({t:"action", kind:"drawTickets"});
+  else { drawTickets(myIndex()); }
+}
+function actionKeepTickets(keep){
+  if(NET.mode==="guest") netSend({t:"action", kind:"keepTickets", keep});
+  else { keepTickets(myIndex(), keep); }
+}
+function actionClaim(routeId, color){
+  if(NET.mode==="guest") netSend({t:"action", kind:"claim", route:routeId, color});
+  else {
+    if(!claimRoute(myIndex(), routeId, color)) flashHint("Impossible de prendre cette route.");
+  }
+}
+
+/* ============================================================
+   DÉMARRAGE
+   ============================================================ */
+document.getElementById("netLocalBtn").onclick = ()=>{
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+};
+document.getElementById("hintsBtn").onclick = ()=>{ HINTS = !HINTS; renderAll(); };
+
+/* ---------- lignes de joueurs (mode local : 2 à 5, humain ou IA) ---------- */
+const AI_NAMES = ["Vous-Savez-Qui 🤖","Bellatrix 🤖","Drago 🤖","Dobby 🤖"];
+const DEF_COLORS = ["#c0392b","#2e7d5b","#2e5e9e","#c9971f","#7b4b9e"];
+const extraRows = [];
+function addPlayerRow(){
+  if(extraRows.length>=4) return;
+  const idx = extraRows.length;
+  const row = document.createElement("div");
+  row.className = "player-row";
+  const color = document.createElement("input");
+  color.type = "color"; color.value = DEF_COLORS[idx+1]; color.title = "Couleur des wagons";
+  const name = document.createElement("input");
+  name.type = "text"; name.maxLength = 20; name.placeholder = "Prénom";
+  name.value = AI_NAMES[idx];
+  const aiLbl = document.createElement("label");
+  aiLbl.className = "ai-toggle";
+  const ai = document.createElement("input");
+  ai.type = "checkbox"; ai.checked = true;
+  aiLbl.appendChild(ai); aiLbl.appendChild(document.createTextNode("🤖 IA"));
+  ai.onchange = ()=>{
+    /* nom par défaut cohérent quand on bascule humain <-> IA */
+    if(!ai.checked && AI_NAMES.includes(name.value)) name.value = "Joueur "+(extraRows.indexOf(entry)+2);
+    else if(ai.checked && /^Joueur \d+$/.test(name.value)) name.value = AI_NAMES[extraRows.indexOf(entry)%AI_NAMES.length];
+  };
+  const del = document.createElement("button");
+  del.className = "row-del"; del.type = "button"; del.textContent = "✖"; del.title = "Retirer ce joueur";
+  del.onclick = ()=>{
+    if(extraRows.length<=1) return;
+    extraRows.splice(extraRows.indexOf(entry),1);
+    row.remove();
+    updatePlayerRowsUi();
+  };
+  row.appendChild(color); row.appendChild(name); row.appendChild(aiLbl); row.appendChild(del);
+  const entry = {row, color, name, ai, del};
+  extraRows.push(entry);
+  document.getElementById("extraPlayers").appendChild(row);
+  updatePlayerRowsUi();
+}
+function updatePlayerRowsUi(){
+  extraRows.forEach(e=>{ e.del.style.visibility = extraRows.length>1 ? "visible" : "hidden"; });
+  document.getElementById("addPlayerBtn").disabled = extraRows.length>=4;
+}
+addPlayerRow(); /* l'adversaire par défaut */
+document.getElementById("addPlayerBtn").onclick = addPlayerRow;
+
+document.getElementById("startBtn").onclick = ()=>{
+  const n0 = (document.getElementById("pname0").value||"").trim().slice(0,20) || "Joueur 1";
+  const c0 = document.getElementById("pcolor0").value;
+  let players;
+  if(NET.mode==="host"){
+    const live = NET.conns.filter(e=>e.c && e.c.open).sort((a,b)=>a.slot-b.slot);
+    if(!live.length){
+      netStatus("netSetupInfo","⚠️ Aucun joueur connecté — attends qu'au moins un invité rejoigne avec le code "+(NET.code||"")+".");
+      document.getElementById("setup").style.display = "block";
+      return;
+    }
+    players = [{name:n0, color:c0, ai:false, side:"host"}];
+    live.forEach(e=>{
+      e.seat = players.length;
+      players.push({name:e.name, color:e.color, ai:false, side:e.side});
+    });
+  } else {
+    players = [{name:n0, color:c0, ai:false}];
+    extraRows.forEach((e,i)=>{
+      players.push({
+        name:(e.name.value||"").trim().slice(0,20) || (e.ai.checked ? AI_NAMES[i%AI_NAMES.length] : "Joueur "+(players.length+1)),
+        color:e.color.value, ai:e.ai.checked
+      });
+    });
+  }
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("game").classList.add("active");
+  newGame(players);
+  if(NET.mode==="host") NET.started = true;
+  renderAll();
+  maybeAiTurn();
+};
+
+/* ============================================================
+   RÉSEAU (PeerJS) — hôte autoritaire, invité en miroir
+   ============================================================ */
+function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
+function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } } /* invité -> hôte */
+function netSendTo(entry, obj){ if(entry && entry.c && entry.c.open){ try{ entry.c.send(obj); }catch(e){} } }
+function netBroadcast(obj){ NET.conns.forEach(e=>netSendTo(e, obj)); }
+/* petit badge fixe avec le code de la partie, pour qu'un joueur parti
+   puisse revenir en retapant ce code dans « Rejoindre » */
+function netShowCodeBadge(){
+  if(!NET.code) return;
+  let b = document.getElementById("netCodeBadge");
+  if(!b){
+    b = document.createElement("div");
+    b.id = "netCodeBadge";
+    b.style.cssText = "position:fixed;top:6px;left:8px;z-index:900;background:rgba(0,0,0,.65);color:#fff;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;letter-spacing:1px;";
+    document.body.appendChild(b);
+  }
+  b.textContent = "🔑 Code : "+NET.code;
+  b.title = "Code de la partie — un joueur déconnecté peut revenir en entrant ce code dans « Rejoindre une partie en ligne »";
+}
+
+document.getElementById("netHostBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netHostPanel").style.display = "block";
+  netHost(0);
+};
+document.getElementById("netJoinBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netJoinPanel").style.display = "block";
+};
+document.getElementById("netConnectBtn").onclick = ()=>{
+  const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
+  const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
+  if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  NET.rejected = false;
+  document.getElementById("netConnectBtn").disabled = true;
+  netJoin(code, name);
+};
+
+function netHost(attempt){
+  NET.mode = "host";
+  const code = netGenCode();
+  netStatus("netHostStatus","Création de la partie…");
+  const peer = new Peer("adr-"+code);
+  NET.peer = peer;
+  peer.on("open", ()=>{
+    NET.code = code;
+    document.getElementById("netCode").textContent = code;
+    netStatus("netHostStatus",`En attente des autres joueurs (jusqu'à ${NET_MAX_GUESTS})… Envoie-leur ce code !`);
+  });
+  peer.on("error", (e)=>{
+    if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
+    else if(e.type!=="peer-unavailable") netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+  });
+  peer.on("connection", (c)=>{
+    c.on("data", (msg)=>netHostOnData(c, msg));
+    c.on("close", ()=>netHostConnLost(c));
+    c.on("error", ()=>netHostConnLost(c));
+  });
+}
+function netFreeSlot(){
+  for(let s=0;s<NET_MAX_GUESTS;s++){
+    if(!NET.conns.some(e=>e.slot===s)) return s;
+  }
+  return -1;
+}
+function netShowSetupAsHost(){
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  /* en ligne : les joueurs sont l'hôte + les invités connectés, pas de lignes locales */
+  document.getElementById("extraPlayers").style.display = "none";
+  document.getElementById("addPlayerWrap").style.display = "none";
+  document.getElementById("hotseatHint").style.display = "none";
+  const info = document.getElementById("netSetupInfo");
+  info.style.display = "block";
+  info.style.background = ""; info.style.color = "";
+  const names = NET.conns.map(e=>e.name).join(", ") || "personne";
+  info.textContent = `🌐 Partie en ligne — connecté(s) : ${names} (${NET.conns.length}/${NET_MAX_GUESTS} invités). D'autres joueurs peuvent encore rejoindre avec le code ${NET.code||""}. Lance la partie quand tout le monde est là.`;
+  netShowCodeBadge();
+}
+setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 400);
+
+function netHostOnData(c, msg){
+  if(!msg || typeof msg!=="object") return;
+  let entry = NET.conns.find(e=>e.c===c);
+  if(msg.t==="hello"){
+    const name = netEsc(msg.name).slice(0,20) || "Joueur";
+    if(entry){ entry.name = name; return; }
+    if(NET.started){
+      netHostHandleRejoin(c, name);
+    } else {
+      const slot = netFreeSlot();
+      if(slot<0){ try{ c.send({t:"full"}); }catch(e){} setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300); return; }
+      entry = {c, slot, side:"g"+slot, seat:null, name, color:DEF_COLORS[(slot+1)%DEF_COLORS.length]};
+      NET.conns.push(entry);
+      netSendTo(entry, {t:"welcome", code:NET.code});
+      netSendTo(entry, {t:"setup", guestColor:entry.color, guestName:entry.name, code:NET.code});
+      netShowSetupAsHost();
+    }
+    return;
+  }
+  if(!entry) return;
+  if(msg.t==="setupGuest"){
+    if(NET.started) return;
+    entry.name = netEsc(msg.name).slice(0,20) || entry.name;
+    if(msg.color && /^#[0-9a-fA-F]{6}$/.test(msg.color)) entry.color = msg.color;
+    netShowSetupAsHost();
+    netSendTo(entry, {t:"setup", guestColor:entry.color, guestName:entry.name, code:NET.code});
+  } else if(msg.t==="action"){
+    netHandleGuestAction(entry, msg);
+  }
+}
+
+/* partie déjà lancée : on remet le nouvel arrivant sur le siège du joueur
+   déconnecté qui porte le même prénom (ou le seul siège libre) */
+function netHostHandleRejoin(c, name){
+  const takenSeats = new Set(NET.conns.map(e=>e.seat));
+  const candidates = [];
+  G.players.forEach((p,i)=>{
+    if(i>0 && p.side && p.side!=="host" && !p.ai && !takenSeats.has(i)) candidates.push({p, i});
+  });
+  let found = candidates.find(x=>x.p.name.trim().toLowerCase()===String(name).trim().toLowerCase());
+  if(!found && candidates.length===1) found = candidates[0];
+  if(!found){
+    try{ c.send({t:"noSeat", names:candidates.map(x=>x.p.name)}); }catch(e){}
+    setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300);
+    return;
+  }
+  const entry = {c, slot:parseInt(found.p.side.slice(1),10), side:found.p.side, seat:found.i, name:found.p.name, color:found.p.color};
+  NET.conns.push(entry);
+  netUpdateDiscoBanner();
+  log(`🔌 ${found.p.name} s'est reconnecté(e) à la partie.`);
+  netSendTo(entry, {t:"welcome", code:NET.code});
+  netSendState();
+}
+
+function netHandleGuestAction(entry, msg){
+  if(!NET.started || !G || G.over || entry.seat===null) return;
+  const gIdx = entry.seat;
+  if(msg.kind==="keepTickets"){
+    if(Array.isArray(msg.keep)) keepTickets(gIdx, msg.keep.map(x=>x|0));
+    return;
+  }
+  if(msg.kind==="drawFaceUp") drawFaceUp(gIdx, msg.i|0);
+  else if(msg.kind==="drawBlind") drawBlind(gIdx);
+  else if(msg.kind==="drawTickets") drawTickets(gIdx);
+  else if(msg.kind==="claim") claimRoute(gIdx, String(msg.route), String(msg.color));
+}
+
+/* synchro hôte -> invités (chacun reçoit SA vue : main et destinations privées) */
+function netScheduleSync(){
+  if(NET.mode!=="host" || !NET.started) return;
+  if(NET.syncTimer) return;
+  NET.syncTimer = setTimeout(()=>{ NET.syncTimer=null; netSendState(); }, 40);
+}
+function netSendState(){
+  if(NET.mode!=="host" || !NET.started || NET.ended || !G) return;
+  NET.conns.forEach(entry=>{
+    if(entry.seat===null) return;
+    netSendTo(entry, {t:"state", code:NET.code, view: viewFor(entry.seat)});
+  });
+}
+
+/* invité */
+function netJoin(code, name){
+  NET.mode = "guest";
+  NET.joinCode = code; NET.guestName = name;
+  netConnectAsGuest(false);
+}
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
+  const peer = new Peer();
+  NET.peer = peer;
+  let settled = false;
+  const fail = (msg)=>{
+    if(settled) return; settled = true;
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect) netScheduleGuestRetry();
+    else { netStatus("netJoinStatus", msg); document.getElementById("netConnectBtn").disabled = false; }
+  };
+  peer.on("error", (e)=>{
+    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+  });
+  peer.on("open", ()=>{
+    const c = peer.connect("adr-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    c.on("open", ()=>{
+      clearTimeout(to); settled = true; NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName});
+      if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Personnalise ta couleur ci-dessous.");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+  });
+}
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts = (NET.reconnectAttempts||0)+1;
+  netShowReconnectBanner();
+  if(NET.reconnectAttempts>30){ netReconnectFailed(); return; }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="welcome"){
+    NET.code = msg.code || NET.joinCode;
+    netShowCodeBadge();
+  } else if(msg.t==="full"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    netStatus("netJoinStatus","❌ La partie est pleine (5 joueurs max).");
+    document.getElementById("netConnectBtn").disabled = false;
+  } else if(msg.t==="noSeat"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    const names = Array.isArray(msg.names) ? msg.names.filter(Boolean) : [];
+    const txt = names.length
+      ? "❌ Partie en cours. Pour reprendre une place, utilise exactement le prénom d'un joueur déconnecté : "+names.join(", ")+"."
+      : "❌ Partie déjà en cours et aucun siège libre.";
+    if(NET.started){
+      netShowBanner(netEsc(txt)+` <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+      const btn = document.getElementById("netGiveUpBtn");
+      if(btn) btn.onclick = ()=>location.reload();
+    } else {
+      netStatus("netJoinStatus", txt);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
+  } else if(msg.t==="state"){
+    if(NET.ended) return;
+    if(msg.code && msg.code!==NET.code){ NET.code = msg.code; }
+    if(!NET.started){
+      NET.started = true;
+      document.getElementById("netHome").style.display = "none";
+      document.getElementById("game").classList.add("active");
+    }
+    netShowCodeBadge();
+    SNAP = msg.view;
+    logHistory = (SNAP.log||[]).slice();
+    renderAll();
+  } else if(msg.t==="setup"){
+    if(NET.started) return;
+    if(msg.code && !NET.code){ NET.code = msg.code; }
+    netShowCodeBadge();
+    document.getElementById("netJoinReadyPanel").style.display = "block";
+    const colorEl = document.getElementById("netGuestColor");
+    if(document.activeElement !== colorEl && msg.guestColor) colorEl.value = msg.guestColor;
+    const nameEl = document.getElementById("netGuestNameLive");
+    if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+  }
+}
+let netGuestSetupTimer = null;
+function netSendGuestSetup(){
+  if(NET.mode!=="guest") return;
+  clearTimeout(netGuestSetupTimer);
+  netGuestSetupTimer = setTimeout(()=>{
+    netSend({
+      t:"setupGuest",
+      name: document.getElementById("netGuestNameLive").value,
+      color: document.getElementById("netGuestColor").value
+    });
+  }, 120);
+}
+["netGuestColor","netGuestNameLive"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("input", netSendGuestSetup);
+  el.addEventListener("change", netSendGuestSetup);
+});
+
+/* déconnexion / reconnexion */
+function netShowBanner(html){
+  let b = document.getElementById("netBanner");
+  if(!b){ b = document.createElement("div"); b.id="netBanner"; b.className="net-reconnect-banner"; document.body.appendChild(b); }
+  b.innerHTML = html;
+}
+function netHideBanner(){ const b = document.getElementById("netBanner"); if(b) b.remove(); }
+function netOnConnLost(){
+  if(NET.mode==="guest") netGuestOnDisconnect();
+}
+function netHostConnLost(c){
+  const idx = NET.conns.findIndex(e=>e.c===c);
+  if(idx<0) return;
+  const entry = NET.conns[idx];
+  NET.conns.splice(idx,1);
+  if(!NET.started){
+    if(document.getElementById("setup").style.display!=="none"){
+      netShowSetupAsHost();
+      const info = document.getElementById("netSetupInfo");
+      info.textContent = `🔌 ${entry.name} s'est déconnecté(e) avant le début (le code ${NET.code} lui permet de revenir). `+info.textContent;
+    } else {
+      netStatus("netHostStatus", `${entry.name} s'est déconnecté(e). Il/elle peut revenir avec le même code.`);
+    }
+    return;
+  }
+  log(`🔌 ${entry.name} s'est déconnecté(e). Pour revenir : « Rejoindre une partie en ligne » avec le code ${NET.code} et le même prénom.`);
+  netUpdateDiscoBanner();
+}
+/* bannière côté hôte : liste des joueurs en ligne actuellement déconnectés */
+function netUpdateDiscoBanner(){
+  if(NET.mode!=="host" || !NET.started || !G) return;
+  const connectedSeats = new Set(NET.conns.map(e=>e.seat));
+  const missing = G.players.filter((p,i)=>i>0 && p.side && p.side!=="host" && !p.ai && !connectedSeats.has(i));
+  if(!missing.length){ netHideBanner(); return; }
+  netShowBanner(`🔌 ${missing.map(p=>netEsc(p.name)).join(", ")} ${missing.length>1?"sont déconnecté(e)s":"s'est déconnecté(e)"}. Pour revenir : « Rejoindre une partie en ligne » avec le code <b>${NET.code}</b> et le même prénom. La partie continue en attendant. <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  const btn = document.getElementById("netHostGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+function netGuestOnDisconnect(){
+  if(NET.reconnecting || NET.ended || NET.rejected) return;
+  NET.conn = null; NET.reconnectAttempts = 0;
+  try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
+  netScheduleGuestRetry();
+}
+function netShowReconnectBanner(){
+  netShowBanner(`🔌 Connexion perdue. Reconnexion en cours… (tentative ${NET.reconnectAttempts}/30) <button id="netRetryNowBtn">Réessayer maintenant</button>`);
+  const btn = document.getElementById("netRetryNowBtn");
+  if(btn) btn.onclick = ()=>{ netConnectAsGuest(true); };
+}
+function netReconnectFailed(){
+  NET.reconnecting = false; NET.ended = true;
+  netShowBanner(`❌ Impossible de se reconnecter — l'autre joueur a peut-être fermé la partie. <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+  const btn = document.getElementById("netGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+</script>
+</body>
+</html>

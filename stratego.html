@@ -426,6 +426,7 @@ let animHide = null;    // cases dont la pièce est masquée pendant l'animation
 
 const NET = {
   mode:null, mySide:null, peer:null, conn:null,
+  code:null,            // code de la partie (affiché en jeu pour revenir)
   guestName:"Joueur 2", started:false, ended:false,
   syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
 };
@@ -1276,6 +1277,20 @@ function netGenCode(){
   return c;
 }
 function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } }
+/* petit badge fixe avec le code de la partie, pour que l'adversaire parti
+   puisse revenir en retapant ce code dans « Rejoindre » */
+function netShowCodeBadge(){
+  if(!NET.code) return;
+  let b = document.getElementById("netCodeBadge");
+  if(!b){
+    b = document.createElement("div");
+    b.id = "netCodeBadge";
+    b.style.cssText = "position:fixed;top:6px;left:8px;z-index:900;background:rgba(0,0,0,.65);color:#fff;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;letter-spacing:1px;";
+    document.body.appendChild(b);
+  }
+  b.textContent = "🔑 Code : "+NET.code;
+  b.title = "Code de la partie — un joueur déconnecté peut revenir en entrant ce code dans « Rejoindre une partie en ligne »";
+}
 
 document.getElementById("netLocalBtn").onclick = ()=>{
   document.getElementById("netHome").style.display = "none";
@@ -1305,8 +1320,10 @@ function netHost(attempt){
   const peer = new Peer("str-"+code);
   NET.peer = peer;
   peer.on("open", ()=>{
+    NET.code = code;
     document.getElementById("netCode").textContent = code;
     netStatus("netHostStatus","En attente de l'autre joueur… Envoie-lui ce code !");
+    netShowCodeBadge();
   });
   peer.on("error", (e)=>{
     if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
@@ -1329,6 +1346,7 @@ function netShowSetupAsHost(){
   info.style.background = ""; info.style.color = "";
   info.textContent = `🌐 Partie en ligne — ${NET.guestName} est connecté(e) ! Vous êtes le joueur 1, ${NET.guestName} le joueur 2.`;
   renderPlayerInputs();
+  netShowCodeBadge();
 }
 setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 400);
 
@@ -1440,6 +1458,8 @@ function netConnectAsGuest(isReconnect){
     c.on("open", ()=>{
       clearTimeout(to); settled = true; NET.reconnecting = false;
       netHideBanner();
+      NET.code = NET.joinCode;
+      netShowCodeBadge();
       c.send({t:"hello", name:NET.guestName});
       if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Personnalise ta couleur ci-dessous.");
       else log("🔌 Reconnecté(e) à la partie.");
@@ -1568,7 +1588,7 @@ function netHostOnDisconnect(){
     }
     return;
   }
-  netShowBanner(`🔌 ${netEsc(NET.guestName)} s'est déconnecté(e). En attente de reconnexion… <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  netShowBanner(`🔌 ${netEsc(NET.guestName)} s'est déconnecté(e). Pour revenir : « Rejoindre une partie en ligne » avec le code <b>${NET.code}</b>. <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
   const btn = document.getElementById("netHostGiveUpBtn");
   if(btn) btn.onclick = ()=>location.reload();
 }
