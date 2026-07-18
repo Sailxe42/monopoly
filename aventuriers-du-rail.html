@@ -470,6 +470,7 @@ const ROUTE_BY_ID = {}; ROUTES.forEach(r=>ROUTE_BY_ID[r.id]=r);
 const ROUTE_PTS = {1:1, 2:2, 3:4, 4:7, 5:10, 6:15, 7:18, 8:21};
 
 /* cartes destination (les 8 premières figurent sur le plateau) */
+/* 35 cartes destination, toutes des paires UNIQUES (les 8 premières figurent sur le plateau) */
 const TICKETS = [
   {a:"POU", b:"PRE", pts:8},
   {a:"V93", b:"DIA", pts:6},
@@ -490,8 +491,44 @@ const TICKETS = [
   {a:"PEX", b:"CDF", pts:12},
   {a:"HOG", b:"LON", pts:9},
   {a:"GRI", b:"DUR", pts:8},
-  {a:"NUR", b:"GRIM", pts:13}
+  {a:"NUR", b:"GRIM", pts:13},
+  {a:"NUR", b:"LON", pts:15},
+  {a:"V93", b:"PEX", pts:12},
+  {a:"FOR", b:"GRI", pts:8},
+  {a:"DUR", b:"AZK", pts:10},
+  {a:"CAB", b:"STM", pts:10},
+  {a:"TIS", b:"AZK", pts:11},
+  {a:"CDF", b:"DIA", pts:5},
+  {a:"TER", b:"STM", pts:7},
+  {a:"FLE", b:"MIN", pts:12},
+  {a:"HOG", b:"GOD", pts:11},
+  {a:"BEA", b:"LON", pts:10},
+  {a:"LOU", b:"GRIM", pts:9},
+  {a:"SHE", b:"AZK", pts:10},
+  {a:"CDF", b:"LON", pts:14},
+  {a:"MAL", b:"GRI", pts:7}
 ];
+function ticketKey(t){ return [t.a, t.b].sort().join("|"); }
+/* paquet dédupliqué : impossible d'avoir deux cartes avec la même paire de lieux */
+function buildTicketDeck(){
+  const seen = new Set(), deck = [];
+  TICKETS.forEach(t=>{
+    const k = ticketKey(t);
+    if(!seen.has(k)){ seen.add(k); deck.push(t); }
+  });
+  return shuffle(deck);
+}
+/* pioche une offre de n cartes en écartant les destinations que le joueur possède déjà */
+function dealOffer(pIdx, n){
+  const owned = new Set(G.players[pIdx].tickets.map(ticketKey));
+  const offer = [], back = [];
+  while(offer.length<n && G.ticketDeck.length){
+    const t = G.ticketDeck.shift();
+    if(owned.has(ticketKey(t))) back.push(t); else offer.push(t);
+  }
+  G.ticketDeck.push(...back);
+  return offer;
+}
 
 const START_WAGONS = 40;
 const CARD_TYPES = COLORS.concat(["loco"]);
@@ -566,7 +603,7 @@ function newGame(list){
   COLORS.forEach(c=>{ for(let i=0;i<12;i++) deck.push(c); });
   for(let i=0;i<14;i++) deck.push("loco");
   shuffle(deck);
-  const ticketDeck = shuffle(TICKETS.slice());
+  const ticketDeck = buildTicketDeck();
 
   G = {
     players: list.map(p=>({
@@ -586,8 +623,7 @@ function newGame(list){
   }
   refillFaceUp();
   for(let p=0;p<G.players.length;p++){
-    const offer = G.ticketDeck.splice(0,3);
-    G.pendings.push({p, offer, minKeep:2});
+    G.pendings.push({p, offer:dealOffer(p,3), minKeep:2});
   }
   log("🚂 La partie commence ! Choisissez vos destinations.");
 }
@@ -733,10 +769,12 @@ function drawBlind(pIdx){
 function drawTickets(pIdx){
   if(G.over || G.phase!=="play" || pIdx!==G.cur || G.drawsLeft!==2 || G.pendings.length) return false;
   if(G.ticketDeck.length===0) return false;
-  const offer = G.ticketDeck.splice(0, Math.min(3, G.ticketDeck.length));
+  const offer = dealOffer(pIdx, Math.min(3, G.ticketDeck.length));
+  if(offer.length===0) return false;
   G.pendings.push({p:pIdx, offer, minKeep:1});
   log(`🗺️ ${G.players[pIdx].name} pioche des cartes Destination.`);
   renderAll();
+  maybeAiTurn(); /* si c'est une IA, planifie son choix de destinations */
   return true;
 }
 function keepTickets(pIdx, keepIdxs){
@@ -976,8 +1014,7 @@ function aiStep(){
   if(G.drawsLeft===2 && wanted.length===0){
     const incomplete = p.tickets.some(t=>!t.done);
     if(!incomplete && G.ticketDeck.length>0 && p.wagons>=10 && !G.endTriggered){
-      drawTickets(pIdx);
-      return;
+      if(drawTickets(pIdx)) return;
     }
     const any = ROUTES.filter(r=>!routeBlocked(r, pIdx) && p.wagons>=r.len && payOptions(pIdx,r).length>0)
                       .sort((a,b)=>b.len-a.len);
