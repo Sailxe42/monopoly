@@ -264,13 +264,13 @@
   <div class="player-row">
     <input type="color" id="pcolor0" value="#c0392b" title="Ta couleur de wagons">
     <input type="text" id="pname0" placeholder="Ton prénom" maxlength="20" value="Joueur 1">
-    <span class="p1-tag">👤 Toi</span>
+    <label class="ai-toggle" id="p0AiLbl"><input type="checkbox" id="pai0">🤖 IA</label>
   </div>
   <div id="extraPlayers"></div>
   <div style="text-align:center;margin:6px 0;" id="addPlayerWrap">
     <button class="btn secondary" id="addPlayerBtn" style="font-size:13.5px;padding:7px 14px;">➕ Ajouter un joueur (5 max)</button>
   </div>
-  <p class="hint" id="hotseatHint" style="text-align:center;">Coche 🤖 pour confier un joueur à l'ordinateur. À plusieurs humains sur le même écran, la main affichée est celle du joueur dont c'est le tour.</p>
+  <p class="hint" id="hotseatHint" style="text-align:center;">Coche 🤖 pour confier un joueur à l'ordinateur — même le joueur 1 ! Si tous les joueurs sont des IA, la partie se joue toute seule sous tes yeux. À plusieurs humains sur le même écran, la main affichée est celle du joueur dont c'est le tour.</p>
   <details class="rules">
     <summary>📜 Règles du jeu</summary>
     <ul>
@@ -405,65 +405,66 @@ function cardColorOf(route){ return route.color==="rose" ? "violet" : route.colo
    "via" = points de passage pour suivre la courbe imprimée.
    "rose" est une couleur de route payable avec des cartes Violet (indiqué en jeu). */
 const ROUTES = [
-  {id:"r1",  a:"POU", b:"V93", len:5, color:"blanc"},
+  {id:"r1",  a:"POU", b:"V93", len:4, color:"blanc"},
   {id:"r2",  a:"V93", b:"NUR", len:6, color:"rouge", via:[[655,90]]},
-  {id:"r3",  a:"V93", b:"FOR", len:5, color:"rouge"},
-  {id:"r4",  a:"V93", b:"TIS", len:4, color:"noir"},
+  {id:"r3",  a:"V93", b:"FOR", len:4, color:"rouge"},
+  {id:"r4",  a:"V93", b:"TIS", len:3, color:"noir"},
   {id:"r5",  a:"V93", b:"HOG", len:5, color:"rose",  via:[[610,250]]},
-  {id:"r6",  a:"NUR", b:"DUR", len:5, color:"vert",  via:[[888,88]]},
+  {id:"r6",  a:"NUR", b:"DUR", len:4, color:"vert",  via:[[888,88]]},
   {id:"r7",  a:"NUR", b:"MAL", len:5, color:"blanc", via:[[838,165]]},
   {id:"r8",  a:"FOR", b:"HOG", len:4, color:"jaune"},
-  {id:"r9",  a:"FOR", b:"MAL", len:4, color:"violet"},
-  {id:"r10", a:"DUR", b:"MAL", len:4, color:"bleu"},
-  {id:"r11", a:"DUR", b:"BEA", len:5, color:"rose",  via:[[1030,235]]},
-  {id:"r12", a:"MAL", b:"BEA", len:4, color:"rouge", via:[[958,292]]},
+  {id:"r9",  a:"FOR", b:"MAL", len:3, color:"violet"},
+  {id:"r10", a:"DUR", b:"MAL", len:3, color:"bleu"},
+  {id:"r11", a:"DUR", b:"BEA", len:4, color:"rose",  via:[[1030,235]]},
+  {id:"r12", a:"MAL", b:"BEA", len:3, color:"rouge", via:[[958,292]]},
   {id:"r13", a:"MAL", b:"LIT", len:4, color:"jaune", via:[[838,350]]},
   {id:"r14", a:"POU", b:"TIS", len:4, color:"violet"},
-  {id:"r15", a:"POU", b:"CAB", len:4, color:"bleu",  via:[[385,310]]},
+  {id:"r15", a:"POU", b:"CAB", len:5, color:"bleu",  via:[[385,310]]},
   {id:"r16", a:"POU", b:"CDF", len:8, color:"jaune", via:[[285,300],[255,400],[262,490],[305,555]]},
   {id:"r17", a:"TIS", b:"HOG", len:3, color:"vert"},
-  {id:"r18", a:"TIS", b:"CAB", len:4, color:"orange"},
-  {id:"r19", a:"TIS", b:"LOU", len:4, color:"rouge", via:[[548,402]]},
+  {id:"r18", a:"TIS", b:"CAB", len:3, color:"orange"},
+  {id:"r19", a:"TIS", b:"LOU", len:5, color:"rouge", via:[[548,402]]},
   {id:"r20", a:"HOG", b:"LIT", len:4, color:"blanc", via:[[735,382]]},
-  {id:"r21", a:"HOG", b:"PRE", len:4, color:"violet"},
-  {id:"r22", a:"HOG", b:"LOU", len:4, color:"noir"},
+  {id:"r21", a:"HOG", b:"PRE", len:3, color:"violet"},
+  {id:"r22", a:"HOG", b:"LOU", len:3, color:"noir"},
   {id:"r23", a:"CAB", b:"LOU", len:4, color:"jaune"},
   {id:"r24", a:"CAB", b:"CDF", len:4, color:"violet", via:[[380,490]]},
   {id:"r25", a:"BEA", b:"LIT", len:5, color:"vert",  via:[[915,390]]},
-  {id:"r26", a:"BEA", b:"GQ",  len:5, color:"rose",  via:[[1052,405]]},
-  {id:"r27", a:"BEA", b:"PEX", len:6, color:"blanc", via:[[1145,390]]},
-  {id:"r28", a:"LIT", b:"PRE", len:3, color:"orange"},
-  {id:"r29", a:"LIT", b:"GQ",  len:6, color:"rouge", via:[[940,468]]},
-  {id:"r30", a:"LIT", b:"PRI", len:5, color:"noir"},
-  {id:"r31", a:"PRE", b:"LOU", len:4, color:"bleu"},
+  {id:"r26", a:"BEA", b:"GQ",  len:4, color:"rose",  via:[[1052,405]]},
+  {id:"r27", a:"BEA", b:"PEX", len:5, color:"blanc", via:[[1145,390]]},
+  {id:"r28", a:"LIT", b:"PRE", len:2, color:"orange"},
+  {id:"r29", a:"LIT", b:"GQ",  len:5, color:"rouge", via:[[940,468]]},
+  {id:"r30", a:"LIT", b:"PRI", len:4, color:"noir"},
+  {id:"r31", a:"PRE", b:"LOU", len:3, color:"bleu"},
   {id:"r32", a:"PRE", b:"GRI", len:3, color:"vert"},
   {id:"r33", a:"GQ",  b:"PEX", len:4, color:"rose"},
-  {id:"r34", a:"GQ",  b:"AZK", len:4, color:"bleu"},
-  {id:"r35", a:"PEX", b:"AZK", len:6, color:"orange", via:[[1140,540]]},
+  {id:"r34", a:"GQ",  b:"AZK", len:3, color:"bleu"},
+  {id:"r35", a:"PEX", b:"AZK", len:5, color:"orange", via:[[1140,540]]},
   {id:"r36", a:"PEX", b:"LON", len:8, color:"blanc", via:[[1300,525],[1370,600],[1400,680],[1370,760]]},
   {id:"r37", a:"LOU", b:"FDD", len:3, color:"vert"},
   {id:"r38", a:"LOU", b:"GRI", len:3, color:"vert",  via:[[614,562]]},
   {id:"r39", a:"CDF", b:"FDD", len:2, color:"bleu"},
-  {id:"r40", a:"CDF", b:"TER", len:3, color:"orange"},
-  {id:"r41", a:"FDD", b:"DIA", len:4, color:"violet"},
+  {id:"r40", a:"CDF", b:"TER", len:2, color:"orange"},
+  {id:"r41", a:"FDD", b:"DIA", len:3, color:"rouge"},
   {id:"r42", a:"FDD", b:"SHE", len:4, color:"rouge"},
   {id:"r43", a:"TER", b:"SHE", len:4, color:"vert",  via:[[390,703]]},
   {id:"r44", a:"GRI", b:"DIA", len:3, color:"bleu"},
   {id:"r45", a:"GRI", b:"PRI", len:4, color:"rose",  via:[[765,618]]},
+  {id:"r46", a:"LOU", b:"DIA", len:4, color:"violet"},
   {id:"r47", a:"DIA", b:"SHE", len:2, color:"bleu"},
   {id:"r48", a:"DIA", b:"STM", len:4, color:"noir"},
   {id:"r49", a:"SHE", b:"FLE", len:3, color:"rose"},
-  {id:"r50", a:"SHE", b:"STM", len:5, color:"blanc", via:[[580,775]]},
-  {id:"r51", a:"FLE", b:"STM", len:6, color:"orange", via:[[540,822]]},
-  {id:"r52", a:"PRI", b:"AZK", len:5, color:"bleu"},
-  {id:"r53", a:"PRI", b:"MIN", len:5, color:"jaune", via:[[890,715]]},
-  {id:"r54", a:"PRI", b:"GRIM",len:6, color:"rouge", via:[[818,723]]},
+  {id:"r50", a:"SHE", b:"STM", len:4, color:"blanc", via:[[580,775]]},
+  {id:"r51", a:"FLE", b:"STM", len:7, color:"orange", via:[[540,822]]},
+  {id:"r52", a:"PRI", b:"AZK", len:4, color:"bleu"},
+  {id:"r53", a:"PRI", b:"MIN", len:6, color:"jaune", via:[[890,715]]},
+  {id:"r54", a:"PRI", b:"GRIM",len:5, color:"rouge", via:[[818,723]]},
   {id:"r55", a:"AZK", b:"GOD", len:3, color:"vert"},
-  {id:"r56", a:"AZK", b:"MIN", len:4, color:"violet"},
+  {id:"r56", a:"AZK", b:"MIN", len:3, color:"violet"},
   {id:"r57", a:"GOD", b:"MIN", len:4, color:"vert"},
   {id:"r58", a:"GOD", b:"LON", len:4, color:"orange", via:[[1168,748]]},
-  {id:"r59", a:"MIN", b:"GRIM",len:5, color:"bleu",  dbl:"r60"},
-  {id:"r60", a:"MIN", b:"GRIM",len:5, color:"vert",  dbl:"r59", via:[[960,820],[890,858]]},
+  {id:"r59", a:"MIN", b:"GRIM",len:4, color:"bleu",  dbl:"r60"},
+  {id:"r60", a:"MIN", b:"GRIM",len:4, color:"vert",  dbl:"r59", via:[[960,820],[890,858]]},
   {id:"r61", a:"MIN", b:"LON", len:5, color:"rouge"}
 ];
 const ROUTE_BY_ID = {}; ROUTES.forEach(r=>ROUTE_BY_ID[r.id]=r);
@@ -1249,7 +1250,9 @@ function renderAll(){
   const me = V.me;
   const multiLocal = localHumanCount()>1;
   const meName = V.players[me] ? V.players[me].name : "";
-  const myTurn = !V.over && V.phase==="play" && V.cur===me && !V.anyPending;
+  /* partie 100% IA : la vue suit le joueur 0 mais en simple spectateur */
+  const iAmAi = !!(V.players[me] && V.players[me].ai);
+  const myTurn = !V.over && V.phase==="play" && V.cur===me && !V.anyPending && !iAmAi;
   const canAct = myTurn && V.drawsLeft===2;
 
   /* bannière de tour */
@@ -1264,8 +1267,8 @@ function renderAll(){
   tb.style.borderColor = myTurn ? "#8d1f1f" : "var(--gold)";
 
   /* titres des panneaux (chaise tournante) */
-  document.getElementById("handTitle").textContent = multiLocal ? `✋ Main de ${meName}` : "✋ Ta main";
-  document.getElementById("ticketTitle").textContent = multiLocal ? `🗺️ Destinations de ${meName}` : "🗺️ Tes destinations";
+  document.getElementById("handTitle").textContent = (multiLocal||iAmAi) ? `✋ Main de ${meName}` : "✋ Ta main";
+  document.getElementById("ticketTitle").textContent = (multiLocal||iAmAi) ? `🗺️ Destinations de ${meName}` : "🗺️ Tes destinations";
 
   /* joueurs */
   const ps = document.getElementById("pstats");
@@ -1274,7 +1277,7 @@ function renderAll(){
     const d = document.createElement("div");
     d.className = "pstat"+(V.cur===i && !V.over ? " cur":"");
     d.innerHTML = `<span class="pdot" style="background:${p.color}"></span>
-      <span class="pname">${escapeHtml(p.name)}${(!multiLocal && i===me)?" (toi)":""}</span>
+      <span class="pname">${escapeHtml(p.name)}${(!multiLocal && i===me && !iAmAi)?" (toi)":""}</span>
       <span class="pmeta">🚃${p.wagons} · 🃏${p.handCount} · 🗺️${p.ticketCount} · ⭐${p.score}</span>`;
     ps.appendChild(d);
   });
@@ -1378,7 +1381,7 @@ function renderAll(){
 
   /* modale destinations */
   const tOv = document.getElementById("ticketOverlay");
-  if(V.pending && !V.over){
+  if(V.pending && !V.over && !iAmAi){
     showTicketModal(V.pending, multiLocal ? meName : null);
   } else {
     if(tOv.classList.contains("active")) setCityGlows(new Set());
@@ -1455,7 +1458,7 @@ function onRouteClick(routeId){
   const V = currentView();
   if(!V || V.over || V.phase!=="play" || V.anyPending) return;
   const me = V.me;
-  if(V.cur!==me || V.drawsLeft!==2) return;
+  if(V.cur!==me || V.drawsLeft!==2 || V.players[me].ai) return;
   const r = ROUTE_BY_ID[routeId];
   if(V.owners[r.id]!==undefined) return;
   if(r.dbl){
@@ -1546,6 +1549,13 @@ document.getElementById("hintsBtn").onclick = ()=>{ HINTS = !HINTS; renderAll();
 
 /* ---------- lignes de joueurs (mode local : 2 à 5, humain ou IA) ---------- */
 const AI_NAMES = ["Vous-Savez-Qui 🤖","Bellatrix 🤖","Drago 🤖","Dobby 🤖"];
+const AI_NAME0 = "Hermione 🤖";
+document.getElementById("pai0").onchange = ()=>{
+  const name0 = document.getElementById("pname0");
+  const on = document.getElementById("pai0").checked;
+  if(on && (name0.value==="" || name0.value==="Joueur 1")) name0.value = AI_NAME0;
+  else if(!on && name0.value===AI_NAME0) name0.value = "Joueur 1";
+};
 const DEF_COLORS = ["#c0392b","#2e7d5b","#2e5e9e","#c9971f","#7b4b9e"];
 const extraRows = [];
 function addPlayerRow(){
@@ -1606,7 +1616,7 @@ document.getElementById("startBtn").onclick = ()=>{
       players.push({name:e.name, color:e.color, ai:false, side:e.side});
     });
   } else {
-    players = [{name:n0, color:c0, ai:false}];
+    players = [{name:n0, color:c0, ai:document.getElementById("pai0").checked}];
     extraRows.forEach((e,i)=>{
       players.push({
         name:(e.name.value||"").trim().slice(0,20) || (e.ai.checked ? AI_NAMES[i%AI_NAMES.length] : "Joueur "+(players.length+1)),
@@ -1702,6 +1712,9 @@ function netShowSetupAsHost(){
   document.getElementById("extraPlayers").style.display = "none";
   document.getElementById("addPlayerWrap").style.display = "none";
   document.getElementById("hotseatHint").style.display = "none";
+  /* en ligne, l'hôte est forcément humain */
+  document.getElementById("pai0").checked = false;
+  document.getElementById("p0AiLbl").style.display = "none";
   const info = document.getElementById("netSetupInfo");
   info.style.display = "block";
   info.style.background = ""; info.style.color = "";
