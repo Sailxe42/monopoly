@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Les Petits Chevaux</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#2f5140;
+    --panel-bg:#fffdf7;
+    --accent:#8a5a2b;
+    --text:#2b2113;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:linear-gradient(180deg,var(--bg),#16281f);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+    padding-top:46px;
+  }
+  .btn{
+    cursor:pointer;border:none;border-radius:8px;padding:10px 16px;
+    font-size:15px;font-weight:600;background:var(--accent);color:#fff;
+    transition:filter .15s, transform .1s;
+  }
+  .btn:hover{filter:brightness(1.15);}
+  .btn:active{transform:scale(.96);}
+  .btn.secondary{background:#555;}
+  .btn:disabled{background:#aaa;cursor:not-allowed;filter:none;}
+  .hint{font-size:12px;color:#666;}
+
+  /* ---------- ACCUEIL / RÉSEAU ---------- */
+  #netHome, #setup{
+    background:var(--panel-bg);border-radius:12px;padding:28px 32px;
+    max-width:540px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+  #netHome h1, #setup h1{margin-top:0;text-align:center;}
+  .net-big-btn{display:block;width:100%;margin:10px 0;font-size:16px;padding:14px;}
+  #netCode{font-size:38px;font-weight:800;letter-spacing:8px;text-align:center;margin:10px 0;color:var(--accent);user-select:all;}
+  .net-status{font-size:13px;color:#555;min-height:18px;text-align:center;}
+  #netSetupInfo{
+    display:none;background:#f6ecd9;border:1px solid #d9bd8c;color:#6b4415;
+    border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px;font-weight:600;
+  }
+  #netJoinReadyPanel .player-row{justify-content:center;margin-top:10px;}
+  #netJoinReadyPanel .player-row input[type=text]{flex:0 1 160px;}
+  .player-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .player-row input[type=text]{flex:1;padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
+  .player-row input[type=color]{width:34px;height:32px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;}
+  .player-row select.psymbol{font-size:17px;padding:3px 4px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;}
+  .player-row select.ptype{font-size:12px;padding:4px 3px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;max-width:120px;}
+  #setup .row{display:flex;gap:10px;margin:14px 0;align-items:center;flex-wrap:wrap;}
+  .net-reconnect-banner{
+    position:fixed;top:0;left:0;right:0;z-index:300;background:#7a3b1f;color:#fff;text-align:center;
+    padding:10px 14px;font-size:13.5px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3);
+  }
+  .net-reconnect-banner button{margin-left:10px;background:#fff;color:#7a3b1f;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:12.5px;}
+  #rulesBox{border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:14px 0;font-size:12px;color:#444;line-height:1.55;}
+  #rulesBox summary{cursor:pointer;font-weight:700;color:#222;}
+
+  /* ---------- JEU ---------- */
+  #game{display:none;width:100%;max-width:1180px;flex-direction:column;gap:12px;}
+  #game.active{display:flex;}
+  #topBar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    background:var(--panel-bg);border-radius:10px;padding:10px 16px;box-shadow:0 4px 16px rgba(0,0,0,.25);
+  }
+  #turnTitle{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px;}
+  #turnDot{width:14px;height:14px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  #diceZone{display:flex;align-items:center;gap:12px;}
+  #dieFace{
+    width:52px;height:52px;border-radius:12px;background:#fff;border:2px solid #333;
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    padding:7px;gap:2px;box-shadow:0 3px 10px rgba(0,0,0,.3);
+  }
+  #dieFace .pip{width:100%;height:100%;border-radius:50%;background:#222;}
+  #dieFace .pip.off{background:transparent;}
+  #dieFace.rolling{animation:dieShake .12s linear infinite;}
+  @keyframes dieShake{
+    0%{transform:rotate(-9deg) scale(1.04);}
+    50%{transform:rotate(8deg) scale(.97);}
+    100%{transform:rotate(-9deg) scale(1.04);}
+  }
+  #dieFace.pop{animation:diePop .35s ease;}
+  @keyframes diePop{0%{transform:scale(1.3);}100%{transform:scale(1);}}
+
+  #board-area{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;justify-content:center;}
+  #boardWrap{
+    position:relative;
+    width:min(92vw, 68vh, 620px);
+    aspect-ratio:1;
+    background:
+      linear-gradient(160deg,#fdf6e5,#f2e6cd);
+    border:10px solid #7b5330;
+    border-radius:10px;
+    padding:8px;
+    box-shadow:0 10px 34px rgba(0,0,0,.5), inset 0 0 0 2px rgba(123,83,48,.35), inset 0 0 30px rgba(123,83,48,.12);
+    flex-shrink:0;
+  }
+  #boardGrid{
+    position:absolute;inset:8px;
+    display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);
+  }
+  #pieceLayer{position:absolute;inset:8px;pointer-events:none;}
+  .cell{
+    border:1px solid #cbb994;background:#fffdf6;border-radius:2px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cell,26px)*.36);font-weight:600;color:#b6a37c;
+    user-select:none;line-height:1;
+  }
+  .cell.start{border-color:rgba(0,0,0,.35);box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);}
+  .cell.gate{border-color:rgba(0,0,0,.28);}
+  .cell.lane{color:rgba(255,255,255,.92);border-color:rgba(0,0,0,.22);font-weight:700;font-style:italic;}
+  .stable{
+    border-radius:14px;border:3px solid rgba(0,0,0,.28);
+    box-shadow:inset 0 0 0 3px rgba(255,255,255,.45);
+  }
+  .center-hub{
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid rgba(0,0,0,.3);
+  }
+  .center-hub span{
+    background:#fffdf6;border:2px solid rgba(0,0,0,.25);border-radius:50%;
+    width:44%;height:44%;display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cell,26px)*.85);font-weight:800;font-style:italic;color:#6b5a3a;
+    box-shadow:0 2px 6px rgba(0,0,0,.3);
+  }
+  .slot{
+    position:absolute;transform:translate(-50%,-50%);
+    width:calc(var(--cell,26px)*.9);height:calc(var(--cell,26px)*.9);
+    border-radius:50%;border:2px dashed rgba(255,255,255,.85);background:rgba(255,255,255,.35);
+    box-shadow:inset 0 2px 5px rgba(0,0,0,.12);
+  }
+  .horse{
+    position:absolute;transform:translate(-50%,-50%);
+    width:calc(var(--cell,26px)*.92);height:calc(var(--cell,26px)*.92);
+    border-radius:50%;border:2px solid rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cell,26px)*.46);line-height:1;
+    box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.6);
+    transition:left .42s cubic-bezier(.34,1.2,.64,1), top .42s cubic-bezier(.34,1.2,.64,1);
+    z-index:5;
+  }
+  .horse.movable{cursor:pointer;pointer-events:auto;z-index:7;outline:3px solid #ffc400;animation:horsePulse 1.05s ease-in-out infinite;}
+  @keyframes horsePulse{
+    0%,100%{box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.6), 0 0 0 0 rgba(255,196,0,.85);}
+    50%{box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.6), 0 0 0 7px rgba(255,196,0,0);}
+  }
+  .horse.sel{outline:3px solid #ff8f00;}
+  /* cheval rentré au centre : rangé en plus petit dans son triangle */
+  .horse.done{
+    width:calc(var(--cell,26px)*.56);height:calc(var(--cell,26px)*.56);
+    font-size:calc(var(--cell,26px)*.3);
+    box-shadow:0 2px 4px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.7);
+    z-index:8;
+  }
+  /* aide au comptage : pastilles numérotées sur le trajet */
+  .step{
+    position:absolute;transform:translate(-50%,-50%);
+    width:calc(var(--cell,26px)*.56);height:calc(var(--cell,26px)*.56);
+    border-radius:50%;background:rgba(255,196,0,.94);color:#4a3400;
+    display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cell,26px)*.36);font-weight:800;line-height:1;
+    box-shadow:0 1px 4px rgba(0,0,0,.4);z-index:6;
+  }
+  .step.last{
+    width:calc(var(--cell,26px)*.92);height:calc(var(--cell,26px)*.92);
+    background:rgba(255,196,0,.35);border:3px dashed #ffb300;color:#7a5200;
+    font-size:calc(var(--cell,26px)*.46);
+  }
+  .step.eat{background:rgba(214,40,40,.35);border-color:#d62828;color:#7a1010;}
+
+  #sidePanel{flex:1 1 260px;min-width:250px;display:flex;flex-direction:column;gap:12px;}
+  .pc-mat{
+    background:var(--panel-bg);border-radius:10px;padding:9px 12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.22);border:2px solid transparent;
+  }
+  .pc-mat.current{border-color:#ffb300;background:#fffdf3;}
+  .pc-mat-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-weight:700;font-size:13.5px;}
+  .pc-dot{width:13px;height:13px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  .pc-tag{font-size:10.5px;font-weight:700;background:#eee;color:#555;padding:2px 7px;border-radius:20px;}
+  .pc-stats{display:flex;gap:10px;font-size:11.5px;color:#555;margin-top:4px;flex-wrap:wrap;}
+  .pc-pips{display:flex;gap:3px;margin-top:5px;}
+  .pc-pip{width:13px;height:13px;border-radius:50%;border:2px solid #333;opacity:.28;}
+  .pc-pip.out{opacity:1;}
+  .pc-pip.home{opacity:1;box-shadow:0 0 0 2px #1e9e45;}
+
+  #log{max-height:190px;overflow-y:auto;font-size:12px;display:flex;flex-direction:column-reverse;background:var(--panel-bg);border-radius:10px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  #log div{padding:2px;border-bottom:1px solid #eee;}
+  #actionHint{font-size:12.5px;font-weight:700;color:#8a5a2b;min-height:16px;}
+
+  #victory-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;overflow:hidden;}
+  #victory-overlay.active{display:flex;}
+  #victory-box{position:relative;z-index:2;background:#fff;border-radius:18px;padding:34px 46px;text-align:center;max-width:min(92vw,480px);box-shadow:0 14px 60px rgba(0,0,0,.5);}
+  .confetti{position:absolute;top:-24px;z-index:1;border-radius:2px;animation:confettiFall linear infinite;}
+  @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);}}
+
+  .cross-link{position:fixed;top:10px;right:12px;font-size:12px;}
+  .cross-link a{color:#fff;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;text-decoration:none;font-weight:600;}
+
+  @media(max-width:900px){
+    #board-area{flex-direction:column;align-items:center;}
+    #sidePanel{width:min(92vw,600px);flex:none;}
+  }
+  @media(max-width:480px){
+    body{padding:8px;padding-top:46px;}
+    .cross-link{top:6px;right:6px;font-size:10.5px;}
+    .cross-link a{padding:4px 8px;}
+    #setup, #netHome{padding:20px 18px;}
+    #boardWrap{width:min(96vw,520px);}
+    .player-row{flex-wrap:wrap;row-gap:6px;}
+    .player-row input[type=text]{flex:1 1 100%;order:1;}
+    .player-row input[type=color]{order:2;}
+    .player-row select.psymbol{order:3;}
+    .player-row select.ptype{order:4;flex:1;max-width:none;}
+    #victory-box{padding:24px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="cross-link"><a href="index.html">🏠 Menu des jeux</a></div>
+
+<!-- ===================== ACCUEIL / RÉSEAU ===================== -->
+<div id="netHome">
+  <h1>🐴 Les Petits Chevaux</h1>
+  <div id="netChoice">
+    <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer sur cet ordinateur</button>
+    <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
+    <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
+    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code aux autres (jusqu'à 4 joueurs). Un joueur déconnecté peut revenir en retapant le code affiché en haut de la partie.</p>
+  </div>
+  <div id="netHostPanel" style="display:none;text-align:center;">
+    <p style="margin-bottom:0;">Code de la partie :</p>
+    <div id="netCode">·····</div>
+    <p class="net-status" id="netHostStatus"></p>
+  </div>
+  <div id="netJoinPanel" style="display:none;">
+    <div class="player-row">
+      <input type="text" id="netNameInput" placeholder="Ton prénom" maxlength="20">
+    </div>
+    <div class="player-row">
+      <input type="text" id="netCodeInput" placeholder="Code de la partie (ABCDE)" maxlength="8" style="text-transform:uppercase;">
+    </div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn" id="netConnectBtn">Rejoindre</button>
+    </div>
+    <p class="net-status" id="netJoinStatus"></p>
+    <div id="netJoinReadyPanel" style="display:none;">
+      <p class="net-status" style="font-weight:600;color:var(--accent);">Personnalise ton écurie :</p>
+      <div class="player-row">
+        <input type="color" id="netGuestColor" value="#2980b9" title="Couleur">
+        <select id="netGuestSymbol" title="Symbole"></select>
+        <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
+      </div>
+      <p class="net-status">✅ Connecté(e) ! En attente que l'hôte lance la partie…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" style="display:none;">
+  <h1>🐴 Les Petits Chevaux</h1>
+  <div id="netSetupInfo"></div>
+
+  <div class="row">
+    <label for="numPlayers"><b>Nombre de joueurs :</b></label>
+    <select id="numPlayers">
+      <option value="2" selected>2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+  <div id="playerInputs"></div>
+
+  <div class="row">
+    <label><input type="checkbox" id="randomOrder" checked> <b>🎲 Ordre de jeu aléatoire</b></label>
+  </div>
+
+  <div class="row">
+    <label for="horsesSel"><b>Chevaux par joueur :</b></label>
+    <select id="horsesSel">
+      <option value="2">2 (partie rapide)</option>
+      <option value="3">3</option>
+      <option value="4" selected>4 (classique)</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label for="exitSel"><b>Sortir de l'écurie avec :</b></label>
+    <select id="exitSel">
+      <option value="6" selected>un 6 (classique)</option>
+      <option value="16">un 1 ou un 6 (plus rapide)</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label for="laneSel"><b>Escalier :</b></label>
+    <select id="laneSel">
+      <option value="step" selected>marche par marche (1, puis 2, puis 3… et 6 pour le centre)</option>
+      <option value="fast">au compte exact du dé (plus rapide)</option>
+    </select>
+  </div>
+
+  <details id="rulesBox">
+    <summary>📖 Règles rapides</summary>
+    <p>Chaque joueur a ses chevaux à l'écurie. Il faut faire le nombre de sortie (un <b>6</b> par défaut) pour poser un cheval sur sa <b>case de départ</b>, la case colorée juste à côté de son écurie.</p>
+    <p>On avance ensuite du nombre de points du dé dans le sens des aiguilles d'une montre — passe la souris sur un cheval pour voir le trajet compté case par case. Tomber sur un cheval adverse le renvoie à son écurie 🏇 — on ne peut jamais s'arrêter sur un de ses propres chevaux.</p>
+    <p>Après un tour complet, le cheval repasse par le <b>bout de sa branche</b> (la case teintée de sa couleur) puis rentre dans son <b>escalier</b> : il faut le compte <b>exact</b> pour arriver sur la marche 1 (impossible de la dépasser).</p>
+    <p>Ensuite on monte <b>marche par marche</b>, et il faut à chaque fois le chiffre de la marche visée : un <b>2</b> pour passer de la marche 1 à la 2, un <b>3</b> pour aller sur la 3, un <b>5</b> pour aller sur la 5… et un <b>6</b> pour rentrer au centre. C'est pour ça que les marches sont numérotées !</p>
+    <p>Un <b>6</b> donne le droit de rejouer. Le premier joueur qui rentre tous ses chevaux au centre gagne !</p>
+  </details>
+
+  <div style="text-align:center;">
+    <button class="btn" id="startBtn">Démarrer la partie</button>
+  </div>
+</div>
+
+<!-- ===================== JEU ===================== -->
+<div id="game">
+  <div id="topBar">
+    <div id="turnTitle"><span id="turnDot"></span><span id="turnText"></span></div>
+    <div id="diceZone">
+      <div id="dieFace"></div>
+      <button class="btn" id="rollBtn">🎲 Lancer le dé</button>
+    </div>
+  </div>
+
+  <div id="board-area">
+    <div id="boardWrap">
+      <div id="boardGrid"></div>
+      <div id="pieceLayer"></div>
+    </div>
+    <div id="sidePanel">
+      <div id="mats"></div>
+      <div id="actionHint"></div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VICTOIRE ===================== -->
+<div id="victory-overlay">
+  <div id="victory-box"></div>
+</div>
+
+<script>
+/* ============================================================
+   PLATEAU — croix classique 15x15
+   ============================================================ */
+/* les 52 cases du circuit, dans l'ordre (sens horaire) */
+const PATH = [
+  [1,6],[2,6],[3,6],[4,6],[5,6],
+  [6,5],[6,4],[6,3],[6,2],[6,1],[6,0],
+  [7,0],
+  [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
+  [9,6],[10,6],[11,6],[12,6],[13,6],[14,6],
+  [14,7],
+  [14,8],[13,8],[12,8],[11,8],[10,8],[9,8],
+  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
+  [7,14],
+  [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],
+  [5,8],[4,8],[3,8],[2,8],[1,8],[0,8],
+  [0,7],
+  [0,6]
+];
+const TRACK_LEN = PATH.length;      // 52
+const LANE_LEN = 5;                 // escalier : marches 1 à 5
+const HOME_POS = TRACK_LEN + LANE_LEN;     // 57 = le centre, "marche 6" (arrivée)
+const LAST_POS = HOME_POS;
+
+/* escalier (allée colorée) de chaque coin, du bord vers le centre */
+const LANES = {
+  0:[[1,7],[2,7],[3,7],[4,7],[5,7]],
+  1:[[7,1],[7,2],[7,3],[7,4],[7,5]],
+  2:[[13,7],[12,7],[11,7],[10,7],[9,7]],
+  3:[[7,13],[7,12],[7,11],[7,10],[7,9]]
+};
+/* origine (coin haut-gauche) de chaque écurie, en cases */
+const STABLES = {0:{x:0,y:0}, 1:{x:9,y:0}, 2:{x:9,y:9}, 3:{x:0,y:9}};
+const STABLE_SLOTS = [[1.5,1.5],[4.5,1.5],[1.5,4.5],[4.5,4.5]];
+/* case d'apparition de chaque coin : la 1re case du couloir d'aller, juste
+   après le bout du bras (le cheval sort là et part faire son tour) */
+const START_INDEX = {0:51, 1:12, 2:25, 3:38};
+/* dernière case du tour = le bout du bras, aligné avec l'escalier : c'est par
+   là que le cheval bifurque pour monter chez lui */
+const LANE_GATE = {};
+[0,1,2,3].forEach(c=>{ LANE_GATE[c] = (START_INDEX[c] + TRACK_LEN - 1) % TRACK_LEN; });
+/* coins utilisés selon le nombre de joueurs (2 joueurs = coins opposés) */
+const CORNERS_FOR = {2:[0,2], 3:[0,1,2], 4:[0,1,2,3]};
+
+const TOKEN_COLORS = ["#d62828","#f0a202","#2a9d3f","#2364c4"];
+const HORSE_SYMBOLS = ["🐴","🦄","🐎","🦓","🐕","🐈","🐐","🦌"];
+
+/* ============================================================
+   ÉTAT DU JEU
+   ============================================================ */
+let players = [];          // {name,color,symbol,ai,side,corner,horses:[pos]}
+let currentPlayerIndex = 0;
+let dice = null;
+let phase = "roll";        // roll | move | wait | over
+let gameOver = false;
+let horsesPerPlayer = 4;
+let exitRule = "6";        // "6" ou "16"
+let laneRule = "step";     // "step" = marche par marche (1,2,3…), "fast" = compte exact du dé
+let logHistory = [];
+let boardBuilt = false;
+let lastDieShown = null;
+
+const NET = {
+  mode:null,
+  mySide:null,          // 'host' pour l'hôte, 'g0'/'g1'/'g2'... pour un invité
+  peer:null,
+  conn:null,            // (invité) connexion vers l'hôte
+  conns:[],             // (hôte) liste des invités : {c, side, slot, name}
+  code:null,
+  guestName:"Joueur 2", started:false, ended:false,
+  syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
+};
+const NET_MAX_GUESTS = 3; // 4 joueurs max, dont l'hôte
+
+function log(msg){
+  logHistory.push(msg);
+  if(logHistory.length>300) logHistory.splice(0, logHistory.length-300);
+  const logEl = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = msg;
+  logEl.appendChild(div);
+  logEl.scrollTop = 0;
+  netScheduleSync();
+}
+
+/* ============================================================
+   SETUP UI
+   ============================================================ */
+const numPlayersSel = document.getElementById("numPlayers");
+const playerInputsDiv = document.getElementById("playerInputs");
+
+function symbolOptionsHtml(selectedIdx){
+  return HORSE_SYMBOLS.map((t,k)=>`<option value="${t}" ${k===selectedIdx%HORSE_SYMBOLS.length?"selected":""}>${t}</option>`).join("");
+}
+
+function renderPlayerInputs(){
+  const n = parseInt(numPlayersSel.value);
+  /* on garde les valeurs déjà saisies (utile quand un invité rejoint en cours de config) */
+  const saved = [];
+  document.querySelectorAll("#playerInputs .player-row").forEach((row,i)=>{
+    const c = document.getElementById("pcolor"+i), s = document.getElementById("psymbol"+i),
+          nm = document.getElementById("pname"+i), t = document.getElementById("ptype"+i);
+    if(c && s && nm && t) saved[i] = {color:c.value, symbol:s.value, name:nm.value, type:t.value};
+  });
+  playerInputsDiv.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const row = document.createElement("div");
+    row.className = "player-row";
+    row.innerHTML = `
+      <input type="color" class="pcolor" id="pcolor${i}" value="${TOKEN_COLORS[i]}" title="Couleur">
+      <select class="psymbol" id="psymbol${i}" title="Symbole">${symbolOptionsHtml(i)}</select>
+      <input type="text" id="pname${i}" placeholder="Nom du joueur ${i+1}" value="Joueur ${i+1}">
+      <select class="ptype" id="ptype${i}" title="Humain ou IA">
+        <option value="">👤 Humain</option>
+        <option value="easy">🙂 IA facile</option>
+        <option value="medium">🤖 IA moyenne</option>
+        <option value="hard">😈 IA difficile</option>
+      </select>
+    `;
+    playerInputsDiv.appendChild(row);
+    if(saved[i]){
+      document.getElementById("pcolor"+i).value = saved[i].color;
+      const symSel = document.getElementById("psymbol"+i);
+      if(Array.from(symSel.options).some(o=>o.value===saved[i].symbol)) symSel.value = saved[i].symbol;
+      document.getElementById("pname"+i).value = saved[i].name;
+      document.getElementById("ptype"+i).value = saved[i].type;
+    }
+  }
+  /* partie en ligne : joueur 1 = hôte, chaque invité connecté occupe une
+     rangée (slot 0 -> joueur 2, slot 1 -> joueur 3...), le reste = IA */
+  if(NET.mode==="host"){
+    for(let i=0;i<n;i++){
+      const typeSel = document.getElementById("ptype"+i);
+      const nameInput = document.getElementById("pname"+i);
+      const entry = NET.conns.find(e=>e.slot===i-1);
+      if(i===0){
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#555;flex-shrink:0;font-weight:600;";
+        tag.textContent = "👤 vous";
+        typeSel.parentNode.appendChild(tag);
+      } else if(entry){
+        nameInput.value = entry.name;
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#6b4415;flex-shrink:0;font-weight:600;";
+        tag.textContent = "🌐 en ligne";
+        typeSel.parentNode.appendChild(tag);
+      } else {
+        const humanOpt = typeSel.querySelector('option[value=""]');
+        if(humanOpt) humanOpt.remove();
+        if(!saved[i] || !saved[i].type) typeSel.value = "medium";
+      }
+      if(i>0){
+        ["pname"+i,"pcolor"+i,"psymbol"+i].forEach(id=>{
+          const el = document.getElementById(id);
+          if(el) el.addEventListener("input", netBroadcastSetup);
+        });
+      }
+    }
+    netBroadcastSetup();
+  }
+}
+numPlayersSel.addEventListener("change", renderPlayerInputs);
+renderPlayerInputs();
+["horsesSel","exitSel","laneSel"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", ()=>{ if(NET.mode==="host") netBroadcastSetup(); });
+});
+
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  const n = parseInt(numPlayersSel.value);
+  horsesPerPlayer = parseInt(document.getElementById("horsesSel").value);
+  exitRule = document.getElementById("exitSel").value;
+  laneRule = document.getElementById("laneSel").value;
+  players = [];
+  for(let i=0;i<n;i++){
+    const name = (document.getElementById("pname"+i).value || `Joueur ${i+1}`).trim();
+    const color = document.getElementById("pcolor"+i).value || TOKEN_COLORS[i];
+    const symbol = document.getElementById("psymbol"+i).value || HORSE_SYMBOLS[i%HORSE_SYMBOLS.length];
+    const ai = document.getElementById("ptype"+i).value || null;
+    players.push(createPlayer(name,color,symbol,ai,null));
+  }
+  if(NET.mode==="host"){
+    players[0].side="host"; players[0].ai=null;
+    NET.conns.forEach(e=>{
+      const p = players[e.slot+1];
+      if(p && e.c && e.c.open){ p.side = e.side; p.ai = null; }
+    });
+    /* rangée d'un invité parti avant le début : reprise par une IA */
+    players.forEach(p=>{ if(!p.side && !p.ai) p.ai = "medium"; });
+  }
+  if(document.getElementById("randomOrder").checked){
+    for(let i=players.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [players[i], players[j]] = [players[j], players[i]];
+    }
+  }
+  const corners = CORNERS_FOR[n];
+  players.forEach((p,i)=>{
+    p.corner = corners[i];
+    p.horses = new Array(horsesPerPlayer).fill(-1);
+  });
+  currentPlayerIndex = 0;
+  dice = null; phase = "roll"; gameOver = false;
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("game").classList.add("active");
+  buildBoard();
+  log(`Partie lancée — ${horsesPerPlayer} chevaux par joueur, sortie ${exitRule==="16"?"sur 1 ou 6":"sur 6"}, escalier ${laneRule==="step"?"marche par marche (1, 2, 3… 6 au centre)":"au compte exact"}.`);
+  log(`${document.getElementById("randomOrder").checked?"🎲 Ordre tiré au sort : ":"Ordre de jeu : "}${players.map(p=>p.symbol+" "+p.name).join(" → ")}.`);
+  if(NET.mode==="host"){ NET.started = true; }
+  renderAll();
+  maybeAi();
+  if(NET.mode==="host"){ netSendState(); }
+});
+
+function createPlayer(name,color,symbol,ai,side){
+  return {name, color, symbol, ai, side, corner:0, horses:[]};
+}
+
+/* ============================================================
+   GÉOMÉTRIE
+   ============================================================ */
+function startIndexOf(p){ return START_INDEX[p.corner]; }
+/* case absolue du circuit occupée par un cheval en position relative pos */
+function absCell(p, pos){ return (startIndexOf(p) + pos) % TRACK_LEN; }
+/* coordonnées [x,y] (en cases) d'une position relative, pour le joueur p */
+function xyForPos(p, pos, hIdx){
+  if(pos<0){
+    const st = STABLES[p.corner];
+    const s = STABLE_SLOTS[(hIdx||0) % 4];
+    return [st.x + s[0], st.y + s[1]];
+  }
+  /* rentré au centre : rangé dans le triangle de sa couleur */
+  if(pos >= HOME_POS){
+    const off = ((hIdx||0) - (p.horses.length-1)/2) * 0.5;
+    if(p.corner===0) return [6.45, 7.5+off];
+    if(p.corner===1) return [7.5+off, 6.45];
+    if(p.corner===2) return [8.55, 7.5+off];
+    return [7.5+off, 8.55];
+  }
+  const c = pos < TRACK_LEN ? PATH[absCell(p,pos)] : LANES[p.corner][pos - TRACK_LEN];
+  return [c[0]+0.5, c[1]+0.5];
+}
+function horseXY(p, hIdx){ return xyForPos(p, p.horses[hIdx], hIdx); }
+
+/* ============================================================
+   MOTEUR DE JEU
+   ============================================================ */
+function canExit(d){ return exitRule==="16" ? (d===6 || d===1) : d===6; }
+
+/* liste des coups légaux du joueur pIdx avec le dé d :
+   [{h, from, to, capture:{p,h}|null}] */
+function legalMoves(pIdx, d){
+  const p = players[pIdx];
+  const moves = [];
+  if(!p) return moves;
+  p.horses.forEach((pos, h)=>{
+    let to;
+    if(pos < 0){
+      if(!canExit(d)) return;
+      to = 0;
+    } else if(pos >= HOME_POS){
+      return;                              // cheval rentré au centre : il ne bouge plus
+    } else if(pos >= TRACK_LEN){
+      /* dans l'escalier : il faut le chiffre de la marche visée
+         (sur la 2 il faut un 3, sur la 4 un 5, sur la 5 un 6 pour le centre) */
+      if(laneRule==="step"){
+        const marche = pos - TRACK_LEN + 1;
+        if(d !== marche + 1) return;
+        to = pos + 1;
+      } else {
+        to = pos + d;
+        if(to > HOME_POS) return;
+      }
+    } else {
+      to = pos + d;
+      /* on ne peut pas dépasser la 1re marche : il faut le compte exact */
+      if(to > (laneRule==="step" ? TRACK_LEN : HOME_POS)) return;
+    }
+    /* interdit de s'arrêter sur un de ses propres chevaux (le centre, lui,
+       accueille tous les chevaux rentrés) */
+    if(to < HOME_POS && p.horses.some((q,k)=> k!==h && q===to)) return;
+    let capture = null;
+    if(to < TRACK_LEN){
+      const cell = absCell(p, to);
+      for(let j=0;j<players.length;j++){
+        if(j===pIdx) continue;
+        const o = players[j];
+        for(let k=0;k<o.horses.length;k++){
+          const opos = o.horses[k];
+          if(opos>=0 && opos<TRACK_LEN && absCell(o,opos)===cell){ capture = {p:j, h:k}; }
+        }
+      }
+    }
+    moves.push({h, from:pos, to, capture});
+  });
+  return moves;
+}
+
+function doRoll(){
+  if(gameOver || phase!=="roll") return;
+  dice = 1 + Math.floor(Math.random()*6);
+  const p = players[currentPlayerIndex];
+  const moves = legalMoves(currentPlayerIndex, dice);
+  log(`🎲 ${p.symbol} ${p.name} fait ${dice}.`);
+  if(moves.length===0){
+    phase = "wait";
+    log(`… aucun coup possible pour ${p.name}.`);
+    renderAll();
+    netScheduleSync();
+    setTimeout(()=>{ if(!gameOver && phase==="wait") nextTurn(); }, 1200);
+    return;
+  }
+  phase = "move";
+  renderAll();
+  netScheduleSync();
+  if(moves.length===1){
+    setTimeout(()=>{ if(phase==="move" && !gameOver) applyMove(currentPlayerIndex, moves[0].h); }, 850);
+  } else if(p.ai){
+    setTimeout(()=>{ if(phase==="move" && !gameOver) applyMove(currentPlayerIndex, aiChoose(currentPlayerIndex, moves)); }, 900);
+  }
+}
+
+function applyMove(pIdx, h){
+  if(gameOver || phase!=="move" || pIdx!==currentPlayerIndex) return;
+  const moves = legalMoves(pIdx, dice);
+  const mv = moves.find(m=>m.h===h);
+  if(!mv) return;
+  const p = players[pIdx];
+  if(mv.from < 0) log(`🏇 ${p.symbol} ${p.name} sort un cheval de l'écurie.`);
+  p.horses[h] = mv.to;
+  if(mv.capture){
+    const o = players[mv.capture.p];
+    o.horses[mv.capture.h] = -1;
+    log(`💥 ${p.name} renvoie un cheval de ${o.name} à l'écurie !`);
+  }
+  if(mv.to === HOME_POS){
+    const n = p.horses.filter(q=>q>=HOME_POS).length;
+    log(`🏆 Un cheval de ${p.name} est rentré au centre ! (${n}/${p.horses.length})`);
+  } else if(mv.from < TRACK_LEN && mv.to >= TRACK_LEN){
+    log(`🏁 Un cheval de ${p.name} entre dans son escalier (marche ${mv.to-TRACK_LEN+1}).`);
+  } else if(mv.to > TRACK_LEN){
+    log(`⬆️ Un cheval de ${p.name} monte sur la marche ${mv.to-TRACK_LEN+1}.`);
+  }
+  const arrived = p.horses.filter(q=>q>=HOME_POS).length;
+  if(arrived === p.horses.length){
+    gameOver = true; phase = "over";
+    renderAll();
+    log(`🏆 ${p.symbol} ${p.name} a rentré tous ses chevaux au centre !`);
+    showVictory(pIdx);
+    netScheduleSync();
+    return;
+  }
+  const replay = (dice===6);
+  renderAll();
+  netScheduleSync();
+  if(replay){
+    phase = "roll";
+    log(`🎲 ${p.name} a fait 6 : il rejoue.`);
+    renderAll();
+    netScheduleSync();
+    maybeAi();
+  } else {
+    setTimeout(()=>{ if(!gameOver) nextTurn(); }, 450);
+  }
+}
+
+function nextTurn(){
+  if(gameOver) return;
+  currentPlayerIndex = (currentPlayerIndex+1) % players.length;
+  dice = null;
+  phase = "roll";
+  renderAll();
+  netScheduleSync();
+  maybeAi();
+}
+
+function maybeAi(){
+  if(NET.mode==="guest" || gameOver) return;
+  const p = players[currentPlayerIndex];
+  if(p && p.ai && phase==="roll"){
+    setTimeout(()=>{ if(phase==="roll" && !gameOver && players[currentPlayerIndex]===p) doRoll(); }, 850);
+  }
+}
+
+/* ---------- IA ---------- */
+function aiChoose(pIdx, moves){
+  const p = players[pIdx];
+  const level = p.ai || "medium";
+  if(level==="easy") return moves[Math.floor(Math.random()*moves.length)].h;
+  let best = moves[0], bestScore = -1e9;
+  moves.forEach(m=>{
+    let s = 0;
+    if(m.capture){
+      const victim = players[m.capture.p];
+      s += 100 + victim.horses[m.capture.h]; // plus le cheval visé est avancé, mieux c'est
+    }
+    if(m.to >= HOME_POS) s += 130;                           // rentrer un cheval au centre
+    else if(m.to >= TRACK_LEN) s += 85 + (m.to - TRACK_LEN)*4; // entrer/monter dans l'escalier
+    if(m.from < 0) s += 55;                                  // sortir un cheval
+    s += m.to * 0.6;                                         // faire avancer les plus avancés
+    if(level==="hard"){
+      if(m.to < TRACK_LEN){
+        if(dangerAt(pIdx, m.to)) s -= 45;
+        if(m.from>=0 && dangerAt(pIdx, m.from)) s += 25;      // fuir une case menacée
+      }
+      if(m.to >= TRACK_LEN - 6 && m.to < TRACK_LEN) s += 10;  // approcher de l'entrée
+    }
+    s += Math.random()*4;
+    if(s > bestScore){ bestScore = s; best = m; }
+  });
+  return best.h;
+}
+/* une case relative est-elle à portée de dé d'un cheval adverse ? */
+function dangerAt(pIdx, relPos){
+  if(relPos<0 || relPos>=TRACK_LEN) return false;
+  const cell = absCell(players[pIdx], relPos);
+  for(let j=0;j<players.length;j++){
+    if(j===pIdx) continue;
+    const o = players[j];
+    for(const opos of o.horses){
+      if(opos<0 || opos>=TRACK_LEN) continue;
+      const ocell = absCell(o, opos);
+      const dist = (cell - ocell + TRACK_LEN) % TRACK_LEN;
+      if(dist>=1 && dist<=6 && (opos + dist) < TRACK_LEN) return true;
+    }
+  }
+  return false;
+}
+
+/* ============================================================
+   PLATEAU — construction du DOM
+   ============================================================ */
+function cornerColor(c){
+  const p = players.find(x=>x.corner===c);
+  return p ? p.color : "#b9b3a6";
+}
+function tint(hex, alpha){
+  const h = hex.replace("#","");
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function buildBoard(){
+  const grid = document.getElementById("boardGrid");
+  const layer = document.getElementById("pieceLayer");
+  grid.innerHTML = "";
+  layer.querySelectorAll(".horse,.slot,.step").forEach(e=>e.remove());
+  selectedHorse = null;
+
+  /* écuries */
+  for(let c=0;c<4;c++){
+    const st = STABLES[c];
+    const d = document.createElement("div");
+    d.className = "stable";
+    d.style.gridColumn = `${st.x+1} / span 6`;
+    d.style.gridRow = `${st.y+1} / span 6`;
+    d.style.background = tint(cornerColor(c), .30);
+    d.style.borderColor = cornerColor(c);
+    grid.appendChild(d);
+  }
+
+  /* circuit — cases nues ; seules celles de départ et les entrées d'escalier
+     portent la couleur d'un joueur */
+  const startCells = [0,1,2,3].map(c=>START_INDEX[c]);
+  const gateCells = [0,1,2,3].map(c=>LANE_GATE[c]);
+  PATH.forEach((c,i)=>{
+    const d = document.createElement("div");
+    d.className = "cell";
+    d.style.gridColumn = c[0]+1;
+    d.style.gridRow = c[1]+1;
+    const owner = startCells.indexOf(i);
+    const gate = gateCells.indexOf(i);
+    if(owner>=0){
+      d.classList.add("start");
+      d.style.background = cornerColor(owner);
+      d.title = "Case de départ";
+    } else if(gate>=0){
+      d.classList.add("gate");
+      d.style.background = tint(cornerColor(gate), .42);
+      d.title = "Entrée de l'escalier";
+    }
+    grid.appendChild(d);
+  });
+
+  /* escaliers, numérotés de 1 à 5 vers le centre */
+  for(let c=0;c<4;c++){
+    LANES[c].forEach((cell,k)=>{
+      const d = document.createElement("div");
+      d.className = "cell lane";
+      d.style.gridColumn = cell[0]+1;
+      d.style.gridRow = cell[1]+1;
+      d.style.background = tint(cornerColor(c), .45 + k*0.13);
+      d.textContent = k+1;   // en italique (CSS) pour ne pas confondre avec les cases du tour
+      d.title = "Escalier — marche "+(k+1);
+      grid.appendChild(d);
+    });
+  }
+
+  /* centre : 4 triangles, chacun face à l'escalier de sa couleur */
+  const hub = document.createElement("div");
+  hub.className = "center-hub";
+  hub.style.gridColumn = "7 / span 3";
+  hub.style.gridRow = "7 / span 3";
+  hub.style.background = `conic-gradient(from -45deg,`
+    + ` ${cornerColor(1)} 0deg 90deg,`      /* escalier du haut */
+    + ` ${cornerColor(2)} 90deg 180deg,`    /* escalier de droite */
+    + ` ${cornerColor(3)} 180deg 270deg,`   /* escalier du bas */
+    + ` ${cornerColor(0)} 270deg 360deg)`;  /* escalier de gauche */
+  hub.innerHTML = "<span>6</span>";   /* le centre = la 6e marche : il faut un 6 pour y entrer */
+  hub.title = "Arrivée — depuis la marche 5, il faut un 6";
+  grid.appendChild(hub);
+
+  /* emplacements vides d'écurie + pions */
+  players.forEach((p,pi)=>{
+    const st = STABLES[p.corner];
+    for(let h=0;h<p.horses.length;h++){
+      const s = STABLE_SLOTS[h%4];
+      const slot = document.createElement("div");
+      slot.className = "slot";
+      slot.style.left = ((st.x+s[0])/15*100)+"%";
+      slot.style.top = ((st.y+s[1])/15*100)+"%";
+      layer.appendChild(slot);
+
+      const el = document.createElement("div");
+      el.className = "horse";
+      el.id = `h${pi}_${h}`;
+      el.style.background = p.color;
+      el.textContent = p.symbol;
+      el.addEventListener("click", ()=>onHorseClick(pi,h));
+      el.addEventListener("mouseenter", ()=>showPath(pi,h));
+      el.addEventListener("mouseleave", ()=>{ if(!selectedHorse) clearPath(); });
+      layer.appendChild(el);
+    }
+  });
+  boardBuilt = true;
+  fitBoard();
+}
+
+function fitBoard(){
+  const wrap = document.getElementById("boardWrap");
+  if(!wrap) return;
+  const w = wrap.clientWidth - 12;
+  if(w>0) wrap.style.setProperty("--cell", (w/15)+"px");
+}
+window.addEventListener("resize", fitBoard);
+
+/* ============================================================
+   RENDU
+   ============================================================ */
+function iControl(pIdx){
+  const p = players[pIdx];
+  if(!p) return false;
+  if(NET.mode==="guest") return p.side===NET.mySide;
+  if(NET.mode==="host") return p.side==="host";
+  return !p.ai;
+}
+
+function renderAll(){
+  if(!boardBuilt) return;
+  if(phase!=="move" || gameOver){ selectedHorse = null; clearPath(); }
+  renderDie();
+  renderHorses();
+  renderMats();
+  const p = players[currentPlayerIndex];
+  document.getElementById("turnDot").style.background = p ? p.color : "#ccc";
+  const you = iControl(currentPlayerIndex);
+  document.getElementById("turnText").textContent = gameOver
+    ? "Partie terminée"
+    : `${p.symbol} ${p.name}${you?" — à toi de jouer !":(p.ai?" (IA) réfléchit…":" joue…")}`;
+  const rollBtn = document.getElementById("rollBtn");
+  rollBtn.disabled = !(phase==="roll" && !gameOver && you);
+  const hint = document.getElementById("actionHint");
+  if(gameOver) hint.textContent = "";
+  else if(phase==="move" && you) hint.textContent = HAS_HOVER
+    ? "👉 Survole un cheval pour compter les cases, clique pour le déplacer."
+    : "👉 Appuie sur un cheval pour voir le trajet, puis à nouveau pour valider.";
+  else if(phase==="roll" && you) hint.textContent = "🎲 Lance le dé.";
+  else hint.textContent = "";
+}
+
+const PIP_MAP = {
+  1:[0,0,0,0,1,0,0,0,0],
+  2:[1,0,0,0,0,0,0,0,1],
+  3:[1,0,0,0,1,0,0,0,1],
+  4:[1,0,1,0,0,0,1,0,1],
+  5:[1,0,1,0,1,0,1,0,1],
+  6:[1,0,1,1,0,1,1,0,1]
+};
+function renderDie(){
+  const face = document.getElementById("dieFace");
+  const v = dice;
+  if(!v){ face.innerHTML = ""; lastDieShown = null; return; }
+  if(lastDieShown!==v){
+    lastDieShown = v;
+    face.classList.add("rolling");
+    let ticks = 0;
+    const int = setInterval(()=>{
+      drawPips(face, 1+Math.floor(Math.random()*6));
+      if(++ticks>4){
+        clearInterval(int);
+        face.classList.remove("rolling");
+        drawPips(face, v);
+        face.classList.remove("pop"); void face.offsetWidth; face.classList.add("pop");
+      }
+    }, 70);
+  } else {
+    drawPips(face, v);
+  }
+}
+function drawPips(face, v){
+  face.innerHTML = PIP_MAP[v].map(on=>`<div class="pip${on?"":" off"}"></div>`).join("");
+}
+
+function renderHorses(){
+  const moves = (phase==="move" && !gameOver && iControl(currentPlayerIndex))
+    ? legalMoves(currentPlayerIndex, dice) : [];
+  const movable = new Set(moves.map(m=>`${currentPlayerIndex}_${m.h}`));
+  players.forEach((p,pi)=>{
+    p.horses.forEach((pos,h)=>{
+      const el = document.getElementById(`h${pi}_${h}`);
+      if(!el) return;
+      const [x,y] = horseXY(p,h);
+      el.style.left = (x/15*100)+"%";
+      el.style.top = (y/15*100)+"%";
+      el.style.background = p.color;
+      el.textContent = p.symbol;
+      el.classList.toggle("movable", movable.has(`${pi}_${h}`));
+      el.classList.toggle("done", pos>=HOME_POS);
+    });
+  });
+}
+
+function renderMats(){
+  const box = document.getElementById("mats");
+  box.innerHTML = "";
+  players.forEach((p,i)=>{
+    const home = p.horses.filter(q=>q>=HOME_POS).length;
+    const lane = p.horses.filter(q=>q>=TRACK_LEN && q<HOME_POS).length;
+    const stable = p.horses.filter(q=>q<0).length;
+    const track = p.horses.length - home - lane - stable;
+    const d = document.createElement("div");
+    d.className = "pc-mat" + (i===currentPlayerIndex && !gameOver ? " current" : "");
+    let tag = "";
+    if(p.ai) tag = `<span class="pc-tag">${p.ai==="easy"?"🙂 IA facile":p.ai==="hard"?"😈 IA difficile":"🤖 IA"}</span>`;
+    else if(p.side && p.side!=="host") tag = `<span class="pc-tag">🌐 en ligne</span>`;
+    else if(NET.mode && p.side==="host") tag = `<span class="pc-tag">🖥 hôte</span>`;
+    if(NET.mode && iControl(i)) tag += `<span class="pc-tag" style="background:#f6ecd9;color:#6b4415;">c'est toi</span>`;
+    d.innerHTML = `
+      <div class="pc-mat-head"><span class="pc-dot" style="background:${p.color}"></span>${p.symbol} ${escapeHtml(p.name)} ${tag}</div>
+      <div class="pc-stats"><span>🏠 écurie : <b>${stable}</b></span><span>🏇 en piste : <b>${track}</b></span><span>🪜 escalier : <b>${lane}</b></span><span>🏆 rentrés : <b>${home}/${p.horses.length}</b></span></div>
+      <div class="pc-pips">${p.horses.map(q=>`<div class="pc-pip ${q>=HOME_POS?"home":(q>=0?"out":"")}" style="background:${p.color}"></div>`).join("")}</div>
+    `;
+    box.appendChild(d);
+  });
+}
+function escapeHtml(s){ return String(s||"").replace(/[<>&"']/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ---------- interactions ---------- */
+document.getElementById("rollBtn").addEventListener("click", ()=>{
+  if(gameOver || phase!=="roll") return;
+  if(!iControl(currentPlayerIndex)) return;
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"roll"}); return; }
+  doRoll();
+});
+
+/* sur écran tactile (pas de survol), un 1er appui montre le trajet, le 2e joue */
+const HAS_HOVER = window.matchMedia("(hover: hover)").matches;
+let selectedHorse = null;
+
+function onHorseClick(pi,h){
+  if(gameOver || phase!=="move") return;
+  if(pi!==currentPlayerIndex || !iControl(pi)) return;
+  if(!legalMoves(pi, dice).some(m=>m.h===h)) return;
+  if(!HAS_HOVER && (!selectedHorse || selectedHorse.pi!==pi || selectedHorse.h!==h)){
+    selectedHorse = {pi,h};
+    showPath(pi,h);
+    document.querySelectorAll(".horse.sel").forEach(e=>e.classList.remove("sel"));
+    document.getElementById(`h${pi}_${h}`).classList.add("sel");
+    document.getElementById("actionHint").textContent = "👉 Appuie encore sur ce cheval pour valider.";
+    return;
+  }
+  selectedHorse = null;
+  clearPath();
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"move", h}); return; }
+  applyMove(pi,h);
+}
+
+/* aide au comptage : pastilles 1, 2, 3… sur les cases traversées */
+function showPath(pi,h){
+  if(phase!=="move" || gameOver || pi!==currentPlayerIndex || !iControl(pi)) return;
+  const mv = legalMoves(pi, dice).find(m=>m.h===h);
+  if(!mv) return;
+  clearPath();
+  const p = players[pi];
+  const layer = document.getElementById("pieceLayer");
+  const steps = [];
+  if(mv.from < 0) steps.push(mv.to);                                  // sortie d'écurie : un seul saut
+  else for(let s=mv.from+1; s<=mv.to; s++) steps.push(s);
+  steps.forEach((pos,k)=>{
+    const last = k===steps.length-1;
+    const [x,y] = xyForPos(p, pos, h);
+    const d = document.createElement("div");
+    d.className = "step" + (last?" last":"") + (last && mv.capture ? " eat" : "");
+    d.style.left = (x/15*100)+"%";
+    d.style.top = (y/15*100)+"%";
+    /* la dernière pastille rappelle le dé (dans l'escalier on ne monte que
+       d'une marche, mais il faut bien le chiffre affiché) */
+    d.textContent = (mv.from<0 && last) ? "🏇" : (last ? dice : (k+1));
+    layer.appendChild(d);
+  });
+}
+function clearPath(){
+  document.querySelectorAll("#pieceLayer .step").forEach(e=>e.remove());
+  document.querySelectorAll(".horse.sel").forEach(e=>e.classList.remove("sel"));
+}
+
+/* ============================================================
+   VICTOIRE
+   ============================================================ */
+function showVictory(winnerIdx){
+  const ov = document.getElementById("victory-overlay");
+  if(ov.classList.contains("active")) return;
+  const w = players[winnerIdx];
+  const box = document.getElementById("victory-box");
+  const others = players.filter((p,i)=>i!==winnerIdx)
+    .map(p=>`${p.symbol} ${escapeHtml(p.name)} : ${p.horses.filter(q=>q>=HOME_POS).length} cheval(aux) rentré(s)`).join("<br>");
+  box.innerHTML = `
+    <div style="font-size:64px;">🏆</div>
+    <h1>${w.symbol} ${escapeHtml(w.name)} gagne la course !</h1>
+    <p style="font-size:13px;color:#555;">${others}</p>
+    <button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>
+  `;
+  spawnConfetti(ov, w.color);
+  ov.classList.add("active");
+  netScheduleSync();
+}
+function spawnConfetti(ov, extra){
+  const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12"];
+  if(extra) palette.push(extra, extra);
+  for(let k=0;k<90;k++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random()*100)+"vw";
+    c.style.background = palette[Math.floor(Math.random()*palette.length)];
+    c.style.width = (6+Math.random()*8)+"px";
+    c.style.height = (10+Math.random()*12)+"px";
+    c.style.animationDuration = (2.6+Math.random()*3)+"s";
+    c.style.animationDelay = (Math.random()*3)+"s";
+    ov.appendChild(c);
+  }
+}
+
+/* ============================================================
+   MODE EN LIGNE — PeerJS (même architecture que les autres jeux)
+   ============================================================ */
+function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
+function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } } /* invité -> hôte */
+function netSendTo(entry, obj){ if(entry && entry.c && entry.c.open){ try{ entry.c.send(obj); }catch(e){} } }
+function netBroadcast(obj){ NET.conns.forEach(e=>netSendTo(e, obj)); }
+/* petit badge fixe avec le code de la partie, pour qu'un joueur parti
+   puisse revenir en retapant ce code dans « Rejoindre » */
+function netShowCodeBadge(){
+  if(!NET.code) return;
+  let b = document.getElementById("netCodeBadge");
+  if(!b){
+    b = document.createElement("div");
+    b.id = "netCodeBadge";
+    b.style.cssText = "position:fixed;top:6px;left:8px;z-index:900;background:rgba(0,0,0,.65);color:#fff;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;letter-spacing:1px;";
+    document.body.appendChild(b);
+  }
+  b.textContent = "🔑 Code : "+NET.code;
+  b.title = "Code de la partie — un joueur déconnecté peut revenir en entrant ce code dans « Rejoindre une partie en ligne »";
+}
+
+document.getElementById("netLocalBtn").onclick = ()=>{
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+};
+document.getElementById("netHostBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netHostPanel").style.display = "block";
+  netHost(0);
+};
+document.getElementById("netJoinBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netJoinPanel").style.display = "block";
+};
+document.getElementById("netConnectBtn").onclick = ()=>{
+  const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
+  const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
+  if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  NET.rejected = false;
+  document.getElementById("netConnectBtn").disabled = true;
+  netJoin(code, name);
+};
+
+/* ---------- hôte ---------- */
+function netHost(attempt){
+  NET.mode = "host"; NET.mySide = "host";
+  const code = netGenCode();
+  netStatus("netHostStatus","Création de la partie…");
+  const peer = new Peer("pch-"+code);
+  NET.peer = peer;
+  peer.on("open", ()=>{
+    NET.code = code;
+    document.getElementById("netCode").textContent = code;
+    netStatus("netHostStatus",`En attente des autres joueurs (jusqu'à ${NET_MAX_GUESTS})… Envoie-leur ce code !`);
+  });
+  peer.on("error", (e)=>{
+    if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
+    else if(e.type!=="peer-unavailable") netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+  });
+  peer.on("connection", (c)=>{
+    c.on("data", (msg)=>netHostOnData(c, msg));
+    c.on("close", ()=>netHostConnLost(c));
+    c.on("error", ()=>netHostConnLost(c));
+  });
+}
+
+function netFreeSlot(){
+  for(let s=0;s<NET_MAX_GUESTS;s++){
+    if(!NET.conns.some(e=>e.slot===s)) return s;
+  }
+  return -1;
+}
+
+function netShowSetupAsHost(){
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  const info = document.getElementById("netSetupInfo");
+  info.style.display = "block";
+  const names = NET.conns.map(e=>e.name).join(", ") || "personne";
+  info.textContent = `🌐 Partie en ligne — connecté(s) : ${names} (${NET.conns.length}/${NET_MAX_GUESTS} invités). Vous êtes le joueur 1. D'autres joueurs peuvent encore rejoindre avec le code ${NET.code||""}. Ajoutez des IA si vous voulez.`;
+  const minPlayers = NET.conns.length+1;
+  let wanted = NET.setupShown ? Math.max(parseInt(numPlayersSel.value)||2, minPlayers) : Math.max(2, minPlayers);
+  NET.setupShown = true;
+  numPlayersSel.value = String(Math.min(wanted, 4));
+  renderPlayerInputs();
+  netShowCodeBadge();
+}
+setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 500);
+
+function netHostOnData(c, msg){
+  if(!msg || typeof msg!=="object") return;
+  let entry = NET.conns.find(e=>e.c===c);
+  if(msg.t==="hello"){
+    const name = netEsc(msg.name).slice(0,20) || "Joueur";
+    if(entry){ entry.name = name; return; }
+    if(NET.started){
+      netHostHandleRejoin(c, name);
+    } else {
+      const slot = netFreeSlot();
+      if(slot<0){ try{ c.send({t:"full"}); }catch(e){} setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300); return; }
+      entry = {c, slot, side:"g"+slot, name};
+      NET.conns.push(entry);
+      netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+      netShowSetupAsHost();
+    }
+    return;
+  }
+  if(!entry) return;
+  if(msg.t==="setupGuest"){
+    netApplyGuestSetupChange(entry, msg);
+  } else if(msg.t==="action"){
+    netHandleGuestAction(msg, entry.side);
+  }
+}
+
+/* partie déjà lancée : on remet le nouvel arrivant sur le siège du joueur
+   déconnecté qui porte le même prénom (ou le seul siège libre) */
+function netHostHandleRejoin(c, name){
+  const takenSides = new Set(NET.conns.map(e=>e.side));
+  const candidates = players.filter(p=>p.side && p.side!=="host" && !takenSides.has(p.side));
+  let p = candidates.find(x=>x.name.trim().toLowerCase()===String(name).trim().toLowerCase());
+  if(!p && candidates.length===1) p = candidates[0];
+  if(!p){
+    try{ c.send({t:"noSeat", names:candidates.map(x=>x.name)}); }catch(e){}
+    setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300);
+    return;
+  }
+  const entry = {c, slot:parseInt(p.side.slice(1),10), side:p.side, name:p.name};
+  NET.conns.push(entry);
+  netUpdateDiscoBanner();
+  log(`🔌 ${p.name} s'est reconnecté(e) à la partie.`);
+  netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+  netSendState();
+}
+
+function netBroadcastSetup(){
+  if(NET.mode!=="host" || NET.started || !NET.conns.length) return;
+  NET.conns.forEach(entry=>{
+    const i = entry.slot+1;
+    const colorEl = document.getElementById("pcolor"+i);
+    const symbolEl = document.getElementById("psymbol"+i);
+    const nameEl = document.getElementById("pname"+i);
+    if(!colorEl || !symbolEl || !nameEl) return;
+    netSendTo(entry, {
+      t:"setup",
+      guestColor:colorEl.value, guestSymbol:symbolEl.value, guestName:nameEl.value,
+      code:NET.code
+    });
+  });
+}
+function netApplyGuestSetupChange(entry, msg){
+  if(NET.started) return;
+  const i = entry.slot+1;
+  const nameEl = document.getElementById("pname"+i);
+  const colorEl = document.getElementById("pcolor"+i);
+  const symbolEl = document.getElementById("psymbol"+i);
+  if(!nameEl || !colorEl || !symbolEl) return;
+  entry.name = netEsc(msg.name).slice(0,20) || ("Joueur "+(i+1));
+  nameEl.value = entry.name;
+  if(msg.color) colorEl.value = msg.color;
+  if(msg.symbol && Array.from(symbolEl.options).some(o=>o.value===msg.symbol)) symbolEl.value = msg.symbol;
+  netBroadcastSetup();
+}
+
+function netHandleGuestAction(msg, side){
+  if(!NET.started || gameOver) return;
+  const p = players[currentPlayerIndex];
+  if(!p || p.side!==side) return;
+  if(msg.kind==="roll"){
+    if(phase==="roll") doRoll();
+  } else if(msg.kind==="move"){
+    if(phase==="move") applyMove(currentPlayerIndex, msg.h);
+  }
+}
+
+/* ---------- synchronisation hôte -> invités ---------- */
+function netScheduleSync(){
+  if(NET.mode!=="host") return;
+  if(NET.syncTimer) return;
+  NET.syncTimer = setTimeout(()=>{ NET.syncTimer=null; netSendState(); }, 40);
+}
+function netSendState(){
+  if(NET.mode!=="host" || !NET.started || NET.ended) return;
+  const victOn = document.getElementById("victory-overlay").classList.contains("active");
+  netBroadcast({
+    t:"state",
+    players: players.map(p=>({
+      name:p.name, color:p.color, symbol:p.symbol, ai:p.ai, side:p.side||null,
+      corner:p.corner, horses:p.horses.slice()
+    })),
+    cur: currentPlayerIndex, dice, phase, gameOver,
+    horsesPerPlayer, exitRule, laneRule, code:NET.code,
+    log: logHistory.slice(-120),
+    victory: victOn ? {active:true, html:document.getElementById("victory-box").innerHTML} : {active:false}
+  });
+}
+
+/* ---------- invité ---------- */
+function netJoin(code, name){
+  NET.mode = "guest";
+  NET.mySide = null; // attribué par l'hôte dans le message "welcome" (g0, g1, g2)
+  NET.joinCode = code; NET.guestName = name;
+  const symSel = document.getElementById("netGuestSymbol");
+  symSel.innerHTML = HORSE_SYMBOLS.map(t=>`<option value="${t}">${t}</option>`).join("");
+  netConnectAsGuest(false);
+}
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
+  const peer = new Peer();
+  NET.peer = peer;
+  let settled = false;
+  const fail = (msg)=>{
+    if(settled) return; settled = true;
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect) netScheduleGuestRetry();
+    else { netStatus("netJoinStatus", msg); document.getElementById("netConnectBtn").disabled = false; }
+  };
+  peer.on("error", (e)=>{
+    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+  });
+  peer.on("open", ()=>{
+    const c = peer.connect("pch-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    c.on("open", ()=>{
+      clearTimeout(to); settled = true; NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName});
+      if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Personnalise ton écurie ci-dessous.");
+      else log("🔌 Reconnecté(e) à la partie.");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+  });
+}
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts = (NET.reconnectAttempts||0)+1;
+  netShowReconnectBanner();
+  if(NET.reconnectAttempts>30){ netReconnectFailed(); return; }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="welcome"){
+    NET.mySide = msg.side;
+    NET.code = msg.code || NET.joinCode;
+    netShowCodeBadge();
+  } else if(msg.t==="full"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    netStatus("netJoinStatus","❌ La partie est pleine (4 joueurs max).");
+    document.getElementById("netConnectBtn").disabled = false;
+  } else if(msg.t==="noSeat"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    const names = Array.isArray(msg.names) ? msg.names.filter(Boolean) : [];
+    const txt = names.length
+      ? "❌ Partie en cours. Pour reprendre une place, utilise exactement le prénom d'un joueur déconnecté : "+names.join(", ")+"."
+      : "❌ Partie déjà en cours et aucun siège libre.";
+    if(NET.started){
+      netShowBanner(netEsc(txt)+` <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+      const btn = document.getElementById("netGiveUpBtn");
+      if(btn) btn.onclick = ()=>location.reload();
+    } else {
+      netStatus("netJoinStatus", txt);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
+  } else if(msg.t==="state") netApplySnapshot(msg);
+  else if(msg.t==="setup") netApplySetupMsg(msg);
+}
+
+function netApplySetupMsg(msg){
+  if(NET.started) return;
+  if(msg.code && !NET.code) NET.code = msg.code;
+  netShowCodeBadge();
+  document.getElementById("netJoinReadyPanel").style.display = "block";
+  const symSel = document.getElementById("netGuestSymbol");
+  if(document.activeElement !== symSel) symSel.value = msg.guestSymbol;
+  const colorEl = document.getElementById("netGuestColor");
+  if(document.activeElement !== colorEl) colorEl.value = msg.guestColor;
+  const nameEl = document.getElementById("netGuestNameLive");
+  if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+}
+let netGuestSetupTimer = null;
+function netSendGuestSetup(){
+  if(NET.mode!=="guest") return;
+  clearTimeout(netGuestSetupTimer);
+  netGuestSetupTimer = setTimeout(()=>{
+    netSend({t:"setupGuest",
+      name: document.getElementById("netGuestNameLive").value,
+      color: document.getElementById("netGuestColor").value,
+      symbol: document.getElementById("netGuestSymbol").value
+    });
+  }, 120);
+}
+["netGuestColor","netGuestSymbol","netGuestNameLive"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("input", netSendGuestSetup);
+  el.addEventListener("change", netSendGuestSetup);
+});
+
+function netApplySnapshot(s){
+  if(NET.ended) return;
+  if(s.code && s.code!==NET.code){ NET.code = s.code; netShowCodeBadge(); }
+  horsesPerPlayer = s.horsesPerPlayer;
+  exitRule = s.exitRule;
+  laneRule = s.laneRule || "step";
+  if(!NET.started){
+    NET.started = true;
+    netShowCodeBadge();
+    players = s.players.map(sp=>{
+      const p = createPlayer(sp.name, sp.color, sp.symbol, sp.ai, sp.side);
+      p.corner = sp.corner; p.horses = sp.horses.slice();
+      return p;
+    });
+    document.getElementById("netHome").style.display = "none";
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("game").classList.add("active");
+    buildBoard();
+  }
+  s.players.forEach((sp,i)=>{
+    const p = players[i]; if(!p) return;
+    p.name=sp.name; p.color=sp.color; p.symbol=sp.symbol; p.ai=sp.ai; p.side=sp.side;
+    p.corner=sp.corner; p.horses=sp.horses.slice();
+  });
+  currentPlayerIndex = s.cur;
+  dice = s.dice;
+  phase = s.phase;
+  gameOver = s.gameOver;
+  renderAll();
+  if(s.victory && s.victory.active){
+    const vo = document.getElementById("victory-overlay");
+    if(!vo.classList.contains("active")){
+      document.getElementById("victory-box").innerHTML = s.victory.html;
+      spawnConfetti(vo, null);
+      vo.classList.add("active");
+    }
+  }
+  const logEl = document.getElementById("log");
+  const key = s.log.length+"|"+(s.log[0]||"")+"|"+(s.log[s.log.length-1]||"");
+  if(logEl.dataset.key !== key){
+    logEl.dataset.key = key;
+    logEl.innerHTML = "";
+    s.log.forEach(m=>{ const d=document.createElement("div"); d.textContent=m; logEl.appendChild(d); });
+  }
+}
+
+/* ---------- déconnexion / reconnexion ---------- */
+function netShowBanner(html){
+  let b = document.getElementById("netBanner");
+  if(!b){ b = document.createElement("div"); b.id="netBanner"; b.className="net-reconnect-banner"; document.body.appendChild(b); }
+  b.innerHTML = html;
+}
+function netHideBanner(){ const b = document.getElementById("netBanner"); if(b) b.remove(); }
+function netOnConnLost(){
+  if(NET.mode==="guest") netGuestOnDisconnect();
+}
+function netHostConnLost(c){
+  const idx = NET.conns.findIndex(e=>e.c===c);
+  if(idx<0) return;
+  const entry = NET.conns[idx];
+  NET.conns.splice(idx,1);
+  if(!NET.started){
+    if(document.getElementById("setup").style.display!=="none"){
+      netShowSetupAsHost();
+      const info = document.getElementById("netSetupInfo");
+      info.textContent = `🔌 ${entry.name} s'est déconnecté(e) avant le début (le code ${NET.code} lui permet de revenir). `+info.textContent;
+    } else {
+      netStatus("netHostStatus", `${entry.name} s'est déconnecté(e). Il/elle peut revenir avec le même code.`);
+    }
+    return;
+  }
+  log(`🔌 ${entry.name} s'est déconnecté(e). Pour revenir : « Rejoindre une partie en ligne » avec le code ${NET.code} et le même prénom.`);
+  netUpdateDiscoBanner();
+}
+/* bannière côté hôte : liste des joueurs en ligne actuellement déconnectés */
+function netUpdateDiscoBanner(){
+  if(NET.mode!=="host" || !NET.started) return;
+  const connected = new Set(NET.conns.map(e=>e.side));
+  const missing = players.filter(p=>p.side && p.side!=="host" && !connected.has(p.side));
+  if(!missing.length){ netHideBanner(); return; }
+  netShowBanner(`🔌 ${missing.map(p=>netEsc(p.name)).join(", ")} ${missing.length>1?"sont déconnecté(e)s":"s'est déconnecté(e)"}. Pour revenir : « Rejoindre une partie en ligne » avec le code <b>${NET.code}</b> et le même prénom. La partie continue en attendant. <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  const btn = document.getElementById("netHostGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+function netGuestOnDisconnect(){
+  if(NET.reconnecting || NET.ended || NET.rejected) return;
+  NET.conn = null; NET.reconnectAttempts = 0;
+  try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
+  netScheduleGuestRetry();
+}
+function netShowReconnectBanner(){
+  netShowBanner(`🔌 Connexion perdue. Reconnexion en cours… (tentative ${NET.reconnectAttempts}/30) <button id="netRetryNowBtn">Réessayer maintenant</button>`);
+  const btn = document.getElementById("netRetryNowBtn");
+  if(btn) btn.onclick = ()=>{ netConnectAsGuest(true); };
+}
+function netReconnectFailed(){
+  NET.reconnecting = false; NET.ended = true;
+  netShowBanner(`❌ Impossible de se reconnecter — l'hôte a peut-être fermé la partie. <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+  const btn = document.getElementById("netGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+</script>
+</body>
+</html>
