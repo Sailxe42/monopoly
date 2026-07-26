@@ -1,0 +1,2288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Bonne Paye</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#14563f;
+    --panel-bg:#fffdf7;
+    --accent:#1e8b5a;
+    --gold:#d4a017;
+    --text:#22301f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:linear-gradient(180deg,var(--bg),#08241a);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+    padding-top:46px;
+  }
+  .btn{
+    cursor:pointer;border:none;border-radius:8px;padding:10px 16px;
+    font-size:15px;font-weight:600;background:var(--accent);color:#fff;
+    transition:filter .15s, transform .1s;
+  }
+  .btn:hover{filter:brightness(1.15);}
+  .btn:active{transform:scale(.96);}
+  .btn.secondary{background:#555;}
+  .btn.gold{background:var(--gold);color:#3b2a00;}
+  .btn.small{font-size:12.5px;padding:6px 10px;}
+  .btn:disabled{background:#aaa;cursor:not-allowed;filter:none;}
+  .hint{font-size:12px;color:#666;}
+
+  /* ---------- ACCUEIL / RÉSEAU ---------- */
+  #netHome, #setup{
+    background:var(--panel-bg);border-radius:12px;padding:28px 32px;
+    max-width:560px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+  #netHome h1, #setup h1{margin-top:0;text-align:center;}
+  .net-big-btn{display:block;width:100%;margin:10px 0;font-size:16px;padding:14px;}
+  #netCode{font-size:38px;font-weight:800;letter-spacing:8px;text-align:center;margin:10px 0;color:var(--accent);user-select:all;}
+  .net-status{font-size:13px;color:#555;min-height:18px;text-align:center;}
+  #netSetupInfo{
+    display:none;background:#e6f3ea;border:1px solid #8cc9a5;color:#155c3a;
+    border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px;font-weight:600;
+  }
+  #netJoinReadyPanel .player-row{justify-content:center;margin-top:10px;}
+  #netJoinReadyPanel .player-row input[type=text]{flex:0 1 160px;}
+  .player-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .player-row input[type=text]{flex:1;padding:8px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
+  .player-row input[type=color]{width:34px;height:32px;padding:0;border:none;background:none;cursor:pointer;flex-shrink:0;}
+  .player-row select.psymbol{font-size:17px;padding:3px 4px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;}
+  .player-row select.ptype{font-size:12px;padding:4px 3px;border-radius:6px;border:1px solid #ccc;flex-shrink:0;cursor:pointer;max-width:120px;}
+  #setup .row{display:flex;gap:10px;margin:14px 0;align-items:center;flex-wrap:wrap;}
+  #setup .row input[type=number]{width:86px;padding:7px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
+  #setup .row input[type=number]:disabled{background:#eee;color:#999;}
+  #customRow, #timerRow{background:#f3f8f4;border:1px solid #cfe4d6;border-radius:8px;padding:10px 12px;}
+  .net-reconnect-banner{
+    position:fixed;top:0;left:0;right:0;z-index:300;background:#8a4a13;color:#fff;text-align:center;
+    padding:10px 14px;font-size:13.5px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.3);
+  }
+  .net-reconnect-banner button{margin-left:10px;background:#fff;color:#8a4a13;border:none;border-radius:6px;padding:4px 10px;font-weight:700;cursor:pointer;font-size:12.5px;}
+  #rulesBox{border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:14px 0;font-size:12px;color:#444;line-height:1.55;}
+  #rulesBox summary{cursor:pointer;font-weight:700;color:#222;}
+
+  /* ---------- JEU ---------- */
+  #game{display:none;width:100%;max-width:1240px;flex-direction:column;gap:12px;}
+  #game.active{display:flex;}
+  #topBar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    background:var(--panel-bg);border-radius:10px;padding:10px 16px;box-shadow:0 4px 16px rgba(0,0,0,.25);
+  }
+  #turnTitle{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px;}
+  #turnDot{width:14px;height:14px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  #diceZone{display:flex;align-items:center;gap:12px;}
+  #clockZone{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  #clock{
+    font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;
+    background:#eef4ff;border:1px solid #b8c9ea;color:#1a3a6b;
+    padding:5px 10px;border-radius:8px;
+  }
+  #clock.low{background:#ffeef1;border-color:#eeb3bf;color:#a01427;animation:clockBlink 1s steps(2,end) infinite;}
+  #clock.done{background:#fdf0cf;border-color:#e0bf6a;color:#7a5b06;animation:none;}
+  @keyframes clockBlink{50%{opacity:.45;}}
+  #dieFace{
+    width:52px;height:52px;border-radius:12px;background:#fff;border:2px solid #333;
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    padding:7px;gap:2px;box-shadow:0 3px 10px rgba(0,0,0,.3);
+  }
+  #dieFace .pip{width:100%;height:100%;border-radius:50%;background:#222;}
+  #dieFace .pip.off{background:transparent;}
+  #dieFace.rolling{animation:dieShake .12s linear infinite;}
+  @keyframes dieShake{
+    0%{transform:rotate(-9deg) scale(1.04);}
+    50%{transform:rotate(8deg) scale(.97);}
+    100%{transform:rotate(-9deg) scale(1.04);}
+  }
+  #dieFace.pop{animation:diePop .35s ease;}
+  @keyframes diePop{0%{transform:scale(1.3);}100%{transform:scale(1);}}
+
+  #board-area{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;justify-content:center;}
+  #boardWrap{
+    position:relative;
+    flex:1 1 620px;min-width:min(96vw,340px);max-width:760px;
+    background:linear-gradient(160deg,#fdfaf0,#f1ead6);
+    border:9px solid #12634a;
+    border-radius:12px;
+    padding:10px;
+    box-shadow:0 10px 34px rgba(0,0,0,.5), inset 0 0 0 2px rgba(18,99,74,.25);
+  }
+  #boardTop{display:flex;align-items:stretch;gap:10px;margin-bottom:8px;}
+  #startCell{
+    flex:0 0 108px;border:2px dashed #12634a;border-radius:10px;background:#e8f4ec;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:6px 4px;text-align:center;font-size:10.5px;font-weight:700;color:#12634a;line-height:1.25;
+  }
+  #startCell .sc-ico{font-size:20px;}
+  #monthTitle{
+    flex:1;border-radius:10px;background:linear-gradient(90deg,#12634a,#1e8b5a);
+    color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;
+    font-weight:800;font-size:clamp(13px,2.1vw,17px);letter-spacing:1px;padding:6px 10px;
+  }
+  #weekHead{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;}
+  #weekHead div{text-align:center;font-size:10.5px;font-weight:800;color:#7b6a45;letter-spacing:1px;}
+  #boardGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  #pawnLayer{position:absolute;inset:0;pointer-events:none;}
+  .day{
+    position:relative;border:1px solid #d8cbab;border-radius:7px;background:#fffdf6;
+    min-height:clamp(52px,8.4vw,74px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:12px 2px 4px;overflow:hidden;
+  }
+  .day .num{position:absolute;top:2px;left:4px;font-size:10px;font-weight:800;color:#a9976e;}
+  .day .ico{font-size:clamp(15px,2.6vw,21px);line-height:1;}
+  .day .lbl{font-size:clamp(7.5px,1.25vw,9.5px);font-weight:700;text-align:center;margin-top:2px;color:#6d5f42;line-height:1.15;}
+  .day.mail{background:#eef4ff;border-color:#b8c9ea;}
+  .day.deal{background:#fff3e0;border-color:#e8c48c;}
+  .day.sell{background:#f3ecfb;border-color:#c8b0e6;}
+  .day.rest{background:#f1f1ee;border-color:#cfcfc7;color:#8a8a80;}
+  .day.shop{background:#ffeef1;border-color:#eeb3bf;}
+  .day.party{background:#fff8dc;border-color:#e6d488;}
+  .day.charity{background:#ffeef6;border-color:#eeafc9;}
+  .day.bet{background:#e9f7f2;border-color:#95d4bb;}
+  .day.luck{background:#e9f9ec;border-color:#96d8a4;}
+  .day.tax{background:#f0eee9;border-color:#c8bda6;}
+  .day.payday{
+    background:linear-gradient(135deg,#ffdf7e,#d4a017);border:2px solid #a97c05;
+    color:#4a3400;
+  }
+  .day.payday .lbl{color:#4a3400;font-size:clamp(9px,1.7vw,13px);letter-spacing:1px;}
+  .day.payday .num{color:#7a5b06;}
+  .day.here{box-shadow:0 0 0 3px #ffb300 inset, 0 0 12px rgba(255,179,0,.7);}
+
+  .pawn{
+    position:absolute;transform:translate(-50%,-50%);
+    width:26px;height:26px;border-radius:50%;
+    border:2px solid rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;line-height:1;
+    box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.55);
+    transition:left .45s cubic-bezier(.34,1.15,.64,1), top .45s cubic-bezier(.34,1.15,.64,1);
+    z-index:5;
+  }
+  .pawn.turn{outline:3px solid #ffc400;z-index:7;animation:pawnPulse 1.1s ease-in-out infinite;}
+  @keyframes pawnPulse{
+    0%,100%{box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.55), 0 0 0 0 rgba(255,196,0,.85);}
+    50%{box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.55), 0 0 0 7px rgba(255,196,0,0);}
+  }
+  @media(max-width:520px){ .pawn{width:21px;height:21px;font-size:11px;} }
+
+  #sidePanel{flex:1 1 290px;min-width:270px;display:flex;flex-direction:column;gap:12px;}
+  #bank{
+    background:var(--panel-bg);border-radius:10px;padding:10px 12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.22);font-size:12.5px;
+  }
+  #bank h3{margin:0 0 6px;font-size:13px;display:flex;align-items:center;gap:6px;}
+  #bankBtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .bp-mat{
+    background:var(--panel-bg);border-radius:10px;padding:9px 12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.22);border:2px solid transparent;
+  }
+  .bp-mat.current{border-color:#ffb300;background:#fffdf3;}
+  .bp-mat.done{opacity:.72;}
+  .bp-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-weight:700;font-size:13.5px;}
+  .bp-dot{width:13px;height:13px;border-radius:50%;border:2px solid #333;flex-shrink:0;}
+  .bp-tag{font-size:10.5px;font-weight:700;background:#eee;color:#555;padding:2px 7px;border-radius:20px;}
+  .bp-cash{font-size:17px;font-weight:800;color:#12634a;margin:3px 0 1px;}
+  .bp-line{font-size:11.5px;color:#555;display:flex;gap:8px;flex-wrap:wrap;}
+  .bp-loan{color:#b3261e;font-weight:700;}
+  .bp-bills{margin-top:4px;font-size:11px;color:#7a5b06;line-height:1.45;}
+  .bp-items{margin-top:3px;font-size:11px;color:#5b4a86;line-height:1.45;}
+  .bp-bar{height:5px;border-radius:4px;background:#e6e0cf;margin-top:6px;overflow:hidden;}
+  .bp-bar i{display:block;height:100%;background:linear-gradient(90deg,#1e8b5a,#d4a017);}
+
+  #log{max-height:200px;overflow-y:auto;font-size:12px;background:var(--panel-bg);border-radius:10px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+  #log div{padding:2px;border-bottom:1px solid #eee;}
+  #actionHint{font-size:12.5px;font-weight:700;color:#0f5c3f;min-height:16px;}
+
+  /* ---------- CARTE / DÉCISION ---------- */
+  #deckModal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:200;padding:16px;}
+  #deckModal.active{display:flex;}
+  #deckCard{
+    background:var(--panel-bg);border-radius:16px;padding:22px 24px;text-align:center;
+    max-width:min(94vw,430px);width:100%;box-shadow:0 16px 50px rgba(0,0,0,.55);
+    border-top:8px solid var(--accent);
+    animation:cardIn .28s ease;
+  }
+  @keyframes cardIn{from{transform:translateY(18px) scale(.94);opacity:0;}to{transform:none;opacity:1;}}
+  #deckCard.pay{border-top-color:var(--gold);}
+  #deckCard.bad{border-top-color:#b3261e;}
+  #deckCard .dc-ico{font-size:46px;line-height:1;}
+  #deckCard h2{margin:8px 0 4px;font-size:19px;}
+  #deckCard .dc-sub{font-size:11.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8a8067;}
+  #deckCard .dc-lines{font-size:13.5px;line-height:1.6;margin:12px 0 4px;text-align:left;}
+  #deckCard .dc-lines .big{font-size:16px;font-weight:800;}
+  #deckCard .dc-lines .plus{color:#12634a;font-weight:700;}
+  #deckCard .dc-lines .minus{color:#b3261e;font-weight:700;}
+  #deckBtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:14px;}
+  #deckWait{font-size:11.5px;color:#888;margin-top:10px;}
+
+  #victory-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:250;padding:16px;overflow:hidden;}
+  #victory-overlay.active{display:flex;}
+  #victory-box{position:relative;z-index:2;background:#fff;border-radius:18px;padding:30px 34px;text-align:center;max-width:min(94vw,500px);box-shadow:0 14px 60px rgba(0,0,0,.5);}
+  #victory-box table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;}
+  #victory-box td,#victory-box th{padding:5px 6px;border-bottom:1px solid #eee;text-align:left;}
+  #victory-box td.n{text-align:right;font-weight:700;}
+  .confetti{position:absolute;top:-24px;z-index:1;border-radius:2px;animation:confettiFall linear infinite;}
+  @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);}}
+
+  .cross-link{position:fixed;top:10px;right:12px;font-size:12px;}
+  .cross-link a{color:#fff;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;text-decoration:none;font-weight:600;}
+
+  @media(max-width:960px){
+    #board-area{flex-direction:column;align-items:center;}
+    #boardWrap{flex:none;width:min(96vw,700px);}
+    #sidePanel{width:min(96vw,700px);flex:none;}
+  }
+  @media(max-width:480px){
+    body{padding:8px;padding-top:46px;}
+    .cross-link{top:6px;right:6px;font-size:10.5px;}
+    .cross-link a{padding:4px 8px;}
+    #setup, #netHome{padding:20px 18px;}
+    #startCell{flex-basis:82px;font-size:9.5px;}
+    .player-row{flex-wrap:wrap;row-gap:6px;}
+    .player-row input[type=text]{flex:1 1 100%;order:1;}
+    .player-row input[type=color]{order:2;}
+    .player-row select.psymbol{order:3;}
+    .player-row select.ptype{order:4;flex:1;max-width:none;}
+    #victory-box{padding:22px 18px;}
+    #deckCard{padding:18px 16px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="cross-link"><a href="index.html">🏠 Menu des jeux</a></div>
+
+<!-- ===================== ACCUEIL / RÉSEAU ===================== -->
+<div id="netHome">
+  <h1>💰 La Bonne Paye</h1>
+  <div id="netChoice">
+    <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer sur cet ordinateur</button>
+    <button class="btn net-big-btn" id="netHostBtn">🌐 Créer une partie en ligne</button>
+    <button class="btn net-big-btn secondary" id="netJoinBtn">🔗 Rejoindre une partie en ligne</button>
+    <p class="hint" style="margin-top:12px;text-align:center;">En ligne : l'un crée la partie et envoie le code aux autres (jusqu'à 4 joueurs). Un joueur déconnecté peut revenir en retapant le code affiché en haut de la partie.</p>
+  </div>
+  <div id="netHostPanel" style="display:none;text-align:center;">
+    <p style="margin-bottom:0;">Code de la partie :</p>
+    <div id="netCode">·····</div>
+    <p class="net-status" id="netHostStatus"></p>
+  </div>
+  <div id="netJoinPanel" style="display:none;">
+    <div class="player-row">
+      <input type="text" id="netNameInput" placeholder="Ton prénom" maxlength="20">
+    </div>
+    <div class="player-row">
+      <input type="text" id="netCodeInput" placeholder="Code de la partie (ABCDE)" maxlength="8" style="text-transform:uppercase;">
+    </div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn" id="netConnectBtn">Rejoindre</button>
+    </div>
+    <p class="net-status" id="netJoinStatus"></p>
+    <div id="netJoinReadyPanel" style="display:none;">
+      <p class="net-status" style="font-weight:600;color:var(--accent);">Choisis ton pion :</p>
+      <div class="player-row">
+        <input type="color" id="netGuestColor" value="#2980b9" title="Couleur">
+        <select id="netGuestSymbol" title="Pion"></select>
+        <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
+      </div>
+      <p class="net-status">✅ Connecté(e) ! En attente que l'hôte lance la partie…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" style="display:none;">
+  <h1>💰 La Bonne Paye</h1>
+  <div id="netSetupInfo"></div>
+
+  <div class="row">
+    <label for="numPlayers"><b>Nombre de joueurs :</b></label>
+    <select id="numPlayers">
+      <option value="2" selected>2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+  <div id="playerInputs"></div>
+
+  <div class="row">
+    <label><input type="checkbox" id="randomOrder" checked> <b>🎲 Ordre de jeu aléatoire</b></label>
+  </div>
+
+  <div class="row">
+    <label for="monthsSel"><b>Durée de la partie :</b></label>
+    <select id="monthsSel">
+      <option value="1">1 mois (partie rapide)</option>
+      <option value="2" selected>2 mois (classique)</option>
+      <option value="3">3 mois</option>
+      <option value="4">4 mois (longue)</option>
+      <option value="12">12 mois — une année complète</option>
+      <option value="custom">✏️ Nombre de mois au choix…</option>
+      <option value="timer">⏱️ Au minuteur (durée de jeu)…</option>
+    </select>
+  </div>
+
+  <div class="row" id="customRow" style="display:none;">
+    <label for="customMonths">Nombre de mois :</label>
+    <input type="number" id="customMonths" min="1" max="999" value="6">
+    <label><input type="checkbox" id="noLimitMonths"> <b>♾️ Sans limite</b></label>
+    <span class="hint" style="flex:1 1 100%;">Sans limite, la partie continue tant que vous voulez : un bouton <b>🏁 Finir après ce mois</b> apparaît en haut de la partie pour la clore quand vous en avez assez.</span>
+  </div>
+
+  <div class="row" id="timerRow" style="display:none;">
+    <label for="timerMin">Durée de jeu :</label>
+    <select id="timerMin">
+      <option value="10">10 minutes</option>
+      <option value="15">15 minutes</option>
+      <option value="20">20 minutes</option>
+      <option value="30" selected>30 minutes</option>
+      <option value="45">45 minutes</option>
+      <option value="60">1 heure</option>
+      <option value="90">1 h 30</option>
+      <option value="120">2 heures</option>
+    </select>
+    <span class="hint" style="flex:1 1 100%;">On joue autant de mois que possible. Quand le minuteur sonne, <b>chacun termine le mois en cours</b>, puis on compare les fortunes.</span>
+  </div>
+
+  <div class="row">
+    <label for="salarySel"><b>Salaire mensuel :</b></label>
+    <select id="salarySel">
+      <option value="3000">3 000 $ (serré)</option>
+      <option value="3500" selected>3 500 $ (classique)</option>
+      <option value="4500">4 500 $ (confortable)</option>
+    </select>
+  </div>
+
+  <details id="rulesBox">
+    <summary>📖 Règles rapides</summary>
+    <p>Chaque joueur parcourt le <b>calendrier du mois</b> avec un dé, une case = un jour. Le but n'est pas d'arriver le premier : c'est d'avoir <b>le plus d'argent</b> à la fin du dernier mois.</p>
+    <p><b>📬 Courrier</b> : tu piges une lettre. Ça peut être un chèque (encaissé tout de suite), une <b>facture</b> (elle s'empile et sera payée le jour de paye), une publicité, un acheteur…</p>
+    <p><b>💼 Affaire</b> : on te propose un objet à acheter. Tu le revends plus cher sur une case <b>🏷️ Vide-grenier</b> (ou quand un acheteur se présente dans le courrier). C'est là qu'on fait sa fortune !</p>
+    <p><b>💰 Jour de paye</b> (le 31) : tu ne peux pas le dépasser, on s'y arrête toujours. Tu touches ton salaire, tu règles <b>toutes</b> tes factures et tu paies <b>10 % d'intérêts</b> sur ton emprunt. Le mois suivant recommence au départ.</p>
+    <p><b>🏦 Banque</b> : tu peux emprunter par tranches de 500 $ à tout moment pendant ton tour (et rembourser quand tu veux). Si tu ne peux pas payer quelque chose, la banque te prête d'office — mais les intérêts tombent à chaque paye.</p>
+    <p><b>Durée</b> : de 1 mois à une année complète, un nombre de mois libre, ou <b>au minuteur</b> — dans ce cas on enchaîne les mois et, quand le temps sonne, chacun termine simplement le mois en cours. Sans limite de mois, le bouton <b>🏁 Finir après ce mois</b> en haut de la partie déclenche la même chose quand vous voulez.</p>
+    <p>⚠️ Attention : une affaire que tu n'as pas réussi à revendre avant la fin de la partie ne vaut <b>plus rien</b> — n'achète jamais plus d'affaires qu'il ne te reste de cases 🏷️ à traverser (le compte est affiché sur chaque carte). À la fin, les emprunts sont déduits et le plus riche gagne 🏆</p>
+  </details>
+
+  <div style="text-align:center;">
+    <button class="btn" id="startBtn">Démarrer la partie</button>
+  </div>
+</div>
+
+<!-- ===================== JEU ===================== -->
+<div id="game">
+  <div id="topBar">
+    <div id="turnTitle"><span id="turnDot"></span><span id="turnText"></span></div>
+    <div id="clockZone">
+      <span id="clock" style="display:none;"></span>
+      <button class="btn small secondary" id="endBtn" style="display:none;">🏁 Finir après ce mois</button>
+    </div>
+    <div id="diceZone">
+      <div id="dieFace"></div>
+      <button class="btn" id="rollBtn">🎲 Lancer le dé</button>
+    </div>
+  </div>
+
+  <div id="board-area">
+    <div id="boardWrap">
+      <div id="boardTop">
+        <div id="startCell"><span class="sc-ico">🚀</span><span class="sc-txt">Départ<br>du mois</span></div>
+        <div id="monthTitle"></div>
+      </div>
+      <div id="weekHead"><div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div></div>
+      <div id="boardGrid"></div>
+      <div id="pawnLayer"></div>
+    </div>
+    <div id="sidePanel">
+      <div id="bank"></div>
+      <div id="actionHint"></div>
+      <div id="mats"></div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CARTE / DÉCISION ===================== -->
+<div id="deckModal">
+  <div id="deckCard"></div>
+</div>
+
+<!-- ===================== FIN DE PARTIE ===================== -->
+<div id="victory-overlay">
+  <div id="victory-box"></div>
+</div>
+
+<script>
+/* ============================================================
+   LE CALENDRIER — 31 jours, les dimanches (7, 14, 21, 28) sont
+   des jours de repos, le 31 est le jour de paye
+   ============================================================ */
+const SQ = {
+  mail:    {icon:"📬", label:"Courrier",      cls:"mail"},
+  deal:    {icon:"💼", label:"Affaire",       cls:"deal"},
+  sell:    {icon:"🏷️", label:"Vide-grenier",  cls:"sell"},
+  rest:    {icon:"😴", label:"Dimanche",      cls:"rest"},
+  shop:    {icon:"🛍️", label:"Achats fous",   cls:"shop"},
+  birthday:{icon:"🎂", label:"Anniversaire",  cls:"party"},
+  charity: {icon:"❤️", label:"Bonne action",  cls:"charity"},
+  bet:     {icon:"🎰", label:"Pari",          cls:"bet"},
+  luck:    {icon:"🍀", label:"Coup de chance",cls:"luck"},
+  tax:     {icon:"🏛️", label:"Impôts",        cls:"tax"},
+  postman: {icon:"📮", label:"Le facteur",    cls:"mail"},
+  payday:  {icon:"💰", label:"JOUR DE PAYE",  cls:"payday"}
+};
+const DAYS = [null,
+  "mail","deal","mail","luck","shop","mail","rest",
+  "deal","mail","birthday","sell","mail","charity","rest",
+  "mail","deal","postman","bet","mail","sell","rest",
+  "deal","mail","shop","deal","luck","tax","rest",
+  "mail","sell","payday"
+];
+const LAST_DAY = 31;
+
+/* ---------- le courrier ---------- */
+const MAIL_CARDS = [
+  {k:"bill", icon:"💡", label:"Facture d'électricité", amount:300},
+  {k:"bill", icon:"📞", label:"Facture de téléphone", amount:200},
+  {k:"bill", icon:"🚰", label:"Facture d'eau", amount:150},
+  {k:"bill", icon:"🔧", label:"Note du garage", amount:450},
+  {k:"bill", icon:"🦷", label:"Note du dentiste", amount:500},
+  {k:"bill", icon:"🐈", label:"Vétérinaire", amount:250},
+  {k:"bill", icon:"🚗", label:"Assurance auto", amount:400},
+  {k:"bill", icon:"🌐", label:"Abonnement internet", amount:180},
+  {k:"bill", icon:"🔥", label:"Chauffagiste", amount:600},
+  {k:"bill", icon:"🚿", label:"Plombier", amount:700},
+  {k:"bill", icon:"💊", label:"Pharmacie", amount:90},
+  {k:"bill", icon:"🅿️", label:"Amende de stationnement", amount:100},
+  {k:"bill", icon:"🏛️", label:"Impôts locaux", amount:800},
+  {k:"bill", icon:"🏠", label:"Réparation du toit", amount:900},
+  {k:"bill", icon:"🎒", label:"Frais de scolarité", amount:550},
+  {k:"bill", icon:"🍽️", label:"Note du traiteur", amount:300},
+  {k:"bill", icon:"💪", label:"Abonnement salle de sport", amount:120},
+  {k:"bill", icon:"📺", label:"Abonnement télé", amount:160},
+  {k:"cash", icon:"🧾", label:"Remboursement d'impôts", amount:400},
+  {k:"cash", icon:"💌", label:"Chèque de mamie", amount:200},
+  {k:"cash", icon:"📈", label:"Dividendes de tes actions", amount:300},
+  {k:"cash", icon:"🧥", label:"Un billet oublié dans une vieille veste", amount:50},
+  {k:"cash", icon:"🎁", label:"Prime de fidélité du magasin", amount:250},
+  {k:"cash", icon:"🏥", label:"Remboursement de la mutuelle", amount:180},
+  {k:"cash", icon:"🤝", label:"Ton cousin te rembourse enfin", amount:500},
+  {k:"cash", icon:"📝", label:"Sondage rémunéré", amount:40},
+  {k:"cash", icon:"🏆", label:"Tu gagnes un petit concours", amount:150},
+  {k:"pay",  icon:"☎️", label:"Tu craques au démarchage téléphonique", amount:120},
+  {k:"pay",  icon:"💐", label:"Invitation à un mariage : le cadeau", amount:200},
+  {k:"pay",  icon:"🍕", label:"Tu commandes des pizzas pour tout le monde", amount:80},
+  {k:"nothing", icon:"📄", label:"Publicité — direct à la poubelle"},
+  {k:"nothing", icon:"📭", label:"Le facteur s'est trompé de boîte aux lettres"},
+  {k:"each", icon:"🎉", label:"Tu fêtes ta promotion : chaque joueur t'offre 100 $", amount:100},
+  {k:"eachPay", icon:"✉️", label:"Chaîne de lettres : envoie 50 $ à chaque joueur", amount:50},
+  {k:"buyer", icon:"🤵", label:"Un acheteur se présente : tu peux vendre une affaire tout de suite !"},
+  {k:"cancel", icon:"⚖️", label:"Erreur de facturation : ta plus grosse facture est annulée !"},
+  {k:"offer", icon:"📢", label:"Réclame : lot de casseroles en promotion", buy:150, sell:350}
+];
+
+/* ---------- les affaires ---------- */
+const DEAL_CARDS = [
+  {icon:"🚙", label:"Vieille voiture à restaurer", buy:800, sell:1600},
+  {icon:"🚲", label:"Lot de vélos d'occasion", buy:300, sell:700},
+  {icon:"📮", label:"Timbres de collection", buy:500, sell:900},
+  {icon:"🕹️", label:"Console rétro complète", buy:200, sell:500},
+  {icon:"🪑", label:"Meuble de brocante", buy:150, sell:400},
+  {icon:"🖼️", label:"Tableau chez l'antiquaire", buy:1000, sell:2000},
+  {icon:"🎸", label:"Guitare vintage", buy:400, sell:900},
+  {icon:"📱", label:"Lot de téléphones reconditionnés", buy:600, sell:1100},
+  {icon:"🧵", label:"Machine à coudre ancienne", buy:100, sell:300},
+  {icon:"💎", label:"Bijou ancien", buy:700, sell:1400},
+  {icon:"🚐", label:"Caravane à retaper", buy:900, sell:1700},
+  {icon:"🃏", label:"Cartes de sport rares", buy:250, sell:650},
+  {icon:"⌚", label:"Montre de gousset", buy:350, sell:750},
+  {icon:"🎺", label:"Trompette de fanfare", buy:180, sell:450}
+];
+
+/* ---------- coups de chance ---------- */
+const LUCK_CARDS = [
+  {icon:"🎫", label:"Tu grattes un ticket gagnant !", cash:200},
+  {icon:"🤝", label:"Un ami te rembourse un vieux prêt.", cash:300},
+  {icon:"🧥", label:"Tu retrouves des billets dans un manteau.", cash:150},
+  {icon:"↩️", label:"Remboursement d'un achat raté.", cash:250},
+  {icon:"💌", label:"Un chèque inattendu dans la boîte !", cash:500},
+  {icon:"⚖️", label:"Geste commercial : ta plus grosse facture est annulée !", cancel:true},
+  {icon:"⭐", label:"Ton patron te verse une prime.", cash:400},
+  {icon:"🛞", label:"Tu crèves un pneu en rentrant…", cash:-150},
+  {icon:"📱", label:"Ton téléphone tombe dans l'évier…", cash:-200}
+];
+
+const TOKEN_COLORS = ["#d62828","#f0a202","#2a9d3f","#2364c4"];
+const PAWN_SYMBOLS = ["🧑‍💼","👩‍🍳","🧑‍🔧","👩‍⚕️","🧑‍🎓","👵","🧑‍🚀","🐶"];
+
+const LOAN_STEP = 500;
+const LOAN_MAX = 15000;
+const INTEREST = 0.10;
+const START_CASH = 2000;   // volontairement juste : le 1er mois oblige à choisir
+
+/* ============================================================
+   ÉTAT DU JEU
+   ============================================================ */
+let players = [];          // {name,color,symbol,ai,side,day,month,cash,loan,bills,items,done}
+let currentPlayerIndex = 0;
+let dice = null;
+let phase = "roll";        // roll | move | decide | over
+let gameOver = false;
+let monthsTotal = 2;       // Infinity = pas de limite de mois (minuteur ou bouton 🏁)
+let salary = 3500;
+let timerMs = 0;           // durée de jeu choisie (0 = pas de minuteur)
+let timerEnd = null;       // horodatage de fin (hôte / partie locale)
+let timeLeft = 0;          // millisecondes restantes (l'invité reçoit la valeur)
+let lastCall = false;      // le minuteur a sonné (ou 🏁) : chacun finit son mois
+let pending = null;        // décision/carte en cours (partagée dans le snapshot)
+let evQueue = [];          // évènements restants pour le tour en cours (hôte)
+let mailDeck = [], dealDeck = [];
+let logHistory = [];
+let boardBuilt = false;
+let lastDieShown = null;
+let seq = 0;               // garde-fou pour les minuteurs
+let autoTimer = null;
+const dayCells = {};
+
+const NET = {
+  mode:null,
+  mySide:null,          // 'host' pour l'hôte, 'g0'/'g1'/'g2'... pour un invité
+  peer:null,
+  conn:null,            // (invité) connexion vers l'hôte
+  conns:[],             // (hôte) liste des invités : {c, side, slot, name}
+  code:null,
+  guestName:"Joueur 2", started:false, ended:false,
+  syncTimer:null, reconnecting:false, reconnectAttempts:0, joinCode:null,
+};
+const NET_MAX_GUESTS = 3; // 4 joueurs max, dont l'hôte
+
+function fmt(n){
+  const v = Math.round(n);
+  return (v<0?"-":"") + Math.abs(v).toLocaleString("fr-FR").replace(/ /g," ") + " $";
+}
+function escapeHtml(s){ return String(s==null?"":s).replace(/[<>&"']/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function log(msg){
+  logHistory.push(msg);
+  if(logHistory.length>300) logHistory.splice(0, logHistory.length-300);
+  const logEl = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = msg;
+  logEl.insertBefore(div, logEl.firstChild); // le coup le plus récent toujours en haut
+  logEl.scrollTop = 0;
+  netScheduleSync();
+}
+
+/* ============================================================
+   SETUP UI
+   ============================================================ */
+const numPlayersSel = document.getElementById("numPlayers");
+const playerInputsDiv = document.getElementById("playerInputs");
+
+function symbolOptionsHtml(selectedIdx){
+  return PAWN_SYMBOLS.map((t,k)=>`<option value="${t}" ${k===selectedIdx%PAWN_SYMBOLS.length?"selected":""}>${t}</option>`).join("");
+}
+
+function renderPlayerInputs(){
+  const n = parseInt(numPlayersSel.value);
+  /* on garde les valeurs déjà saisies (utile quand un invité rejoint en cours de config) */
+  const saved = [];
+  document.querySelectorAll("#playerInputs .player-row").forEach((row,i)=>{
+    const c = document.getElementById("pcolor"+i), s = document.getElementById("psymbol"+i),
+          nm = document.getElementById("pname"+i), t = document.getElementById("ptype"+i);
+    if(c && s && nm && t) saved[i] = {color:c.value, symbol:s.value, name:nm.value, type:t.value};
+  });
+  playerInputsDiv.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const row = document.createElement("div");
+    row.className = "player-row";
+    row.innerHTML = `
+      <input type="color" class="pcolor" id="pcolor${i}" value="${TOKEN_COLORS[i]}" title="Couleur">
+      <select class="psymbol" id="psymbol${i}" title="Pion">${symbolOptionsHtml(i)}</select>
+      <input type="text" id="pname${i}" placeholder="Nom du joueur ${i+1}" value="Joueur ${i+1}">
+      <select class="ptype" id="ptype${i}" title="Humain ou IA">
+        <option value="">👤 Humain</option>
+        <option value="easy">🙂 IA facile</option>
+        <option value="medium">🤖 IA moyenne</option>
+        <option value="hard">😈 IA difficile</option>
+      </select>
+    `;
+    playerInputsDiv.appendChild(row);
+    if(saved[i]){
+      document.getElementById("pcolor"+i).value = saved[i].color;
+      const symSel = document.getElementById("psymbol"+i);
+      if(Array.from(symSel.options).some(o=>o.value===saved[i].symbol)) symSel.value = saved[i].symbol;
+      document.getElementById("pname"+i).value = saved[i].name;
+      document.getElementById("ptype"+i).value = saved[i].type;
+    }
+  }
+  /* partie en ligne : joueur 1 = hôte, chaque invité connecté occupe une
+     rangée (slot 0 -> joueur 2, slot 1 -> joueur 3...), le reste = IA */
+  if(NET.mode==="host"){
+    for(let i=0;i<n;i++){
+      const typeSel = document.getElementById("ptype"+i);
+      const nameInput = document.getElementById("pname"+i);
+      const entry = NET.conns.find(e=>e.slot===i-1);
+      if(i===0){
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#555;flex-shrink:0;font-weight:600;";
+        tag.textContent = "👤 vous";
+        typeSel.parentNode.appendChild(tag);
+      } else if(entry){
+        nameInput.value = entry.name;
+        typeSel.style.display = "none";
+        const tag = document.createElement("span");
+        tag.style.cssText = "font-size:11px;color:#155c3a;flex-shrink:0;font-weight:600;";
+        tag.textContent = "🌐 en ligne";
+        typeSel.parentNode.appendChild(tag);
+      } else {
+        const humanOpt = typeSel.querySelector('option[value=""]');
+        if(humanOpt) humanOpt.remove();
+        if(!saved[i] || !saved[i].type) typeSel.value = "medium";
+      }
+      if(i>0){
+        ["pname"+i,"pcolor"+i,"psymbol"+i].forEach(id=>{
+          const el = document.getElementById(id);
+          if(el) el.addEventListener("input", netBroadcastSetup);
+        });
+      }
+    }
+    netBroadcastSetup();
+  }
+}
+numPlayersSel.addEventListener("change", renderPlayerInputs);
+renderPlayerInputs();
+["monthsSel","salarySel","customMonths","noLimitMonths","timerMin"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", ()=>{ if(NET.mode==="host") netBroadcastSetup(); });
+});
+/* les deux réglages « au choix » n'apparaissent que si on les demande */
+function refreshDurationRows(){
+  const v = document.getElementById("monthsSel").value;
+  document.getElementById("customRow").style.display = v==="custom" ? "flex" : "none";
+  document.getElementById("timerRow").style.display = v==="timer" ? "flex" : "none";
+  document.getElementById("customMonths").disabled = document.getElementById("noLimitMonths").checked;
+}
+document.getElementById("monthsSel").addEventListener("change", refreshDurationRows);
+document.getElementById("noLimitMonths").addEventListener("change", refreshDurationRows);
+refreshDurationRows();
+
+/* lit les réglages de durée choisis dans le formulaire */
+function readDurationSetup(){
+  const v = document.getElementById("monthsSel").value;
+  timerMs = 0; timerEnd = null; timeLeft = 0; lastCall = false;
+  if(v==="timer"){
+    monthsTotal = Infinity;
+    timerMs = (parseInt(document.getElementById("timerMin").value,10)||30) * 60000;
+    timerEnd = Date.now() + timerMs;
+    timeLeft = timerMs;
+  } else if(v==="custom"){
+    monthsTotal = document.getElementById("noLimitMonths").checked
+      ? Infinity
+      : Math.max(1, Math.min(999, parseInt(document.getElementById("customMonths").value,10) || 6));
+  } else {
+    monthsTotal = parseInt(v,10) || 2;
+  }
+}
+function durationLabel(){
+  if(timerMs>0) return `minuteur de ${clockText(timerMs)} (on termine le mois en cours quand il sonne)`;
+  if(!isFinite(monthsTotal)) return "sans limite de mois (bouton 🏁 pour clore la partie)";
+  return `${monthsTotal} mois`;
+}
+
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  bump();   // invalide tout minuteur en attente
+  const n = parseInt(numPlayersSel.value);
+  readDurationSetup();
+  salary = parseInt(document.getElementById("salarySel").value);
+  players = [];
+  for(let i=0;i<n;i++){
+    const name = (document.getElementById("pname"+i).value || `Joueur ${i+1}`).trim();
+    const color = document.getElementById("pcolor"+i).value || TOKEN_COLORS[i];
+    const symbol = document.getElementById("psymbol"+i).value || PAWN_SYMBOLS[i%PAWN_SYMBOLS.length];
+    const ai = document.getElementById("ptype"+i).value || null;
+    players.push(createPlayer(name,color,symbol,ai,null));
+  }
+  if(NET.mode==="host"){
+    players[0].side="host"; players[0].ai=null;
+    NET.conns.forEach(e=>{
+      const p = players[e.slot+1];
+      if(p && e.c && e.c.open){ p.side = e.side; p.ai = null; }
+    });
+    /* rangée d'un invité parti avant le début : reprise par une IA */
+    players.forEach(p=>{ if(!p.side && !p.ai) p.ai = "medium"; });
+  }
+  if(document.getElementById("randomOrder").checked){
+    for(let i=players.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [players[i], players[j]] = [players[j], players[i]];
+    }
+  }
+  mailDeck = shuffled(MAIL_CARDS);
+  dealDeck = shuffled(DEAL_CARDS);
+  currentPlayerIndex = 0;
+  dice = null; phase = "roll"; gameOver = false; pending = null; evQueue = [];
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("game").classList.add("active");
+  buildBoard();
+  log(`Partie lancée — ${durationLabel()}, salaire ${fmt(salary)} par mois, ${fmt(START_CASH)} en poche au départ.`);
+  log(`${document.getElementById("randomOrder").checked?"🎲 Ordre tiré au sort : ":"Ordre de jeu : "}${players.map(p=>p.symbol+" "+p.name).join(" → ")}.`);
+  if(NET.mode==="host"){ NET.started = true; }
+  renderAll();
+  maybeAi();
+  if(NET.mode==="host"){ netSendState(); }
+});
+
+function createPlayer(name,color,symbol,ai,side){
+  return {name, color, symbol, ai, side, day:0, month:1,
+          cash:START_CASH, loan:0, bills:[], items:[], done:false};
+}
+
+/* ============================================================
+   PIOCHES
+   ============================================================ */
+function shuffled(src){
+  const a = src.map(c=>Object.assign({}, c));
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+function drawMail(){
+  if(!mailDeck.length) mailDeck = shuffled(MAIL_CARDS);
+  return mailDeck.pop();
+}
+function drawDeal(){
+  if(!dealDeck.length) dealDeck = shuffled(DEAL_CARDS);
+  return dealDeck.pop();
+}
+
+/* ============================================================
+   ARGENT
+   ============================================================ */
+function billsTotal(p){ return p.bills.reduce((s,b)=>s+b.amount, 0); }
+/* à la fin de la partie, une affaire qu'on n'a pas réussi à revendre ne vaut
+   plus rien (règle du jeu original) : acheter est un vrai pari, il faut
+   compter les cases 🏷️ qu'il reste avant la fin */
+function salvageValue(p){ return 0; }
+function netWorth(p){ return p.cash + salvageValue(p) - p.loan; }
+const SELL_DAYS = (function(){ const a=[]; for(let d=1; d<=LAST_DAY; d++) if(DAYS[d]==="sell") a.push(d); return a; })();
+function sellDaysLeftThisMonth(p){ return SELL_DAYS.filter(d=>d>p.day).length; }
+/* dernier mois que ce joueur va jouer — null si on ne le sait pas encore
+   (partie sans limite de mois : le minuteur ou le bouton 🏁 trancheront) */
+function lastMonthFor(p){
+  if(lastCall) return p.month;
+  if(isFinite(monthsTotal)) return monthsTotal;
+  return null;
+}
+/* nombre de cases 🏷️ Vide-grenier qu'il reste à traverser d'ici la fin,
+   ou null si la fin n'est pas connue */
+function sellChancesLeft(p){
+  if(p.done) return 0;
+  const end = lastMonthFor(p);
+  if(end===null) return null;
+  return sellDaysLeftThisMonth(p) + SELL_DAYS.length * Math.max(0, end - p.month);
+}
+/* pour décider (IA, avertissements) : à défaut de fin connue, on raisonne
+   comme s'il restait encore un mois à jouer */
+function sellChancesGuess(p){
+  const c = sellChancesLeft(p);
+  return c===null ? sellDaysLeftThisMonth(p) + SELL_DAYS.length : c;
+}
+function sellChancesLine(p){
+  const c = sellChancesLeft(p);
+  const stock = `tu as déjà <b>${p.items.length}</b> affaire${p.items.length>1?"s":""} en stock`;
+  if(c===null) return `Cases 🏷️ d'ici la fin du mois : <b>${sellDaysLeftThisMonth(p)}</b> (partie sans limite de mois) — ${stock}.`;
+  return `Occasions de vendre d'ici la fin : <b>${c}</b> case${c>1?"s":""} 🏷️ — ${stock}.`;
+}
+/* paiement : si la caisse est vide, la banque prête d'office par tranches de 500 */
+function pay(p, amount, reason){
+  if(amount<=0) return 0;
+  let borrowed = 0;
+  if(p.cash < amount){
+    const need = amount - p.cash;
+    borrowed = Math.min(Math.ceil(need/LOAN_STEP)*LOAN_STEP, LOAN_MAX - p.loan);
+    if(borrowed>0){
+      p.loan += borrowed; p.cash += borrowed;
+      log(`🏦 ${p.name} emprunte ${fmt(borrowed)} à la banque${reason?" ("+reason+")":""}.`);
+    }
+  }
+  p.cash = Math.max(0, p.cash - amount);
+  return borrowed;
+}
+function receive(p, amount){ p.cash += amount; }
+
+/* ============================================================
+   MOTEUR DE JEU
+   ============================================================ */
+function bump(){ seq++; clearTimeout(autoTimer); autoTimer = null; }
+
+/* ---------- minuteur / fin de partie décidée ---------- */
+function clockText(ms){
+  const s = Math.max(0, Math.round(ms/1000));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if(h>0) return h+" h "+String(m).padStart(2,"0");
+  return m+":"+String(sec).padStart(2,"0");
+}
+/* le temps est écoulé (ou quelqu'un a demandé la fin) : chacun termine le
+   mois qu'il a commencé, puis on compare les fortunes */
+function triggerLastCall(reason){
+  if(lastCall || gameOver) return;
+  lastCall = true;
+  log(`${reason} — chacun termine le mois en cours, puis on compare les fortunes !`);
+  renderAll();
+  netScheduleSync();
+}
+function renderClock(){
+  const el = document.getElementById("clock");
+  const btn = document.getElementById("endBtn");
+  const showClock = timerMs>0 && !gameOver;
+  el.style.display = showClock ? "inline-block" : "none";
+  if(showClock){
+    el.className = lastCall ? "done" : (timeLeft <= 120000 ? "low" : "");
+    el.textContent = lastCall ? "⏱️ Dernier mois !" : "⏱️ "+clockText(timeLeft);
+    el.title = lastCall
+      ? "Le temps est écoulé : chacun termine le mois en cours."
+      : "Temps de jeu restant — quand il sonne, chacun termine le mois en cours.";
+  }
+  /* le bouton n'a de sens que si aucune limite de mois n'est fixée, et
+     seul celui qui tient la partie (hôte ou partie locale) peut le presser */
+  const canEnd = !gameOver && !lastCall && !isFinite(monthsTotal) && NET.mode!=="guest" && players.length>0;
+  btn.style.display = canEnd ? "inline-block" : "none";
+  if(canEnd && btn.dataset.arm!=="1") btn.textContent = "🏁 Finir après ce mois";
+}
+
+function doRoll(){
+  if(gameOver || phase!=="roll") return;
+  const p = players[currentPlayerIndex];
+  if(!p || p.done) return;
+  bump();
+  dice = 1 + Math.floor(Math.random()*6);
+  const target = Math.min(p.day + dice, LAST_DAY);
+  const clamped = (p.day + dice) > LAST_DAY;
+  log(`🎲 ${p.symbol} ${p.name} fait ${dice} → jour ${target}${clamped?" (on ne dépasse pas le jour de paye)":""}.`);
+  p.day = target;
+  phase = "move";
+  renderAll();
+  netScheduleSync();
+  const mySeq = seq;
+  setTimeout(()=>{ if(seq===mySeq && !gameOver) resolveDay(); }, 700);
+}
+
+function resolveDay(){
+  const p = players[currentPlayerIndex];
+  if(!p) return;
+  const type = DAYS[p.day];
+  evQueue = [];
+  switch(type){
+    case "payday":  evQueue.push({t:"payday"}); break;
+    case "mail":    evQueue.push({t:"mail"}); break;
+    case "postman": evQueue.push({t:"mail"},{t:"mail"}); break;
+    case "deal":    evQueue.push({t:"deal"}); break;
+    case "sell":    evQueue.push({t:"sell", src:"square"}); break;
+    case "bet":     evQueue.push({t:"bet"}); break;
+    case "luck":    evQueue.push({t:"luck"}); break;
+    case "shop":    evQueue.push({t:"shop"}); break;
+    case "birthday":evQueue.push({t:"birthday"}); break;
+    case "charity": evQueue.push({t:"charity"}); break;
+    case "tax":     evQueue.push({t:"tax"}); break;
+    default:        evQueue.push({t:"rest"}); break;
+  }
+  processNext();
+}
+
+/* traite l'évènement suivant : soit il se règle tout seul (journal),
+   soit il ouvre une carte / une décision (pending) */
+function processNext(){
+  if(gameOver) return;
+  bump();
+  pending = null;
+  if(!evQueue.length){ endTurn(); return; }
+  const ev = evQueue.shift();
+  const p = players[currentPlayerIndex];
+  switch(ev.t){
+    case "rest":     evRest(p); break;
+    case "mail":     evMail(p); break;
+    case "deal":     evDeal(p); break;
+    case "sell":     evSell(p, ev.src); break;
+    case "bet":      evBet(p); break;
+    case "luck":     evLuck(p); break;
+    case "shop":     evShop(p); break;
+    case "birthday": evBirthday(p); break;
+    case "charity":  evCharity(p); break;
+    case "tax":      evTax(p); break;
+    case "payday":   evPayday(p); break;
+    default:         processNext(); return;
+  }
+  if(pending){
+    phase = "decide";
+    renderAll();
+    netScheduleSync();
+    scheduleAuto();
+  }
+}
+
+/* ---------- les cases ---------- */
+function evRest(p){
+  log(`😴 ${p.name} se repose : rien à faire ce dimanche.`);
+  softNext(700);
+}
+function softNext(ms){
+  phase = "move";
+  renderAll();
+  netScheduleSync();
+  const mySeq = seq;
+  setTimeout(()=>{ if(seq===mySeq && !gameOver) processNext(); }, ms||600);
+}
+
+function evMail(p){
+  const c = drawMail();
+  const lines = [];
+  let tone = "";
+  let data = {type:"info"};
+  let options = [{id:"ok", label:"Continuer"}];
+  let auto = true;
+  if(c.k==="bill"){
+    p.bills.push({icon:c.icon, label:c.label, amount:c.amount});
+    lines.push(`<span class="minus big">${fmt(c.amount)}</span> à régler le jour de paye.`);
+    lines.push(`Factures en attente : <b>${p.bills.length}</b> pour <b>${fmt(billsTotal(p))}</b>.`);
+    tone = "bad";
+    log(`📬 ${p.name} reçoit une facture : ${c.label} (${fmt(c.amount)}).`);
+  } else if(c.k==="cash"){
+    receive(p, c.amount);
+    lines.push(`<span class="plus big">+ ${fmt(c.amount)}</span> encaissés tout de suite.`);
+    tone = "pay";
+    log(`📬 ${p.name} encaisse ${fmt(c.amount)} — ${c.label}.`);
+  } else if(c.k==="pay"){
+    pay(p, c.amount, c.label);
+    lines.push(`<span class="minus big">- ${fmt(c.amount)}</span> tout de suite.`);
+    tone = "bad";
+    log(`📬 ${p.name} paie ${fmt(c.amount)} — ${c.label}.`);
+  } else if(c.k==="nothing"){
+    lines.push("Rien à signaler 🙂");
+    log(`📬 ${p.name} : ${c.label}.`);
+  } else if(c.k==="each"){
+    let got = 0;
+    players.forEach((o,i)=>{
+      if(i===currentPlayerIndex) return;
+      pay(o, c.amount, "cadeau à "+p.name);
+      got += c.amount;
+    });
+    receive(p, got);
+    lines.push(`<span class="plus big">+ ${fmt(got)}</span> offerts par les autres joueurs.`);
+    tone = "pay";
+    log(`🎉 Chaque joueur offre ${fmt(c.amount)} à ${p.name} (${fmt(got)}).`);
+  } else if(c.k==="eachPay"){
+    let sent = 0;
+    players.forEach((o,i)=>{
+      if(i===currentPlayerIndex) return;
+      receive(o, c.amount);
+      sent += c.amount;
+    });
+    pay(p, sent, "chaîne de lettres");
+    lines.push(`<span class="minus big">- ${fmt(sent)}</span> envoyés aux autres joueurs.`);
+    tone = "bad";
+    log(`✉️ ${p.name} envoie ${fmt(c.amount)} à chaque joueur (${fmt(sent)}).`);
+  } else if(c.k==="cancel"){
+    if(p.bills.length){
+      let bi = 0;
+      p.bills.forEach((b,i)=>{ if(b.amount > p.bills[bi].amount) bi = i; });
+      const b = p.bills.splice(bi,1)[0];
+      lines.push(`La facture <b>${escapeHtml(b.label)}</b> de <span class="plus">${fmt(b.amount)}</span> part à la poubelle !`);
+      log(`⚖️ La facture « ${b.label} » de ${p.name} (${fmt(b.amount)}) est annulée.`);
+    } else {
+      lines.push("…mais tu n'as aucune facture en attente. Dommage !");
+      log(`⚖️ ${p.name} n'avait aucune facture à annuler.`);
+    }
+    tone = "pay";
+  } else if(c.k==="buyer"){
+    /* un acheteur se présente : on enchaîne sur une vente immédiate */
+    log(`🤵 Un acheteur se présente chez ${p.name}.`);
+    evQueue.unshift({t:"sell", src:"buyer"});
+    processNext();
+    return;
+  } else if(c.k==="offer"){
+    const affordable = p.cash >= c.buy;
+    lines.push(`Prix : <b>${fmt(c.buy)}</b> — revente estimée : <b class="plus">${fmt(c.sell)}</b>.`);
+    lines.push(sellChancesLine(p));
+    lines.push(`En caisse : ${fmt(p.cash)}`);
+    if(!affordable) lines.push(`<span class="minus">Tu n'as pas assez en caisse — la banque te prêterait la différence.</span>`);
+    data = {type:"deal", card:{icon:c.icon, label:c.label, buy:c.buy, sell:c.sell}};
+    options = [{id:"buy", label:`💼 Acheter ${fmt(c.buy)}`}, {id:"pass", label:"Laisser passer"}];
+    auto = false;
+    tone = "";
+  }
+  pending = {
+    kind:"card", sub:"Courrier", icon:c.icon, title:c.label,
+    lines, options, tone, auto, player:currentPlayerIndex, data
+  };
+}
+
+function evDeal(p){
+  const c = drawDeal();
+  const lines = [
+    `Prix demandé : <b>${fmt(c.buy)}</b>`,
+    `Tu pourras le revendre <b class="plus">${fmt(c.sell)}</b> sur une case 🏷️ Vide-grenier (ou à un acheteur du courrier).`,
+    sellChancesLine(p),
+    `En caisse : ${fmt(p.cash)}`
+  ];
+  if(p.items.length >= sellChancesGuess(p)) lines.push(`<span class="minus">⚠️ Tu risques de ne pas pouvoir la revendre — et une affaire invendue est perdue.</span>`);
+  if(p.cash < c.buy) lines.push(`<span class="minus">Attention : la banque te prêtera la différence (intérêts à la paye).</span>`);
+  log(`💼 On propose à ${p.name} : ${c.label} (${fmt(c.buy)} → ${fmt(c.sell)}).`);
+  pending = {
+    kind:"card", sub:"Affaire", icon:c.icon, title:c.label,
+    lines, tone:"", auto:false, player:currentPlayerIndex,
+    options:[{id:"buy", label:`💼 Acheter ${fmt(c.buy)}`},{id:"pass", label:"Laisser passer"}],
+    data:{type:"deal", card:{icon:c.icon, label:c.label, buy:c.buy, sell:c.sell}}
+  };
+}
+
+function evSell(p, src){
+  if(!p.items.length){
+    log(`🏷️ ${p.name} n'a aucune affaire à vendre.`);
+    pending = {
+      kind:"card", sub:src==="buyer"?"Acheteur":"Vide-grenier", icon:"🏷️",
+      title:"Rien à vendre", lines:["Tu n'as aucune affaire en stock pour le moment."],
+      options:[{id:"ok", label:"Continuer"}], tone:"", auto:true,
+      player:currentPlayerIndex, data:{type:"info"}
+    };
+    return;
+  }
+  const lines = ["Choisis l'affaire que tu veux vendre :"];
+  const options = p.items.map((it,i)=>({id:"s"+i, label:`${it.icon} ${it.label} → ${fmt(it.sell)}`}));
+  options.push({id:"none", label:"Ne rien vendre"});
+  pending = {
+    kind:"card", sub:src==="buyer"?"Acheteur":"Vide-grenier", icon:"🏷️",
+    title:src==="buyer"?"Un acheteur est là !":"Vide-grenier",
+    lines, options, tone:"", auto:false, player:currentPlayerIndex, data:{type:"sell"}
+  };
+}
+
+function evBet(p){
+  pending = {
+    kind:"card", sub:"Pari", icon:"🎰", title:"Pari entre amis",
+    lines:[
+      "Mise : <b>300 $</b>. Devine si le dé tombera sur un nombre <b>pair</b> ou <b>impair</b>.",
+      "Gagné : <span class=\"plus\">+ 300 $</span> — perdu : <span class=\"minus\">- 300 $</span>.",
+      `En caisse : ${fmt(p.cash)}`
+    ],
+    options:[{id:"pair", label:"Pair (2, 4, 6)"},{id:"impair", label:"Impair (1, 3, 5)"},{id:"pass", label:"Ne pas parier"}],
+    tone:"", auto:false, player:currentPlayerIndex, data:{type:"bet"}
+  };
+}
+
+function evLuck(p){
+  const c = LUCK_CARDS[Math.floor(Math.random()*LUCK_CARDS.length)];
+  const lines = [];
+  let tone = "pay";
+  if(c.cancel){
+    if(p.bills.length){
+      let bi = 0;
+      p.bills.forEach((b,i)=>{ if(b.amount > p.bills[bi].amount) bi = i; });
+      const b = p.bills.splice(bi,1)[0];
+      lines.push(`La facture <b>${escapeHtml(b.label)}</b> de <span class="plus">${fmt(b.amount)}</span> est effacée !`);
+      log(`🍀 ${p.name} : facture « ${b.label} » annulée (${fmt(b.amount)}).`);
+    } else {
+      lines.push("…mais tu n'as aucune facture en attente.");
+      log(`🍀 ${p.name} : rien à annuler.`);
+    }
+  } else if(c.cash>0){
+    receive(p, c.cash);
+    lines.push(`<span class="plus big">+ ${fmt(c.cash)}</span>`);
+    log(`🍀 ${p.name} gagne ${fmt(c.cash)} — ${c.label}`);
+  } else {
+    pay(p, -c.cash, c.label);
+    lines.push(`<span class="minus big">- ${fmt(-c.cash)}</span>`);
+    tone = "bad";
+    log(`🍀 ${p.name} perd ${fmt(-c.cash)} — ${c.label}`);
+  }
+  pending = {
+    kind:"card", sub:"Coup de chance", icon:c.icon, title:c.label,
+    lines, options:[{id:"ok", label:"Continuer"}], tone, auto:true,
+    player:currentPlayerIndex, data:{type:"info"}
+  };
+}
+
+function evShop(p){
+  const amount = [100,200,300,400][Math.floor(Math.random()*4)];
+  pay(p, amount, "achats fous");
+  log(`🛍️ ${p.name} fait des achats fous : ${fmt(amount)}.`);
+  pending = {
+    kind:"card", sub:"Achats fous", icon:"🛍️", title:"Séance shopping",
+    lines:[`Tu craques dans les magasins : <span class="minus big">- ${fmt(amount)}</span>`],
+    options:[{id:"ok", label:"Continuer"}], tone:"bad", auto:true,
+    player:currentPlayerIndex, data:{type:"info"}
+  };
+}
+
+function evBirthday(p){
+  const amount = 100;
+  let got = 0;
+  players.forEach((o,i)=>{
+    if(i===currentPlayerIndex) return;
+    pay(o, amount, "cadeau d'anniversaire");
+    got += amount;
+  });
+  receive(p, got);
+  log(`🎂 Anniversaire de ${p.name} : chaque joueur offre ${fmt(amount)} (${fmt(got)}).`);
+  pending = {
+    kind:"card", sub:"Anniversaire", icon:"🎂", title:"Joyeux anniversaire !",
+    lines:[`Chaque joueur t'offre ${fmt(amount)} : <span class="plus big">+ ${fmt(got)}</span>`],
+    options:[{id:"ok", label:"Merci !"}], tone:"pay", auto:true,
+    player:currentPlayerIndex, data:{type:"info"}
+  };
+}
+
+function evCharity(p){
+  const amount = 150;
+  pay(p, amount, "bonne action");
+  log(`❤️ ${p.name} fait une bonne action : ${fmt(amount)}.`);
+  pending = {
+    kind:"card", sub:"Bonne action", icon:"❤️", title:"Un geste pour les autres",
+    lines:[`Tu donnes à une association : <span class="minus big">- ${fmt(amount)}</span>`,"Ça ne rapporte rien… sauf de la fierté 🙂"],
+    options:[{id:"ok", label:"Continuer"}], tone:"", auto:true,
+    player:currentPlayerIndex, data:{type:"info"}
+  };
+}
+
+function evTax(p){
+  const amount = Math.round(p.cash*0.1/10)*10;
+  if(amount>0) pay(p, amount, "impôts");
+  log(`🏛️ ${p.name} paie 10 % de sa caisse aux impôts : ${fmt(amount)}.`);
+  pending = {
+    kind:"card", sub:"Impôts", icon:"🏛️", title:"Le fisc passe",
+    lines:[`10 % de ce que tu as en caisse : <span class="minus big">- ${fmt(amount)}</span>`],
+    options:[{id:"ok", label:"Continuer"}], tone:"bad", auto:true,
+    player:currentPlayerIndex, data:{type:"info"}
+  };
+}
+
+function evPayday(p){
+  const lines = [];
+  receive(p, salary);
+  lines.push(`Salaire du mois : <span class="plus big">+ ${fmt(salary)}</span>`);
+  const bt = billsTotal(p);
+  if(p.bills.length){
+    lines.push(`Factures à régler (${p.bills.length}) : <span class="minus big">- ${fmt(bt)}</span>`);
+    p.bills.forEach(b=>{ lines.push(`&nbsp;&nbsp;• ${b.icon||""} ${escapeHtml(b.label)} — ${fmt(b.amount)}`); });
+    pay(p, bt, "factures du mois");
+    p.bills = [];
+  } else {
+    lines.push("Aucune facture à régler 🎉");
+  }
+  if(p.loan>0){
+    const int = Math.round(p.loan*INTEREST/10)*10;
+    lines.push(`Intérêts (10 % de ${fmt(p.loan)}) : <span class="minus">- ${fmt(int)}</span>`);
+    pay(p, int, "intérêts de l'emprunt");
+  }
+  lines.push(`<b>En caisse : ${fmt(p.cash)}</b>${p.loan>0?` — emprunt en cours : <span class="minus">${fmt(p.loan)}</span>`:""}`);
+  log(`💰 Jour de paye pour ${p.name} (mois ${p.month}) : salaire ${fmt(salary)}, factures ${fmt(bt)} → caisse ${fmt(p.cash)}.`);
+
+  const wasLast = lastCall || p.month >= monthsTotal;
+  p.month++;
+  p.day = 0;
+  if(wasLast){
+    p.done = true;
+    lines.push(`🏁 <b>${escapeHtml(p.name)} a terminé ${lastCall && !isFinite(monthsTotal) ? "son dernier mois" : "ses "+(p.month-1)+" mois"} !</b>`);
+    log(`🏁 ${p.name} a terminé la partie.`);
+  } else {
+    lines.push(`➡️ Le mois ${p.month} commence à ton prochain tour.`);
+  }
+  pending = {
+    kind:"card", sub:`Jour de paye — mois ${p.month-1}`, icon:"💰", title:"Jour de paye !",
+    lines, options:[{id:"ok", label:"Continuer"}], tone:"pay", auto:true,
+    player:currentPlayerIndex, data:{type:"info"}
+  };
+}
+
+/* ---------- résolution des décisions ---------- */
+function resolvePending(optId){
+  if(!pending || gameOver) return;
+  const p = players[pending.player];
+  const d = pending.data || {type:"info"};
+  if(d.type==="deal"){
+    if(optId==="buy"){
+      const c = d.card;
+      pay(p, c.buy, "achat : "+c.label);
+      p.items.push({icon:c.icon, label:c.label, buy:c.buy, sell:c.sell});
+      log(`💼 ${p.name} achète ${c.label} pour ${fmt(c.buy)} (revente ${fmt(c.sell)}).`);
+    } else {
+      log(`💼 ${p.name} laisse passer l'affaire.`);
+    }
+    processNext();
+    return;
+  }
+  if(d.type==="sell"){
+    if(optId!=="none" && /^s\d+$/.test(optId)){
+      const i = parseInt(optId.slice(1),10);
+      const it = p.items[i];
+      if(it){
+        p.items.splice(i,1);
+        receive(p, it.sell);
+        log(`🏷️ ${p.name} vend ${it.label} pour ${fmt(it.sell)} (achetée ${fmt(it.buy)}, bénéfice ${fmt(it.sell-it.buy)}).`);
+        bump();
+        pending = {
+          kind:"card", sub:"Vendu !", icon:it.icon, title:"Affaire conclue",
+          lines:[`${escapeHtml(it.label)} vendue <span class="plus big">${fmt(it.sell)}</span>`,
+                 `Bénéfice : <span class="plus">${fmt(it.sell-it.buy)}</span>`,
+                 `En caisse : <b>${fmt(p.cash)}</b>`],
+          options:[{id:"ok", label:"Continuer"}], tone:"pay", auto:true,
+          player:pending.player, data:{type:"info"}
+        };
+        phase = "decide";
+        renderAll();
+        netScheduleSync();
+        scheduleAuto();
+        return;
+      }
+    } else {
+      log(`🏷️ ${p.name} ne vend rien.`);
+    }
+    processNext();
+    return;
+  }
+  if(d.type==="bet"){
+    if(optId==="pass"){
+      log(`🎰 ${p.name} ne parie pas.`);
+      processNext();
+      return;
+    }
+    const roll = 1 + Math.floor(Math.random()*6);
+    const isPair = roll%2===0;
+    const win = (optId==="pair") === isPair;
+    if(win) receive(p, 300); else pay(p, 300, "pari perdu");
+    log(`🎰 ${p.name} parie « ${optId} », le dé fait ${roll} : ${win?"gagné +300 $":"perdu -300 $"}.`);
+    bump();
+    dice = roll;
+    pending = {
+      kind:"card", sub:"Pari", icon:win?"🎉":"😬", title:win?"Gagné !":"Perdu…",
+      lines:[`Le dé est tombé sur <b>${roll}</b> (${isPair?"pair":"impair"}).`,
+             win?`<span class="plus big">+ 300 $</span>`:`<span class="minus big">- 300 $</span>`,
+             `En caisse : <b>${fmt(p.cash)}</b>`],
+      options:[{id:"ok", label:"Continuer"}], tone:win?"pay":"bad", auto:true,
+      player:pending.player, data:{type:"info"}
+    };
+    phase = "decide";
+    renderAll();
+    netScheduleSync();
+    scheduleAuto();
+    return;
+  }
+  /* info */
+  processNext();
+}
+
+function endTurn(){
+  bump();
+  pending = null;
+  if(players.every(p=>p.done)){ endGame(); return; }
+  nextTurn();
+}
+
+function nextTurn(){
+  if(gameOver) return;
+  let i = currentPlayerIndex;
+  for(let k=0;k<players.length;k++){
+    i = (i+1) % players.length;
+    if(!players[i].done) break;
+  }
+  currentPlayerIndex = i;
+  dice = null;
+  phase = "roll";
+  renderAll();
+  netScheduleSync();
+  maybeAi();
+}
+
+function maybeAi(){
+  if(NET.mode==="guest" || gameOver) return;
+  const p = players[currentPlayerIndex];
+  if(p && p.ai && phase==="roll" && !p.done){
+    const mySeq = seq;
+    setTimeout(()=>{
+      if(seq!==mySeq || gameOver || phase!=="roll") return;
+      aiBankMoves(p);
+      doRoll();
+    }, 850);
+  }
+}
+
+/* ---------- IA ---------- */
+/* l'IA rembourse quand elle est à l'aise (les intérêts coûtent cher) */
+function aiBankMoves(p){
+  if(p.loan<=0) return;
+  const lvl = p.ai || "medium";
+  const reserve = lvl==="hard" ? billsTotal(p)+600 : lvl==="medium" ? billsTotal(p)+300 : 800;
+  while(p.loan>0 && p.cash - LOAN_STEP >= reserve){
+    const step = Math.min(LOAN_STEP, p.loan);
+    p.loan -= step;
+    p.cash -= step;
+    log(`🏦 ${p.name} rembourse ${fmt(step)} à la banque (reste ${fmt(p.loan)}).`);
+  }
+}
+function aiChoosePending(){
+  const p = players[pending.player];
+  const lvl = (p && p.ai) || "medium";
+  const d = pending.data || {type:"info"};
+  if(d.type==="deal"){
+    const c = d.card;
+    const ratio = c.sell / c.buy;
+    if(lvl==="easy") return (p.cash >= c.buy && ratio>1.2) ? "buy" : (Math.random()<0.5?"buy":"pass");
+    /* une affaire invendue est perdue : inutile d'en acheter plus qu'il ne
+       reste d'occasions de vendre */
+    const chances = sellChancesGuess(p);
+    if(lvl==="hard" && p.items.length >= chances) return "pass";
+    if(lvl==="medium" && p.items.length >= chances+1) return "pass";
+    const reserve = lvl==="hard" ? billsTotal(p)+200 : 300;
+    if(p.cash - c.buy >= reserve) return "buy";
+    /* une très belle affaire vaut la peine d'un emprunt */
+    if(lvl==="hard" && ratio>=1.9 && p.loan<=2000 && p.cash >= c.buy*0.5) return "buy";
+    return "pass";
+  }
+  if(d.type==="sell"){
+    if(!p.items.length) return "none";
+    /* on vend celle qui rapporte le plus d'argent frais */
+    let best = 0;
+    p.items.forEach((it,i)=>{ if(it.sell > p.items[best].sell) best = i; });
+    return "s"+best;
+  }
+  if(d.type==="bet"){
+    /* le pari est neutre : l'IA difficile s'abstient, la facile s'amuse */
+    if(lvl==="hard") return "pass";
+    if(lvl==="medium") return p.cash>2500 ? (Math.random()<0.5?"pair":"impair") : "pass";
+    return Math.random()<0.7 ? (Math.random()<0.5?"pair":"impair") : "pass";
+  }
+  return pending.options[0].id;
+}
+
+/* minuteurs : l'IA décide toute seule, les cartes d'information se ferment
+   automatiquement au bout de quelques secondes */
+function scheduleAuto(){
+  clearTimeout(autoTimer); autoTimer = null;
+  if(NET.mode==="guest" || !pending || gameOver) return;
+  const p = players[pending.player];
+  const isAi = !!(p && p.ai);
+  let ms = null;
+  if(isAi) ms = pending.auto ? 1100 : 1350;
+  else if(pending.auto) ms = 5200;
+  if(ms==null) return;
+  const mySeq = seq;
+  autoTimer = setTimeout(()=>{
+    if(seq!==mySeq || !pending || gameOver) return;
+    resolvePending(isAi ? aiChoosePending() : pending.options[0].id);
+  }, ms);
+}
+
+/* ---------- banque (joueur humain) ---------- */
+function doLoan(pIdx, delta){
+  const p = players[pIdx];
+  if(!p || gameOver) return;
+  if(pIdx!==currentPlayerIndex) return;
+  if(phase!=="roll") return;
+  if(delta>0){
+    if(p.loan + delta > LOAN_MAX) return;
+    p.loan += delta; p.cash += delta;
+    log(`🏦 ${p.name} emprunte ${fmt(delta)} (emprunt total ${fmt(p.loan)}).`);
+  } else {
+    const amount = Math.min(-delta, p.loan, p.cash);
+    if(amount<=0) return;
+    p.loan -= amount; p.cash -= amount;
+    log(`🏦 ${p.name} rembourse ${fmt(amount)} (reste ${fmt(p.loan)}).`);
+  }
+  renderAll();
+  netScheduleSync();
+}
+
+/* ============================================================
+   FIN DE PARTIE
+   ============================================================ */
+function monthsPlayed(){
+  return players.length ? Math.max.apply(null, players.map(p=>Math.max(0, p.month-1))) : 0;
+}
+function endGame(){
+  gameOver = true; phase = "over";
+  const rank = players.map((p,i)=>({p, i, net:netWorth(p)})).sort((a,b)=>b.net-a.net);
+  const w = rank[0].p;
+  log(`🏆 ${w.symbol} ${w.name} gagne avec ${fmt(rank[0].net)} !`);
+  const rows = rank.map((r,k)=>{
+    return `<tr>
+      <td>${k===0?"🥇":k===1?"🥈":k===2?"🥉":"　"} <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.p.color};border:1px solid #333;"></span> ${r.p.symbol} ${escapeHtml(r.p.name)}</td>
+      <td class="n">${fmt(r.p.cash)}</td>
+      <td class="n">${r.p.items.length?r.p.items.length+" perdue"+(r.p.items.length>1?"s":""):"—"}</td>
+      <td class="n" style="color:#b3261e;">${r.p.loan?"-"+fmt(r.p.loan):"—"}</td>
+      <td class="n">${fmt(r.net)}</td>
+    </tr>`;
+  }).join("");
+  const box = document.getElementById("victory-box");
+  box.innerHTML = `
+    <div style="font-size:60px;">🏆</div>
+    <h1 style="margin:6px 0 2px;">${w.symbol} ${escapeHtml(w.name)} est le plus riche !</h1>
+    <p style="font-size:12.5px;color:#555;margin:0;">Après ${monthsPlayed()} mois${timerMs>0?` (minuteur de ${clockText(timerMs)})`:""} — les affaires restées en stock ne valent plus rien.</p>
+    <table>
+      <tr><th>Joueur</th><th class="n">Caisse</th><th class="n">Stock</th><th class="n">Emprunt</th><th class="n">Total</th></tr>
+      ${rows}
+    </table>
+    <button class="btn" onclick="location.reload()">🔄 Nouvelle partie</button>
+  `;
+  const ov = document.getElementById("victory-overlay");
+  spawnConfetti(ov, w.color);
+  ov.classList.add("active");
+  pending = null;
+  renderAll();
+  netScheduleSync();
+}
+function spawnConfetti(ov, extra){
+  if(ov.querySelector(".confetti")) return;
+  const palette = ["#f1c40f","#e74c3c","#2980b9","#27ae60","#e91e8c","#f39c12"];
+  if(extra) palette.push(extra, extra);
+  for(let k=0;k<90;k++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = (Math.random()*100)+"vw";
+    c.style.background = palette[Math.floor(Math.random()*palette.length)];
+    c.style.width = (6+Math.random()*8)+"px";
+    c.style.height = (10+Math.random()*12)+"px";
+    c.style.animationDuration = (2.6+Math.random()*3)+"s";
+    c.style.animationDelay = (Math.random()*3)+"s";
+    ov.appendChild(c);
+  }
+}
+
+/* ============================================================
+   PLATEAU — construction du DOM
+   ============================================================ */
+function buildBoard(){
+  const grid = document.getElementById("boardGrid");
+  const layer = document.getElementById("pawnLayer");
+  grid.innerHTML = "";
+  layer.innerHTML = "";
+  for(const k in dayCells) delete dayCells[k];
+  for(let d=1; d<=LAST_DAY; d++){
+    const s = SQ[DAYS[d]] || SQ.rest;
+    const cell = document.createElement("div");
+    cell.className = "day " + s.cls;
+    if(d===LAST_DAY) cell.style.gridColumn = "3 / span 5";
+    cell.innerHTML = `<span class="num">${d}</span><span class="ico">${s.icon}</span><span class="lbl">${s.label}</span>`;
+    cell.title = dayTitle(DAYS[d]);
+    grid.appendChild(cell);
+    dayCells[d] = cell;
+  }
+  players.forEach((p,pi)=>{
+    const el = document.createElement("div");
+    el.className = "pawn";
+    el.id = "pawn"+pi;
+    el.style.background = p.color;
+    el.textContent = p.symbol;
+    el.title = p.name;
+    layer.appendChild(el);
+  });
+  boardBuilt = true;
+  requestAnimationFrame(()=>renderPawns(true));
+}
+function dayTitle(type){
+  switch(type){
+    case "mail": return "Courrier — pige une lettre (facture, chèque, publicité…)";
+    case "postman": return "Le facteur — deux lettres d'un coup !";
+    case "deal": return "Affaire — un objet à acheter pour le revendre plus cher";
+    case "sell": return "Vide-grenier — revends une de tes affaires";
+    case "rest": return "Dimanche — rien à faire";
+    case "shop": return "Achats fous — tu craques dans les magasins";
+    case "birthday": return "Anniversaire — chaque joueur t'offre 100 $";
+    case "charity": return "Bonne action — tu donnes 150 $";
+    case "bet": return "Pari — devine la parité du dé pour doubler ta mise";
+    case "luck": return "Coup de chance — une bonne (ou mauvaise) surprise";
+    case "tax": return "Impôts — 10 % de ta caisse";
+    case "payday": return "Jour de paye — salaire, factures et intérêts";
+    default: return "";
+  }
+}
+
+function renderPawns(instant){
+  if(!boardBuilt) return;
+  const layer = document.getElementById("pawnLayer");
+  const start = document.getElementById("startCell");
+  /* on regroupe les pions par case pour les décaler entre eux */
+  const groups = {};
+  players.forEach((p,i)=>{
+    const key = p.done ? "done" : String(p.day);
+    (groups[key] = groups[key] || []).push(i);
+  });
+  Object.keys(groups).forEach(key=>{
+    const list = groups[key];
+    let host = start;
+    if(key!=="done" && key!=="0") host = dayCells[parseInt(key,10)] || start;
+    if(key==="done") host = dayCells[LAST_DAY] || start;
+    const cx = host.offsetLeft + host.offsetWidth/2;
+    const cy = host.offsetTop + host.offsetHeight/2;
+    list.forEach((pi,k)=>{
+      const el = document.getElementById("pawn"+pi);
+      if(!el) return;
+      const n = list.length;
+      const spread = Math.min(host.offsetWidth*0.28, 13);
+      const off = n>1 ? (k - (n-1)/2) * spread : 0;
+      const offY = n>2 ? ((k%2)? spread*0.55 : -spread*0.35) : 0;
+      if(instant) el.style.transition = "none";
+      el.style.left = (cx + off) + "px";
+      el.style.top = (cy + offY) + "px";
+      el.style.background = players[pi].color;
+      el.textContent = players[pi].symbol;
+      el.classList.toggle("turn", pi===currentPlayerIndex && !gameOver && !players[pi].done);
+      el.style.opacity = players[pi].done ? "0.55" : "1";
+      if(instant) requestAnimationFrame(()=>{ el.style.transition = ""; });
+    });
+  });
+  /* surbrillance de la case du joueur courant */
+  Object.values(dayCells).forEach(c=>c.classList.remove("here"));
+  const cur = players[currentPlayerIndex];
+  if(cur && !cur.done && cur.day>0 && dayCells[cur.day]) dayCells[cur.day].classList.add("here");
+}
+window.addEventListener("resize", ()=>renderPawns(true));
+
+/* ============================================================
+   RENDU
+   ============================================================ */
+function iControl(pIdx){
+  const p = players[pIdx];
+  if(!p) return false;
+  if(NET.mode==="guest") return p.side===NET.mySide;
+  if(NET.mode==="host") return p.side==="host";
+  return !p.ai;
+}
+
+function renderAll(){
+  if(!boardBuilt) return;
+  renderDie();
+  renderPawns(false);
+  renderMats();
+  renderBank();
+  renderPending();
+  renderClock();
+  const p = players[currentPlayerIndex];
+  document.getElementById("turnDot").style.background = p ? p.color : "#ccc";
+  const you = iControl(currentPlayerIndex);
+  document.getElementById("turnText").textContent = gameOver
+    ? "Partie terminée"
+    : `${p.symbol} ${p.name}${you?" — à toi de jouer !":(p.ai?" (IA) réfléchit…":" joue…")}`;
+  const mt = document.getElementById("monthTitle");
+  if(p) mt.textContent = gameOver
+    ? `Partie terminée — ${monthsPlayed()} mois joué${monthsPlayed()>1?"s":""}`
+    : `Mois ${Math.min(p.month, monthsTotal)}${isFinite(monthsTotal)?" / "+monthsTotal:""}`
+      + ` — ${p.day>0?"jour "+p.day:"départ du mois"}`
+      + (lastCall ? " — dernier mois !" : "");
+  const rollBtn = document.getElementById("rollBtn");
+  rollBtn.disabled = !(phase==="roll" && !gameOver && you);
+  const hint = document.getElementById("actionHint");
+  if(gameOver) hint.textContent = "";
+  else if(phase==="decide" && pending && iControl(pending.player)) hint.textContent = "👉 Choisis sur la carte affichée.";
+  else if(phase==="roll" && you) hint.textContent = "🎲 Lance le dé — tu peux aussi passer à la banque avant.";
+  else hint.textContent = "";
+}
+
+const PIP_MAP = {
+  1:[0,0,0,0,1,0,0,0,0],
+  2:[1,0,0,0,0,0,0,0,1],
+  3:[1,0,0,0,1,0,0,0,1],
+  4:[1,0,1,0,0,0,1,0,1],
+  5:[1,0,1,0,1,0,1,0,1],
+  6:[1,0,1,1,0,1,1,0,1]
+};
+function renderDie(){
+  const face = document.getElementById("dieFace");
+  const v = dice;
+  if(!v){ face.innerHTML = ""; lastDieShown = null; return; }
+  if(lastDieShown!==v){
+    lastDieShown = v;
+    face.classList.add("rolling");
+    let ticks = 0;
+    const int = setInterval(()=>{
+      drawPips(face, 1+Math.floor(Math.random()*6));
+      if(++ticks>4){
+        clearInterval(int);
+        face.classList.remove("rolling");
+        drawPips(face, v);
+        face.classList.remove("pop"); void face.offsetWidth; face.classList.add("pop");
+      }
+    }, 70);
+  } else {
+    drawPips(face, v);
+  }
+}
+function drawPips(face, v){
+  face.innerHTML = PIP_MAP[v].map(on=>`<div class="pip${on?"":" off"}"></div>`).join("");
+}
+
+function renderBank(){
+  const box = document.getElementById("bank");
+  /* en ligne : toujours SA banque ; en local : celle du joueur du moment
+     (le bloc reste affiché pendant le tour d'une IA pour ne pas faire sauter
+     la colonne) */
+  let myIdx = -1;
+  if(NET.mode) myIdx = players.findIndex(p=>p.side===(NET.mode==="host"?"host":NET.mySide));
+  else myIdx = currentPlayerIndex;
+  if(myIdx<0 || gameOver || !players[myIdx]){ box.style.display="none"; return; }
+  const p = players[myIdx];
+  const myTurn = myIdx===currentPlayerIndex && phase==="roll" && !p.done && iControl(myIdx);
+  box.style.display = "block";
+  box.innerHTML = `
+    <h3>🏦 ${NET.mode || !p.ai ? "Ta banque" : "Banque de "+escapeHtml(p.name)}</h3>
+    <div class="bp-line">
+      <span>En caisse : <b>${fmt(p.cash)}</b></span>
+      <span>Emprunt : <b class="${p.loan?"bp-loan":""}">${fmt(p.loan)}</b></span>
+      <span>Factures : <b>${fmt(billsTotal(p))}</b></span>
+    </div>
+    ${p.items.length?`<div class="bp-items">💼 ${p.items.length} affaire${p.items.length>1?"s":""} en stock — ${sellChancesLeft(p)===null
+        ? `encore <b>${sellDaysLeftThisMonth(p)}</b> case${sellDaysLeftThisMonth(p)>1?"s":""} 🏷️ ce mois-ci`
+        : `encore <b>${sellChancesLeft(p)}</b> case${sellChancesLeft(p)>1?"s":""} 🏷️ d'ici la fin`} (une affaire invendue est perdue).</div>`:""}
+    <div id="bankBtns">
+      <button class="btn small" id="loanBtn" ${myTurn && p.loan+LOAN_STEP<=LOAN_MAX?"":"disabled"}>+ Emprunter ${fmt(LOAN_STEP)}</button>
+      <button class="btn small secondary" id="repayBtn" ${myTurn && p.loan>0 && p.cash>=Math.min(LOAN_STEP,p.loan)?"":"disabled"}>− Rembourser ${fmt(Math.min(LOAN_STEP, p.loan||LOAN_STEP))}</button>
+    </div>
+    <p class="hint" style="margin:6px 0 0;">10 % d'intérêts sur l'emprunt à chaque jour de paye.</p>
+  `;
+  const lb = document.getElementById("loanBtn"), rb = document.getElementById("repayBtn");
+  if(lb) lb.onclick = ()=>{ actLoan(LOAN_STEP); };
+  if(rb) rb.onclick = ()=>{ actLoan(-LOAN_STEP); };
+}
+function actLoan(delta){
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"loan", delta}); return; }
+  doLoan(currentPlayerIndex, delta);
+}
+
+function renderMats(){
+  const box = document.getElementById("mats");
+  box.innerHTML = "";
+  players.forEach((p,i)=>{
+    const d = document.createElement("div");
+    d.className = "bp-mat" + (i===currentPlayerIndex && !gameOver ? " current" : "") + (p.done?" done":"");
+    let tag = "";
+    if(p.ai) tag = `<span class="bp-tag">${p.ai==="easy"?"🙂 IA facile":p.ai==="hard"?"😈 IA difficile":"🤖 IA"}</span>`;
+    else if(p.side && p.side!=="host") tag = `<span class="bp-tag">🌐 en ligne</span>`;
+    else if(NET.mode && p.side==="host") tag = `<span class="bp-tag">🖥 hôte</span>`;
+    if(NET.mode && iControl(i)) tag += `<span class="bp-tag" style="background:#e6f3ea;color:#155c3a;">c'est toi</span>`;
+    if(p.done) tag += `<span class="bp-tag" style="background:#fdf0cf;color:#7a5b06;">🏁 terminé</span>`;
+    const bt = billsTotal(p);
+    const billsHtml = p.bills.length
+      ? `<div class="bp-bills">🧾 ${p.bills.map(b=>`${b.icon||""} ${escapeHtml(b.label)} <b>${fmt(b.amount)}</b>`).join(" · ")}</div>`
+      : `<div class="bp-bills">🧾 aucune facture en attente</div>`;
+    const itemsHtml = p.items.length
+      ? `<div class="bp-items">💼 ${p.items.map(it=>`${it.icon} ${escapeHtml(it.label)} <b>→ ${fmt(it.sell)}</b>`).join(" · ")}</div>`
+      : "";
+    const monthShown = Math.min(p.month, monthsTotal);
+    /* barre = avancement dans la partie si la fin est connue, sinon dans le mois */
+    const prog = p.done ? 100 : (isFinite(monthsTotal)
+      ? Math.round(((monthShown-1)*LAST_DAY + p.day)/(monthsTotal*LAST_DAY)*100)
+      : Math.round(p.day/LAST_DAY*100));
+    d.innerHTML = `
+      <div class="bp-head"><span class="bp-dot" style="background:${p.color}"></span>${p.symbol} ${escapeHtml(p.name)} ${tag}</div>
+      <div class="bp-cash">${fmt(p.cash)}</div>
+      <div class="bp-line">
+        <span>${p.done?"🏁 mois terminés":`📅 mois ${monthShown} · ${p.day>0?"jour "+p.day:"départ"}`}</span>
+        <span>${p.done?"":`💰 paye dans ${LAST_DAY-p.day} j`}</span>
+        <span class="${p.loan?"bp-loan":""}">🏦 ${fmt(p.loan)}</span>
+        <span>🧾 ${fmt(bt)}</span>
+      </div>
+      ${billsHtml}
+      ${itemsHtml}
+      <div class="bp-bar"><i style="width:${prog}%"></i></div>
+    `;
+    box.appendChild(d);
+  });
+}
+
+function renderPending(){
+  const modal = document.getElementById("deckModal");
+  const card = document.getElementById("deckCard");
+  if(!pending || gameOver){ modal.classList.remove("active"); card.innerHTML=""; return; }
+  const mine = iControl(pending.player);
+  const p = players[pending.player];
+  const key = JSON.stringify([pending.title, pending.sub, pending.lines, pending.options.map(o=>o.id), mine]);
+  if(card.dataset.key !== key){
+    card.dataset.key = key;
+    card.className = pending.tone || "";
+    card.innerHTML = `
+      <div class="dc-ico">${pending.icon||"🃏"}</div>
+      <div class="dc-sub">${escapeHtml(pending.sub||"")}</div>
+      <h2>${escapeHtml(pending.title||"")}</h2>
+      <div class="dc-lines">${pending.lines.map(l=>`<div>${l}</div>`).join("")}</div>
+      <div id="deckBtns"></div>
+      <div id="deckWait"></div>
+    `;
+    const btns = card.querySelector("#deckBtns");
+    if(mine){
+      pending.options.forEach((o,k)=>{
+        const b = document.createElement("button");
+        b.className = "btn" + (k>0 && pending.options.length>1 ? " secondary" : (pending.tone==="pay"?" gold":""));
+        b.textContent = o.label;
+        b.onclick = ()=>onChoice(o.id);
+        btns.appendChild(b);
+      });
+    } else {
+      card.querySelector("#deckWait").textContent = `${p?p.symbol+" "+p.name:"Le joueur"} doit choisir…`;
+    }
+  }
+  modal.classList.add("active");
+}
+function onChoice(optId){
+  if(!pending) return;
+  if(!iControl(pending.player)) return;
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"choice", optId}); return; }
+  resolvePending(optId);
+}
+
+/* ---------- interactions ---------- */
+/* le minuteur tourne en temps réel ; l'hôte fait autorité, l'invité décompte
+   sa copie entre deux snapshots */
+setInterval(()=>{
+  if(!boardBuilt || gameOver || timerMs<=0) return;
+  if(NET.mode==="guest"){
+    if(!lastCall) timeLeft = Math.max(0, timeLeft-1000);
+  } else {
+    timeLeft = Math.max(0, (timerEnd||0) - Date.now());
+    if(timeLeft<=0 && !lastCall){ triggerLastCall("⏱️ Le temps de jeu est écoulé"); return; }
+  }
+  renderClock();
+}, 1000);
+
+/* bouton 🏁 : deux appuis pour éviter la fausse manœuvre */
+const endBtnEl = document.getElementById("endBtn");
+endBtnEl.addEventListener("click", ()=>{
+  if(endBtnEl.dataset.arm!=="1"){
+    endBtnEl.dataset.arm = "1";
+    endBtnEl.textContent = "🏁 Confirmer : dernier mois ?";
+    setTimeout(()=>{ if(endBtnEl.dataset.arm==="1"){ endBtnEl.dataset.arm=""; renderClock(); } }, 4000);
+    return;
+  }
+  endBtnEl.dataset.arm = "";
+  triggerLastCall("🏁 Fin de partie demandée");
+});
+
+document.getElementById("rollBtn").addEventListener("click", ()=>{
+  if(gameOver || phase!=="roll") return;
+  if(!iControl(currentPlayerIndex)) return;
+  if(NET.mode==="guest"){ netSend({t:"action", kind:"roll"}); return; }
+  doRoll();
+});
+
+/* ============================================================
+   MODE EN LIGNE — PeerJS (même architecture que les autres jeux)
+   ============================================================ */
+function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
+function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+
+/* ============================================================
+   FIABILITÉ DE LA CONNEXION (navigateurs / réseaux)
+   Les relais TURN livrés par défaut avec PeerJS
+   (eu-0/us-0.turn.peerjs.com) ne résolvent plus en DNS : sans relais, la
+   liaison directe échoue sur les réseaux fermés ou derrière un VPN — dont
+   le VPN intégré d'Opera. On fournit donc des STUN qui répondent vraiment,
+   plus un relais TURN facultatif que l'utilisateur peut ajouter lui-même.
+   ============================================================ */
+const NET_STUN = [
+  {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]},
+  {urls:"stun:stun.cloudflare.com:3478"}
+];
+function netTurnGet(){
+  try{
+    const t = JSON.parse(localStorage.getItem("netTurn")||"null");
+    return (t && t.urls) ? t : null;
+  }catch(e){ return null; }
+}
+function netPeerOpts(){
+  const ice = NET_STUN.slice();
+  const t = netTurnGet();
+  if(t) ice.push(t);
+  return {config:{iceServers:ice, sdpSemantics:"unified-plan", iceCandidatePoolSize:4}};
+}
+/* Issue de secours quand le réseau bloque toute liaison directe :
+   un relais TURN (compte gratuit chez expressturn.com, metered.ca…).
+   Il suffit de le configurer sur UN des deux ordinateurs. */
+function netTurnSetup(){
+  const cur = netTurnGet() || {};
+  const curUrl = Array.isArray(cur.urls) ? cur.urls[0] : (cur.urls||"");
+  const urls = prompt("Adresse du relais TURN\nex : turn:relay1.expressturn.com:3478\n\n(compte gratuit en 2 min sur expressturn.com — laisse vide pour supprimer le relais)", curUrl);
+  if(urls===null) return;
+  if(!urls.trim()){ localStorage.removeItem("netTurn"); alert("Relais TURN supprimé."); return; }
+  const username = prompt("Identifiant (username) fourni par le relais :", cur.username||"") || "";
+  const credential = prompt("Mot de passe (credential/password) du relais :", cur.credential||"") || "";
+  localStorage.setItem("netTurn", JSON.stringify({urls:urls.trim(), username, credential}));
+  alert("Relais enregistré ✅\nRecharge la page, puis refais « Héberger » ou « Rejoindre ».");
+}
+function netStatusHelp(id, msg){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg+" ";
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = "⚙️ Ajouter un relais TURN";
+  b.style.cssText = "margin-left:4px;padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid #999;background:#eee;color:#222;cursor:pointer;";
+  b.onclick = netTurnSetup;
+  el.appendChild(b);
+}
+/* Un bloqueur de pub (Opera, Brave…) peut empêcher le chargement de
+   peerjs.min.js : sans ce test, le bouton semblerait juste ne rien faire. */
+function netLibMissing(statusId){
+  if(typeof Peer !== "undefined") return false;
+  netStatus(statusId, "❌ Le module de connexion (PeerJS) n'a pas pu être chargé : un bloqueur de publicités ou une extension bloque cdn.jsdelivr.net. Désactive-le pour ce site, puis recharge la page.");
+  return true;
+}
+const NET_ERR_SIGNAL = "❌ Impossible de joindre le serveur de mise en relation (0.peerjs.com). Sur Opera : désactive le VPN intégré et le bloqueur de publicités pour ce site, puis recharge la page. Sinon : pare-feu, antivirus ou réseau d'entreprise.";
+const NET_ERR_P2P = "❌ Le serveur répond mais la liaison directe entre les deux ordinateurs ne s'établit pas (VPN, pare-feu ou réseau très fermé). Sur Opera : désactive le VPN intégré (icône VPN dans la barre d'adresse) puis réessaie. Autres pistes : un autre navigateur, le partage de connexion du téléphone, ou un relais TURN.";
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ"; // lettres uniquement, sans I ni O (confondus avec 1 et 0)
+  let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(obj){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(obj); }catch(e){} } } /* invité -> hôte */
+function netSendTo(entry, obj){ if(entry && entry.c && entry.c.open){ try{ entry.c.send(obj); }catch(e){} } }
+function netBroadcast(obj){ NET.conns.forEach(e=>netSendTo(e, obj)); }
+/* petit badge fixe avec le code de la partie, pour qu'un joueur parti
+   puisse revenir en retapant ce code dans « Rejoindre » */
+function netShowCodeBadge(){
+  if(!NET.code) return;
+  let b = document.getElementById("netCodeBadge");
+  if(!b){
+    b = document.createElement("div");
+    b.id = "netCodeBadge";
+    b.style.cssText = "position:fixed;top:6px;left:8px;z-index:900;background:rgba(0,0,0,.65);color:#fff;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;letter-spacing:1px;";
+    document.body.appendChild(b);
+  }
+  b.textContent = "🔑 Code : "+NET.code;
+  b.title = "Code de la partie — un joueur déconnecté peut revenir en entrant ce code dans « Rejoindre une partie en ligne »";
+}
+
+document.getElementById("netLocalBtn").onclick = ()=>{
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+};
+document.getElementById("netHostBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netHostPanel").style.display = "block";
+  netHost(0);
+};
+document.getElementById("netJoinBtn").onclick = ()=>{
+  document.getElementById("netChoice").style.display = "none";
+  document.getElementById("netJoinPanel").style.display = "block";
+};
+document.getElementById("netConnectBtn").onclick = ()=>{
+  const code = (document.getElementById("netCodeInput").value||"").trim().toUpperCase();
+  const name = netEsc((document.getElementById("netNameInput").value||"").trim()).slice(0,20) || "Joueur 2";
+  if(code.length<4){ netStatus("netJoinStatus","Entre le code de la partie (5 caractères)."); return; }
+  NET.rejected = false;
+  document.getElementById("netConnectBtn").disabled = true;
+  netJoin(code, name);
+};
+
+/* ---------- hôte ---------- */
+function netHost(attempt){
+  NET.mode = "host"; NET.mySide = "host";
+  if(netLibMissing("netHostStatus")) return;
+  const code = netGenCode();
+  netStatus("netHostStatus","Création de la partie…");
+  const peer = new Peer("bpay-"+code, netPeerOpts());
+  NET.peer = peer;
+  let opened = false;
+  const openTo = setTimeout(()=>{ if(!opened) netStatus("netHostStatus", NET_ERR_SIGNAL); }, 12000);
+  peer.on("open", ()=>{
+    opened = true;
+    clearTimeout(openTo);
+    NET.code = code;
+    document.getElementById("netCode").textContent = code;
+    netStatus("netHostStatus",`En attente des autres joueurs (jusqu'à ${NET_MAX_GUESTS})… Envoie-leur ce code !`);
+  });
+  peer.on("error", (e)=>{
+    if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(err){} netHost(attempt+1); }
+    else if(e.type!=="peer-unavailable") netStatus("netHostStatus","Erreur de connexion ("+e.type+"). Recharge la page pour réessayer.");
+  });
+  peer.on("connection", (c)=>{
+    c.on("data", (msg)=>netHostOnData(c, msg));
+    c.on("close", ()=>netHostConnLost(c));
+    c.on("error", ()=>netHostConnLost(c));
+  });
+}
+
+function netFreeSlot(){
+  for(let s=0;s<NET_MAX_GUESTS;s++){
+    if(!NET.conns.some(e=>e.slot===s)) return s;
+  }
+  return -1;
+}
+
+function netShowSetupAsHost(){
+  document.getElementById("netHome").style.display = "none";
+  document.getElementById("setup").style.display = "block";
+  const info = document.getElementById("netSetupInfo");
+  info.style.display = "block";
+  const names = NET.conns.map(e=>e.name).join(", ") || "personne";
+  info.textContent = `🌐 Partie en ligne — connecté(s) : ${names} (${NET.conns.length}/${NET_MAX_GUESTS} invités). Vous êtes le joueur 1. D'autres joueurs peuvent encore rejoindre avec le code ${NET.code||""}. Ajoutez des IA si vous voulez.`;
+  const minPlayers = NET.conns.length+1;
+  let wanted = NET.setupShown ? Math.max(parseInt(numPlayersSel.value)||2, minPlayers) : Math.max(2, minPlayers);
+  NET.setupShown = true;
+  numPlayersSel.value = String(Math.min(wanted, 4));
+  renderPlayerInputs();
+  netShowCodeBadge();
+}
+setInterval(()=>{ if(NET.mode==="host" && NET.started && !NET.ended) netScheduleSync(); }, 500);
+
+function netHostOnData(c, msg){
+  if(!msg || typeof msg!=="object") return;
+  let entry = NET.conns.find(e=>e.c===c);
+  if(msg.t==="hello"){
+    const name = netEsc(msg.name).slice(0,20) || "Joueur";
+    if(entry){ entry.name = name; return; }
+    if(NET.started){
+      netHostHandleRejoin(c, name);
+    } else {
+      const slot = netFreeSlot();
+      if(slot<0){ try{ c.send({t:"full"}); }catch(e){} setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300); return; }
+      entry = {c, slot, side:"g"+slot, name};
+      NET.conns.push(entry);
+      netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+      netShowSetupAsHost();
+    }
+    return;
+  }
+  if(!entry) return;
+  if(msg.t==="setupGuest"){
+    netApplyGuestSetupChange(entry, msg);
+  } else if(msg.t==="action"){
+    netHandleGuestAction(msg, entry.side);
+  }
+}
+
+/* partie déjà lancée : on remet le nouvel arrivant sur le siège du joueur
+   déconnecté qui porte le même prénom (ou le seul siège libre) */
+function netHostHandleRejoin(c, name){
+  const takenSides = new Set(NET.conns.map(e=>e.side));
+  const candidates = players.filter(p=>p.side && p.side!=="host" && !takenSides.has(p.side));
+  let p = candidates.find(x=>x.name.trim().toLowerCase()===String(name).trim().toLowerCase());
+  if(!p && candidates.length===1) p = candidates[0];
+  if(!p){
+    try{ c.send({t:"noSeat", names:candidates.map(x=>x.name)}); }catch(e){}
+    setTimeout(()=>{ try{ c.close(); }catch(e){} }, 300);
+    return;
+  }
+  const entry = {c, slot:parseInt(p.side.slice(1),10), side:p.side, name:p.name};
+  NET.conns.push(entry);
+  netUpdateDiscoBanner();
+  log(`🔌 ${p.name} s'est reconnecté(e) à la partie.`);
+  netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+  netSendState();
+}
+
+function netBroadcastSetup(){
+  if(NET.mode!=="host" || NET.started || !NET.conns.length) return;
+  NET.conns.forEach(entry=>{
+    const i = entry.slot+1;
+    const colorEl = document.getElementById("pcolor"+i);
+    const symbolEl = document.getElementById("psymbol"+i);
+    const nameEl = document.getElementById("pname"+i);
+    if(!colorEl || !symbolEl || !nameEl) return;
+    netSendTo(entry, {
+      t:"setup",
+      guestColor:colorEl.value, guestSymbol:symbolEl.value, guestName:nameEl.value,
+      code:NET.code
+    });
+  });
+}
+function netApplyGuestSetupChange(entry, msg){
+  if(NET.started) return;
+  const i = entry.slot+1;
+  const nameEl = document.getElementById("pname"+i);
+  const colorEl = document.getElementById("pcolor"+i);
+  const symbolEl = document.getElementById("psymbol"+i);
+  if(!nameEl || !colorEl || !symbolEl) return;
+  entry.name = netEsc(msg.name).slice(0,20) || ("Joueur "+(i+1));
+  nameEl.value = entry.name;
+  if(msg.color) colorEl.value = msg.color;
+  if(msg.symbol && Array.from(symbolEl.options).some(o=>o.value===msg.symbol)) symbolEl.value = msg.symbol;
+  netBroadcastSetup();
+}
+
+function netHandleGuestAction(msg, side){
+  if(!NET.started || gameOver) return;
+  if(msg.kind==="roll"){
+    const p = players[currentPlayerIndex];
+    if(!p || p.side!==side) return;
+    if(phase==="roll") doRoll();
+  } else if(msg.kind==="choice"){
+    if(!pending) return;
+    const p = players[pending.player];
+    if(!p || p.side!==side) return;
+    if(!pending.options.some(o=>o.id===msg.optId)) return;
+    resolvePending(msg.optId);
+  } else if(msg.kind==="loan"){
+    const p = players[currentPlayerIndex];
+    if(!p || p.side!==side) return;
+    doLoan(currentPlayerIndex, msg.delta>0 ? LOAN_STEP : -LOAN_STEP);
+  }
+}
+
+/* ---------- synchronisation hôte -> invités ---------- */
+function netScheduleSync(){
+  if(NET.mode!=="host") return;
+  if(NET.syncTimer) return;
+  NET.syncTimer = setTimeout(()=>{ NET.syncTimer=null; netSendState(); }, 40);
+}
+function netSendState(){
+  if(NET.mode!=="host" || !NET.started || NET.ended) return;
+  const victOn = document.getElementById("victory-overlay").classList.contains("active");
+  netBroadcast({
+    t:"state",
+    players: players.map(p=>({
+      name:p.name, color:p.color, symbol:p.symbol, ai:p.ai, side:p.side||null,
+      day:p.day, month:p.month, cash:p.cash, loan:p.loan, done:p.done,
+      bills:p.bills.map(b=>({icon:b.icon, label:b.label, amount:b.amount})),
+      items:p.items.map(it=>({icon:it.icon, label:it.label, buy:it.buy, sell:it.sell}))
+    })),
+    cur: currentPlayerIndex, dice, phase, gameOver, pending,
+    /* Infinity ne survit pas à la sérialisation : null = sans limite de mois */
+    months: isFinite(monthsTotal) ? monthsTotal : null,
+    timerMs, timeLeft, lastCall, salary, code:NET.code,
+    log: logHistory.slice(-120),
+    victory: victOn ? {active:true, html:document.getElementById("victory-box").innerHTML} : {active:false}
+  });
+}
+
+/* ---------- invité ---------- */
+function netJoin(code, name){
+  NET.mode = "guest";
+  NET.mySide = null; // attribué par l'hôte dans le message "welcome" (g0, g1, g2)
+  NET.joinCode = code; NET.guestName = name;
+  const symSel = document.getElementById("netGuestSymbol");
+  symSel.innerHTML = PAWN_SYMBOLS.map(t=>`<option value="${t}">${t}</option>`).join("");
+  netConnectAsGuest(false);
+}
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect){
+    if(netLibMissing("netJoinStatus")){ document.getElementById("netConnectBtn").disabled = false; return; }
+    netStatus("netJoinStatus","Connexion…");
+  }
+  const peer = new Peer(undefined, netPeerOpts());
+  NET.peer = peer;
+  let settled = false;
+  let openTo = null, to = null;
+  /* isP2P : l'étape « liaison directe » a échoué -> on propose un relais TURN */
+  const fail = (msg, isP2P)=>{
+    if(settled) return; settled = true;
+    clearTimeout(openTo); clearTimeout(to);
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect) netScheduleGuestRetry();
+    else {
+      if(isP2P) netStatusHelp("netJoinStatus", msg); else netStatus("netJoinStatus", msg);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
+  };
+  peer.on("error", (e)=>{
+    if(e.type==="peer-unavailable") fail("Partie introuvable. Vérifie le code, et que l'hôte a bien laissé son onglet ouvert.");
+    else if(e.type==="network" || e.type==="server-error" || e.type==="socket-error") fail(NET_ERR_SIGNAL);
+    else fail("Erreur de connexion ("+e.type+"). Réessaie.");
+  });
+  openTo = setTimeout(()=>fail(NET_ERR_SIGNAL), 12000);
+  peer.on("open", ()=>{
+    clearTimeout(openTo);
+    if(!isReconnect) netStatus("netJoinStatus","Serveur trouvé — établissement de la liaison directe…");
+    const c = peer.connect("bpay-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    to = setTimeout(()=>fail(NET_ERR_P2P, true), 25000);
+    c.on("open", ()=>{
+      clearTimeout(to); settled = true; NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName});
+      if(!isReconnect) netStatus("netJoinStatus","✅ Connecté ! Choisis ton pion ci-dessous.");
+      else log("🔌 Reconnecté(e) à la partie.");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail(NET_ERR_P2P, true); });
+  });
+}
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts = (NET.reconnectAttempts||0)+1;
+  netShowReconnectBanner();
+  if(NET.reconnectAttempts>30){ netReconnectFailed(); return; }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="welcome"){
+    NET.mySide = msg.side;
+    NET.code = msg.code || NET.joinCode;
+    netShowCodeBadge();
+  } else if(msg.t==="full"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    netStatus("netJoinStatus","❌ La partie est pleine (4 joueurs max).");
+    document.getElementById("netConnectBtn").disabled = false;
+  } else if(msg.t==="noSeat"){
+    NET.rejected = true;
+    NET.reconnecting = false;
+    const names = Array.isArray(msg.names) ? msg.names.filter(Boolean) : [];
+    const txt = names.length
+      ? "❌ Partie en cours. Pour reprendre une place, utilise exactement le prénom d'un joueur déconnecté : "+names.join(", ")+"."
+      : "❌ Partie déjà en cours et aucun siège libre.";
+    if(NET.started){
+      netShowBanner(netEsc(txt)+` <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+      const btn = document.getElementById("netGiveUpBtn");
+      if(btn) btn.onclick = ()=>location.reload();
+    } else {
+      netStatus("netJoinStatus", txt);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
+  } else if(msg.t==="state") netApplySnapshot(msg);
+  else if(msg.t==="setup") netApplySetupMsg(msg);
+}
+
+function netApplySetupMsg(msg){
+  if(NET.started) return;
+  if(msg.code && !NET.code) NET.code = msg.code;
+  netShowCodeBadge();
+  document.getElementById("netJoinReadyPanel").style.display = "block";
+  const symSel = document.getElementById("netGuestSymbol");
+  if(document.activeElement !== symSel) symSel.value = msg.guestSymbol;
+  const colorEl = document.getElementById("netGuestColor");
+  if(document.activeElement !== colorEl) colorEl.value = msg.guestColor;
+  const nameEl = document.getElementById("netGuestNameLive");
+  if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+}
+let netGuestSetupTimer = null;
+function netSendGuestSetup(){
+  if(NET.mode!=="guest") return;
+  clearTimeout(netGuestSetupTimer);
+  netGuestSetupTimer = setTimeout(()=>{
+    netSend({t:"setupGuest",
+      name: document.getElementById("netGuestNameLive").value,
+      color: document.getElementById("netGuestColor").value,
+      symbol: document.getElementById("netGuestSymbol").value
+    });
+  }, 120);
+}
+["netGuestColor","netGuestSymbol","netGuestNameLive"].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener("input", netSendGuestSetup);
+  el.addEventListener("change", netSendGuestSetup);
+});
+
+function netApplySnapshot(s){
+  if(NET.ended) return;
+  if(s.code && s.code!==NET.code){ NET.code = s.code; netShowCodeBadge(); }
+  monthsTotal = (s.months==null) ? Infinity : s.months;
+  timerMs = s.timerMs || 0;
+  lastCall = !!s.lastCall;
+  if(typeof s.timeLeft === "number") timeLeft = s.timeLeft;
+  salary = s.salary;
+  if(!NET.started){
+    NET.started = true;
+    netShowCodeBadge();
+    players = s.players.map(sp=>{
+      const p = createPlayer(sp.name, sp.color, sp.symbol, sp.ai, sp.side);
+      return p;
+    });
+    document.getElementById("netHome").style.display = "none";
+    document.getElementById("setup").style.display = "none";
+    document.getElementById("game").classList.add("active");
+    buildBoard();
+  }
+  s.players.forEach((sp,i)=>{
+    const p = players[i]; if(!p) return;
+    p.name=sp.name; p.color=sp.color; p.symbol=sp.symbol; p.ai=sp.ai; p.side=sp.side;
+    p.day=sp.day; p.month=sp.month; p.cash=sp.cash; p.loan=sp.loan; p.done=sp.done;
+    p.bills = (sp.bills||[]).slice();
+    p.items = (sp.items||[]).slice();
+  });
+  currentPlayerIndex = s.cur;
+  dice = s.dice;
+  phase = s.phase;
+  gameOver = s.gameOver;
+  pending = s.pending || null;
+  renderAll();
+  if(s.victory && s.victory.active){
+    const vo = document.getElementById("victory-overlay");
+    if(!vo.classList.contains("active")){
+      document.getElementById("victory-box").innerHTML = s.victory.html;
+      spawnConfetti(vo, null);
+      vo.classList.add("active");
+    }
+  }
+  const logEl = document.getElementById("log");
+  const key = s.log.length+"|"+(s.log[0]||"")+"|"+(s.log[s.log.length-1]||"");
+  if(logEl.dataset.key !== key){
+    logEl.dataset.key = key;
+    logEl.innerHTML = "";
+    s.log.slice().reverse().forEach(m=>{ const d=document.createElement("div"); d.textContent=m; logEl.appendChild(d); }); // plus récent en premier
+    logEl.scrollTop = 0;
+  }
+}
+
+/* ---------- déconnexion / reconnexion ---------- */
+function netShowBanner(html){
+  let b = document.getElementById("netBanner");
+  if(!b){ b = document.createElement("div"); b.id="netBanner"; b.className="net-reconnect-banner"; document.body.appendChild(b); }
+  b.innerHTML = html;
+}
+function netHideBanner(){ const b = document.getElementById("netBanner"); if(b) b.remove(); }
+function netOnConnLost(){
+  if(NET.mode==="guest") netGuestOnDisconnect();
+}
+function netHostConnLost(c){
+  const idx = NET.conns.findIndex(e=>e.c===c);
+  if(idx<0) return;
+  const entry = NET.conns[idx];
+  NET.conns.splice(idx,1);
+  if(!NET.started){
+    if(document.getElementById("setup").style.display!=="none"){
+      netShowSetupAsHost();
+      const info = document.getElementById("netSetupInfo");
+      info.textContent = `🔌 ${entry.name} s'est déconnecté(e) avant le début (le code ${NET.code} lui permet de revenir). `+info.textContent;
+    } else {
+      netStatus("netHostStatus", `${entry.name} s'est déconnecté(e). Il/elle peut revenir avec le même code.`);
+    }
+    return;
+  }
+  log(`🔌 ${entry.name} s'est déconnecté(e). Pour revenir : « Rejoindre une partie en ligne » avec le code ${NET.code} et le même prénom.`);
+  netUpdateDiscoBanner();
+}
+/* bannière côté hôte : liste des joueurs en ligne actuellement déconnectés */
+function netUpdateDiscoBanner(){
+  if(NET.mode!=="host" || !NET.started) return;
+  const connected = new Set(NET.conns.map(e=>e.side));
+  const missing = players.filter(p=>p.side && p.side!=="host" && !connected.has(p.side));
+  if(!missing.length){ netHideBanner(); return; }
+  netShowBanner(`🔌 ${missing.map(p=>netEsc(p.name)).join(", ")} ${missing.length>1?"sont déconnecté(e)s":"s'est déconnecté(e)"}. Pour revenir : « Rejoindre une partie en ligne » avec le code <b>${NET.code}</b> et le même prénom. La partie continue en attendant. <button id="netHostGiveUpBtn">Quitter la partie en ligne</button>`);
+  const btn = document.getElementById("netHostGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+function netGuestOnDisconnect(){
+  if(NET.reconnecting || NET.ended || NET.rejected) return;
+  NET.conn = null; NET.reconnectAttempts = 0;
+  try{ if(NET.peer && !NET.peer.destroyed) NET.peer.destroy(); }catch(e){}
+  netScheduleGuestRetry();
+}
+function netShowReconnectBanner(){
+  netShowBanner(`🔌 Connexion perdue. Reconnexion en cours… (tentative ${NET.reconnectAttempts}/30) <button id="netRetryNowBtn">Réessayer maintenant</button>`);
+  const btn = document.getElementById("netRetryNowBtn");
+  if(btn) btn.onclick = ()=>{ netConnectAsGuest(true); };
+}
+function netReconnectFailed(){
+  NET.reconnecting = false; NET.ended = true;
+  netShowBanner(`❌ Impossible de se reconnecter — l'hôte a peut-être fermé la partie. <button id="netGiveUpBtn">Revenir à l'accueil</button>`);
+  const btn = document.getElementById("netGiveUpBtn");
+  if(btn) btn.onclick = ()=>location.reload();
+}
+</script>
+</body>
+</html>
