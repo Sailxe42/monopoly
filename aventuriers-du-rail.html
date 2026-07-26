@@ -53,6 +53,19 @@
     font-size:14px; font-weight:700; cursor:pointer; flex:0 0 30px;
   }
   .row-del:hover{filter:brightness(1.2);}
+  #mapPick{margin:4px 0 6px;}
+  .pick-title{text-align:center; font-weight:700; color:var(--accent); font-size:14.5px; margin-bottom:8px;}
+  #mapOpts{display:flex; gap:8px; justify-content:center; flex-wrap:wrap;}
+  .map-opt{
+    flex:1 1 130px; background:#fff9ea; border:2px solid #c9b070; border-radius:10px;
+    padding:9px 8px; cursor:pointer; font-family:Georgia,serif; color:var(--ink);
+    text-align:center; line-height:1.3;
+  }
+  .map-opt:hover{border-color:var(--accent);}
+  .map-opt.sel{border-color:var(--accent); background:#fdeee0; box-shadow:0 0 0 2px #8d1f1f33;}
+  .map-opt .mo-tag{font-size:21px; display:block;}
+  .map-opt .mo-name{font-weight:700; font-size:14px;}
+  .map-opt .mo-sub{font-size:11.5px; color:#6b5636;}
   details.rules{background:#fff9ea; border:1px solid #c9b070; border-radius:10px; padding:10px 14px; margin:16px 0; font-size:13.5px;}
   details.rules summary{cursor:pointer; font-weight:700; color:var(--accent);}
   details.rules li{margin:5px 0;}
@@ -96,6 +109,14 @@
   g.route.claimed .route-win{display:block;}
   .junction-lbl{font-family:Georgia,serif; font-size:17px; font-weight:700; fill:#f0d189; pointer-events:none;}
   .junction-plate{fill:#3a1712; opacity:.9; stroke:#c9971f; stroke-width:1.2;}
+  /* ---- cartes générées (États-Unis / Europe) ---- */
+  .geo-sea{fill:#7ba6bd;}
+  .geo-land{fill:#efdfb4; stroke:#a58f61; stroke-width:1.4; stroke-linejoin:round;}
+  .geo-lake{fill:#7ba6bd; stroke:#8fb2c6; stroke-width:1;}
+  .route-line{fill:none; stroke:#6d5a36; stroke-width:2.5; stroke-opacity:.5; stroke-linecap:round; pointer-events:none;}
+  .city-dot{fill:#fffaef; stroke:#3a2708; stroke-width:3; pointer-events:none;}
+  .city-lbl{font-family:Georgia,serif; font-size:16px; font-weight:700; fill:#f6e6bd; pointer-events:none;}
+  .city-plate{fill:#31210f; opacity:.85; stroke:#b98a2e; stroke-width:1.1;}
   .city-glow{
     fill:#ffdf6e; fill-opacity:.3; stroke:#ffd23e; stroke-width:5; opacity:0; pointer-events:none;
     transform-box:fill-box; transform-origin:center;
@@ -222,7 +243,7 @@
 
 <!-- ===================== ACCUEIL / RÉSEAU ===================== -->
 <div id="netHome">
-  <h1>🚂 Aventurier du Rail<br><span style="font-size:16px;color:#6b4c15;">édition Harry Potter</span></h1>
+  <h1>🚂 Aventurier du Rail<br><span style="font-size:16px;color:#6b4c15;">⚡ Harry Potter · 🗽 États-Unis · 🏰 Europe</span></h1>
   <img class="home-art" src="asset/aventurierRailPlato.png" alt="Plateau Aventurier du Rail Harry Potter">
   <div id="netChoice">
     <button class="btn net-big-btn" id="netLocalBtn">🖥 Jouer en local (2-5 joueurs, IA au choix)</button>
@@ -252,6 +273,7 @@
         <input type="color" id="netGuestColor" value="#2e7d5b" title="Couleur">
         <input type="text" id="netGuestNameLive" placeholder="Ton prénom" maxlength="20">
       </div>
+      <p class="net-status" id="guestMapInfo"></p>
       <p class="net-status">✅ Connecté(e) ! En attente que l'hôte lance la partie…</p>
     </div>
   </div>
@@ -261,6 +283,11 @@
 <div id="setup" style="display:none;">
   <h1>🚂 Aventurier du Rail</h1>
   <div id="netSetupInfo"></div>
+  <div id="mapPick">
+    <div class="pick-title">🗺️ Choisis ta carte</div>
+    <div id="mapOpts"></div>
+    <p class="hint" id="mapDesc" style="text-align:center;margin:4px 0 12px;"></p>
+  </div>
   <div class="player-row">
     <input type="color" id="pcolor0" value="#c0392b" title="Ta couleur de wagons">
     <input type="text" id="pname0" placeholder="Ton prénom" maxlength="20" value="Joueur 1">
@@ -274,9 +301,10 @@
   <details class="rules">
     <summary>📜 Règles du jeu</summary>
     <ul>
-      <li>Chaque joueur commence avec <b>40 wagons</b>, 4 cartes Wagon et choisit au moins 2 cartes Destination.</li>
+      <li>Trois cartes au choix : le <b>plateau illustré Harry Potter</b>, ou les cartes classiques <b>États-Unis</b> et <b>Europe</b> tracées par le jeu (villes à leurs vraies positions géographiques). Les cartes Wagon et Destination sont les mêmes ; seul le réseau change.</li>
+      <li>Chaque joueur commence avec <b>40 wagons</b> (45 sur les cartes États-Unis et Europe), 4 cartes Wagon et choisit au moins 2 cartes Destination.</li>
       <li>À ton tour, fais <b>UNE</b> action : <b>piocher 2 cartes Wagon</b> (une Locomotive visible compte pour les 2), <b>prendre une route</b> en jouant des cartes de sa couleur (les routes roses se paient en cartes Violet, les Locomotives sont des jokers), ou <b>piocher 3 cartes Destination</b> (garde-en au moins 1).</li>
-      <li>Les routes se prennent <b>directement sur la carte</b> : survole une route imprimée pour voir sa longueur, clique pour la prendre. Le bouton 👁 met en évidence les routes encore libres.</li>
+      <li>Les routes se prennent <b>directement sur la carte</b> : survole une route pour voir sa longueur, clique pour la prendre. Sur le plateau Harry Potter, le bouton 👁 met en évidence les routes encore libres (sur les cartes générées elles sont déjà coloriées). Une route <b>grise</b> se paie avec des cartes d'une seule couleur, au choix.</li>
       <li>Points par route : 1&nbsp;=&nbsp;1, 2&nbsp;=&nbsp;2, 3&nbsp;=&nbsp;4, 4&nbsp;=&nbsp;7, 5&nbsp;=&nbsp;10, 6&nbsp;=&nbsp;15, 7&nbsp;=&nbsp;18, 8&nbsp;=&nbsp;21.</li>
       <li>Sur une <b>route double</b>, un seul des deux tronçons peut être pris à 2-3 joueurs. À 4-5 joueurs les deux tronçons sont ouverts, mais jamais pour le même joueur.</li>
       <li>Une Destination complétée rapporte ses points en fin de partie ; sinon elle les fait <b>perdre</b> !</li>
@@ -354,11 +382,11 @@
    1 joueur contre l'IA, ou 2 joueurs en ligne (PeerJS)
    ============================================================ */
 
-/* ---------- données du plateau ----------
+/* ---------- données du plateau — CARTE HARRY POTTER ----------
    Les positions correspondent aux noeuds IMPRIMÉS sur asset/aventurierRailPlato.png (1536x1024).
    Les lieux "j:true" sont des jonctions non étiquetées sur la carte : on leur dessine
    une petite plaque de nom (lieux de l'univers Harry Potter). */
-const CITIES = {
+const CITIES_HP = {
   POU:{name:"Poudlard",              x:365, y:215},
   V93:{name:"Voie 9¾",               x:550, y:159, j:true, lx:-8,  ly:-26},
   NUR:{name:"Nurmengard",            x:782, y:69,  j:true, lx:-14, ly:-24},
@@ -404,7 +432,7 @@ function cardColorOf(route){ return route.color==="rose" ? "violet" : route.colo
 /* routes : relevées sur le plateau imprimé (couleur, nombre de wagons).
    "via" = points de passage pour suivre la courbe imprimée.
    "rose" est une couleur de route payable avec des cartes Violet (indiqué en jeu). */
-const ROUTES = [
+const ROUTES_HP = [
   {id:"r1",  a:"POU", b:"V93", len:4, color:"blanc"},
   {id:"r2",  a:"V93", b:"NUR", len:6, color:"rouge", via:[[655,90]]},
   {id:"r3",  a:"V93", b:"FOR", len:4, color:"rouge"},
@@ -467,12 +495,10 @@ const ROUTES = [
   {id:"r60", a:"MIN", b:"GRIM",len:4, color:"vert",  dbl:"r59", via:[[960,820],[890,858]]},
   {id:"r61", a:"MIN", b:"LON", len:5, color:"rouge"}
 ];
-const ROUTE_BY_ID = {}; ROUTES.forEach(r=>ROUTE_BY_ID[r.id]=r);
 const ROUTE_PTS = {1:1, 2:2, 3:4, 4:7, 5:10, 6:15, 7:18, 8:21};
 
-/* cartes destination (les 8 premières figurent sur le plateau) */
 /* 35 cartes destination, toutes des paires UNIQUES (les 8 premières figurent sur le plateau) */
-const TICKETS = [
+const TICKETS_HP = [
   {a:"POU", b:"PRE", pts:8},
   {a:"V93", b:"DIA", pts:6},
   {a:"POU", b:"BEA", pts:9},
@@ -509,6 +535,524 @@ const TICKETS = [
   {a:"CDF", b:"LON", pts:14},
   {a:"MAL", b:"GRI", pts:7}
 ];
+const GEO_USA = {
+  land:[
+    "M302 208L300 207L275 173L267 158L241 138L239 114L247 99L232 84L240 61L623 61L934 98L942 102L986 100L986 122L995 147L1011 173L1040 193L1051 183L1055 155L1040 117L1026 106L1049 90L1057 79L1122 61L1296 61L1326 145L1311 148L1270 163L1262 185L1244 203L1229 243L1216 272L1229 264L1248 223L1277 191L1301 180L1319 187L1309 210L1336 251L1363 256L1366 255L1375 280L1357 299L1343 324L1329 327L1321 306L1345 275L1317 285L1298 295L1282 284L1272 249L1262 244L1251 252L1244 247L1236 270L1236 291L1233 305L1221 314L1221 320L1160 336L1153 342L1135 368L1131 379L1096 386L1088 392L1092 396L1095 407L1073 424L1054 431L1033 449L1028 449L1021 446L1019 440L1028 414L1032 398L1017 352L996 343L998 338L995 335L990 336L986 332L984 326L981 329L976 329L977 326L972 324L970 317L903 287L888 295L882 296L860 291L846 295L828 287L798 282L792 278L789 264L783 264L783 274L746 274L686 272L574 263L471 247L418 237L302 208Z",
+    "M287 217L278 218L254 198L251 187L239 174L239 166L223 155L222 140L225 135L249 153L264 161L271 185L285 201L287 217Z",
+    "M302 208L418 237L471 247L574 263L686 272L746 274L783 274L783 264L789 264L792 278L798 282L828 287L846 295L860 291L882 296L888 295L903 287L970 317L972 324L977 326L976 329L981 329L984 326L986 332L990 336L995 335L998 338L996 343L1017 352L1032 398L1028 414L1019 440L1021 446L1028 449L1033 449L1054 431L1073 424L1095 407L1092 396L1088 392L1096 386L1131 379L1135 368L1153 342L1160 336L1221 320L1221 314L1233 305L1236 291L1236 270L1244 247L1251 252L1262 244L1272 249L1282 284L1298 295L1304 302L1288 320L1255 347L1248 372L1252 386L1262 398L1270 396L1265 387L1272 391L1273 399L1261 407L1252 409L1239 417L1220 425L1206 436L1233 424L1240 428L1215 442L1203 445L1202 442L1198 450L1204 450L1204 470L1195 493L1192 487L1187 487L1179 481L1186 495L1192 498L1195 508L1184 543L1182 542L1184 523L1172 515L1165 494L1163 506L1171 522L1157 520L1172 526L1179 551L1185 551L1197 585L1188 608L1168 620L1157 638L1147 642L1137 653L1136 663L1115 684L1105 698L1097 716L1096 735L1103 752L1114 773L1127 790L1129 802L1145 830L1148 858L1145 874L1138 879L1126 878L1120 867L1110 862L1081 823L1076 814L1078 796L1070 782L1049 763L1039 760L1018 774L1014 774L1001 763L986 757L961 763L941 762L923 765L914 770L919 777L919 787L925 792L920 796L912 793L903 798L886 798L869 785L849 790L832 784L817 786L798 793L777 812L754 824L741 836L736 848L735 866L736 879L741 888L731 889L696 874L690 861L685 843L672 827L654 793L638 781L619 780L603 800L585 791L574 782L563 752L540 730L533 720L494 715L493 726L431 717L353 671L356 666L303 660L302 646L292 628L283 622L282 614L271 610L265 601L246 594L242 588L243 573L230 542L223 501L226 496L220 485L211 459L214 437L208 420L219 400L225 378L225 357L240 335L258 290L265 255L266 232L265 219L268 215L290 231L293 257L299 252L302 230L302 208Z",
+    "M303 660L356 666L353 671L431 717L493 726L494 715L533 720L540 730L563 752L574 782L585 791L603 800L619 780L638 781L654 793L672 827L685 843L690 861L696 874L731 889L741 888L731 911L726 929L724 963L522 963L500 928L478 904L468 887L449 873L446 866L452 851L440 843L428 828L425 809L413 805L393 775L394 766L385 745L381 723L383 713L369 700L361 700L350 690L345 700L346 713L344 733L366 773L369 776L370 785L374 786L376 803L382 811L385 821L398 837L401 862L411 888L411 902L422 904L437 930L436 935L424 943L420 942L416 925L402 908L376 884L380 865L379 851L355 826L351 829L346 821L333 812L323 795L325 793L334 796L344 788L347 777L334 755L322 745L307 685L303 660Z",
+    "M1107 933L1148 929L1172 934L1184 942L1206 935L1246 954L1203 962L1201 960L1185 963L1163 960L1155 956L1122 957L1113 954L1121 946L1096 948L1081 963L1058 963L1061 956L1071 949L1083 942L1102 937L1107 933Z",
+  ],
+  lakes:[
+    "M720 146L736 136L741 159L761 212L764 230L756 236L747 209L731 191L715 164L720 146Z",
+    "M1091 397L1086 399L1078 398L1082 388L1100 378L1115 371L1124 374L1133 363L1137 364L1140 368L1144 377L1131 389L1100 392L1091 397Z",
+    "M1019 440L1029 440L1042 430L1050 421L1055 419L1066 420L1071 415L1079 410L1095 404L1096 406L1082 425L1049 449L1036 455L1026 455L1013 451L1019 440Z",
+    "M882 296L889 285L898 280L906 270L922 274L934 273L939 276L946 290L967 292L965 300L973 307L971 317L979 319L976 329L970 328L966 321L948 326L933 333L919 324L908 322L913 308L870 335L859 326L841 333L841 329L865 306L882 296Z",
+    "M1056 340L1071 358L1066 368L1051 367L1039 352L1044 368L1037 384L1040 396L1039 404L1028 414L1020 389L1013 387L1003 400L999 401L997 394L1006 382L1006 370L1003 358L988 350L972 347L975 343L991 338L981 329L984 325L988 330L1002 332L1031 330L1048 333L1056 340Z",
+    "M960 341L975 343L972 347L971 357L967 360L965 373L962 365L956 372L948 395L948 406L956 422L958 439L948 457L943 460L936 461L928 446L927 432L923 420L928 386L936 364L933 365L921 383L918 380L934 352L946 348L960 341Z",
+  ]
+};
+const CITIES_USA = {
+  VAN:{name:"Vancouver", x:300, y:199},
+  CAL:{name:"Calgary", x:462, y:191},
+  WIN:{name:"Winnipeg", x:748, y:250},
+  SSM:{name:"Sault St. Marie", x:980, y:326},
+  MTL:{name:"Montréal", x:1180, y:317},
+  SEA:{name:"Seattle", x:301, y:245},
+  HEL:{name:"Helena", x:477, y:313},
+  DUL:{name:"Duluth", x:839, y:331},
+  TOR:{name:"Toronto", x:1083, y:388},
+  BOS:{name:"Boston", x:1247, y:386},
+  POR:{name:"Portland", x:280, y:297},
+  SLC:{name:"Salt Lake City", x:454, y:466},
+  OMA:{name:"Omaha", x:769, y:479},
+  CHI:{name:"Chicago", x:932, y:455},
+  PIT:{name:"Pittsburgh", x:1086, y:474},
+  NYC:{name:"New York", x:1202, y:443},
+  SFO:{name:"San Francisco", x:228, y:496},
+  DEN:{name:"Denver", x:587, y:511},
+  KAN:{name:"Kansas City", x:797, y:536},
+  STL:{name:"Saint Louis", x:887, y:545},
+  NSH:{name:"Nashville", x:963, y:606},
+  WAS:{name:"Washington", x:1152, y:503},
+  LVG:{name:"Las Vegas", x:366, y:574},
+  SFE:{name:"Santa Fe", x:557, y:617},
+  OKC:{name:"Oklahoma City", x:736, y:633},
+  LRK:{name:"Little Rock", x:848, y:651},
+  RAL:{name:"Raleigh", x:1135, y:592},
+  LAX:{name:"Los Angeles", x:288, y:615},
+  PHX:{name:"Phoenix", x:417, y:658},
+  ELP:{name:"El Paso", x:533, y:719},
+  DAL:{name:"Dallas", x:750, y:705},
+  HOU:{name:"Houston", x:782, y:785},
+  NOR:{name:"New Orleans", x:904, y:776},
+  ATL:{name:"Atlanta", x:1021, y:664},
+  CHA:{name:"Charleston", x:1122, y:675},
+  MIA:{name:"Miami", x:1147, y:859},
+};
+const GEO_EUR = {
+  land:[
+    "M1483 623L1464 622L1452 612L1428 613L1416 623L1409 619L1373 615L1337 621L1316 621L1314 626L1277 607L1247 603L1223 589L1238 579L1249 547L1233 537L1261 515L1258 508L1241 519L1237 504L1246 492L1265 483L1265 471L1255 455L1259 435L1255 426L1222 424L1210 428L1193 416L1179 426L1150 421L1149 414L1138 401L1122 404L1118 394L1121 386L1104 370L1085 378L1078 377L1075 386L1067 386L1058 365L1051 355L1054 351L1070 350L1076 341L1069 333L1055 330L1055 324L1046 319L1030 299L1032 290L1028 275L1008 270L999 275L995 268L975 262L966 243L962 227L952 221L959 209L949 179L959 158L955 153L972 132L952 119L991 50L994 33L989 30L1030 17L1239 17L1401 418Z",
+    "M879 335L843 338L819 335L823 320L849 308L869 313L878 317L877 327L879 335Z",
+    "M1144 582L1148 573L1166 576L1173 576L1178 582L1181 582L1182 585L1195 590L1218 582L1216 595L1193 607L1166 633L1151 629L1153 613L1126 608L1129 601L1148 585L1144 582Z",
+    "M689 47L687 87L697 104L689 143L673 164L664 183L654 162L616 197L592 202L570 181L570 145L576 69L594 50L614 40Z",
+    "M536 488L545 498L575 508L562 530L556 553L549 558L539 554L539 563L520 579L517 594L529 591L535 606L532 616L538 629L528 638L531 665L543 671L539 685L514 701L468 685L432 690L425 709L397 708L373 688L362 693L322 668L316 653L333 636L353 572L339 532L327 511L298 489L302 465L332 465L365 483L367 444L384 463L438 448L450 422L469 419L470 431L479 433L486 448L498 467L509 466L530 488L536 488Z",
+    "M566 725L583 713L584 743L574 768L563 760L560 736L566 725Z",
+    "M1300 981L1293 984L1292 990L1282 992L1286 964L1294 937L1307 935L1315 946L1303 962L1300 981Z",
+    "M501 1007L501 1003L521 987L530 961L530 929L537 913L567 902L586 908L584 925L607 915L609 921L594 936L593 951L601 960L595 989L576 1004L576 1007Z",
+    "M321 1007L244 993L243 962L246 942L241 919L272 907L302 909L322 899L349 895L396 897L440 902L453 909L480 900L508 904L518 913L537 913L530 929L530 961L521 987L501 1003L501 1007Z",
+    "M1536 916L1388 967L1381 956L1431 905L1429 864L1419 841L1430 829L1437 805L1446 796L1477 790L1489 795L1499 785L1529 815L1536 816Z",
+    "M1536 753L1536 816L1529 815L1499 785L1476 765L1477 753L1456 720L1469 705L1478 716L1495 725L1514 723L1522 718Z",
+    "M1303 990L1300 981L1303 962L1315 946L1307 935L1294 937L1286 913L1289 898L1299 880L1296 862L1306 866L1333 849L1348 851L1369 845L1395 823L1409 820L1437 805L1430 829L1419 841L1429 864L1431 905L1366 973Z",
+    "M1522 718L1514 723L1497 709L1495 704L1484 708L1474 702L1469 705L1456 700L1436 698L1432 682L1424 672L1455 655L1463 662L1474 664L1473 673L1489 679L1487 692L1500 696L1513 697L1520 713Z",
+    "M664 183L673 164L689 143L697 104L687 87L689 47L790 50L781 58L770 104L782 128L798 146L783 184L765 192L758 248L747 279L725 275L713 302L691 302L687 270L674 231L664 183Z",
+    "M975 262L995 268L999 275L1008 270L1028 275L1032 290L1030 299L1046 319L1055 324L1055 330L1069 333L1076 341L1070 350L1054 351L1051 355L1058 365L1067 386L1050 391L1045 400L1047 417L1038 415L1020 419L1014 412L1007 419L998 416L982 417L959 412L938 412L922 414L912 425L902 427L900 412L893 397L904 389L903 375L897 363L895 348L913 347L933 332L935 312L950 300L946 285L957 278L975 262Z",
+    "M1067 386L1075 386L1078 377L1085 378L1104 370L1121 386L1118 394L1122 404L1138 401L1149 414L1150 421L1179 426L1193 416L1210 428L1222 424L1255 426L1259 435L1255 455L1265 471L1265 483L1246 492L1237 504L1241 519L1224 526L1212 540L1192 548L1176 564L1181 582L1178 582L1173 576L1166 576L1148 573L1144 582L1140 579L1103 578L1099 566L1079 574L1074 594L1061 621L1050 617L1040 624L1028 620L1034 615L1036 603L1040 592L1038 586L1042 582L1045 587L1059 586L1064 582L1059 579L1060 574L1051 567L1045 553L1036 549L1036 538L1025 530L1016 530L998 522L984 527L980 533L970 534L966 543L950 548L943 554L932 547L918 548L904 545L895 553L892 544L880 536L883 522L888 513L893 514L887 499L904 470L914 465L915 455L902 427L912 425L922 414L938 412L959 412L982 417L998 416L1007 419L1014 412L1020 419L1038 415L1047 417L1045 400L1050 391L1067 386Z",
+    "M895 348L897 363L903 375L904 389L893 397L900 412L902 427L915 455L914 465L904 470L887 499L893 514L867 501L852 507L841 504L829 511L818 500L809 505L798 486L782 484L780 474L765 470L762 479L751 472L752 462L736 459L727 448L719 426L721 414L716 396L710 384L716 375L712 358L725 348L780 322L799 327L801 335L819 335L843 338L879 335L889 338L895 348Z",
+    "M768 550L766 563L753 563L758 571L750 593L746 598L726 599L714 606L695 603L663 592L659 580L636 585L633 591L620 585L608 583L599 576L603 568L603 562L610 561L620 571L624 562L643 565L660 560L670 562L677 569L679 564L677 542L686 538L694 522L710 534L722 520L730 518L747 529L757 527L767 534L765 538L768 550Z",
+    "M880 536L892 544L895 553L882 561L872 585L860 608L842 616L828 615L802 629L783 623L765 609L758 604L754 593L750 593L758 571L753 563L766 563L768 550L779 558L787 562L806 557L807 551L816 549L827 544L829 546L839 541L844 533L851 531L875 540L880 536Z",
+    "M980 533L984 527L998 522L1016 530L1025 530L1036 538L1036 549L1045 553L1051 567L1060 574L1059 579L1064 582L1059 586L1045 587L1042 582L1038 586L1040 592L1036 603L1034 615L1028 620L1022 605L1022 590L1019 576L987 535L980 533Z",
+    "M1028 620L1040 624L1050 617L1061 621L1063 630L1053 639L1045 637L1045 678L1030 677L1011 667L985 678L974 688L938 690L920 686L910 690L898 671L903 665L897 661L890 669L875 660L873 646L858 639L855 628L842 616L860 608L872 585L882 561L895 553L904 545L918 548L932 547L943 554L950 548L966 543L970 534L980 533L987 535L1019 576L1022 590L1022 605L1028 620Z",
+    "M946 285L950 300L935 312L933 332L913 347L895 348L889 338L879 335L877 327L878 317L869 313L849 308L843 280L864 268L895 268L913 263L916 270L926 271L946 285Z",
+    "M952 221L962 227L966 243L975 262L957 278L946 285L926 271L916 270L913 263L895 268L864 268L843 280L843 255L850 233L867 220L883 244L897 242L898 216L913 209L921 212L938 223L952 221Z",
+    "M955 153L959 158L949 179L959 209L952 221L938 223L921 212L913 209L898 216L898 197L892 201L880 190L877 171L898 160L919 153L938 156L955 153Z",
+    "M712 358L716 375L710 384L716 396L721 414L719 426L727 448L717 451L712 447L707 453L691 459L683 467L667 474L670 484L672 499L682 507L694 522L686 538L677 542L679 564L677 569L670 562L660 560L643 565L624 562L620 571L610 561L603 562L580 549L575 556L556 553L562 530L575 508L545 498L536 488L539 473L536 465L542 443L544 407L556 409L563 397L572 367L569 355L574 348L591 348L593 356L608 341L605 328L607 309L621 315L633 311L632 324L651 334L650 345L670 341L682 332L703 346L712 358Z",
+    "M903 676L910 690L920 686L938 690L974 688L985 678L1011 667L1030 677L1045 678L1034 694L1029 719L1040 737L1018 735L994 749L996 766L974 771L955 761L936 773L917 773L914 751L901 741L904 736L901 732L905 721L913 710L900 696L897 684L903 676Z",
+    "M1025 965L1022 975L983 982L983 977L948 973L952 959L968 969L989 965L1010 965L1010 970L1025 965Z",
+    "M917 773L936 773L955 761L974 771L996 766L994 749L1007 756L1002 778L997 783L981 783L968 782L938 793L957 810L945 817L931 818L916 802L912 810L919 829L933 844L924 852L940 866L953 875L956 893L930 887L940 903L923 908L935 936L917 938L894 925L883 899L877 877L851 844L849 835L861 818L862 807L870 802L870 793L886 789L895 781L909 781L912 775L917 773Z",
+    "M1499 785L1489 795L1477 790L1446 796L1437 805L1409 820L1395 823L1369 845L1348 851L1333 849L1306 866L1296 862L1299 880L1289 898L1275 886L1282 871L1267 878L1243 876L1229 898L1189 911L1164 898L1135 902L1132 917L1114 924L1085 910L1056 915L1035 885L1014 869L1023 841L1005 828L1029 792L1068 785L1074 758L1122 755L1148 727L1174 712L1214 702L1262 715L1300 718L1327 704L1348 701L1371 675L1396 665L1424 672L1432 682L1436 698L1456 700L1469 705L1456 720L1477 753L1476 765L1499 785Z",
+    "M994 749L1018 735L1040 737L1044 749L1068 757L1064 766L1035 772L1007 804L997 790L997 783L1002 778L1007 756L994 749Z",
+    "M870 793L870 802L862 807L861 818L849 835L845 832L844 825L829 814L827 798L828 775L831 765L827 760L825 749L835 732L837 738L843 735L849 744L855 747L857 759L855 771L859 785L870 793Z",
+    "M758 604L765 609L783 623L802 629L810 624L816 637L824 647L815 659L804 652L788 653L768 647L757 648L752 655L744 647L739 661L750 677L755 688L766 700L775 708L784 722L806 734L804 740L780 728L766 716L744 706L725 680L729 678L719 664L719 652L704 646L696 661L690 649L692 637L708 639L712 633L720 639L729 640L729 630L737 627L740 613L758 604Z",
+    "M603 562L603 568L599 576L608 583L620 585L617 599L606 603L590 598L583 611L572 611L569 605L555 615L544 615L535 606L529 591L517 594L520 579L539 563L539 554L549 558L556 553L575 556L580 549L603 562Z",
+    "M542 443L536 465L531 466L526 484L509 466L498 467L486 448L479 433L470 431L469 419L487 415L501 420L521 417L532 433L542 443Z",
+    "M569 355L572 367L563 397L556 409L544 407L542 443L532 433L521 417L501 420L487 415L499 408L524 362L553 352L569 355Z",
+    "M133 652L145 647L156 646L157 663L170 668L176 665L189 671L191 689L177 694L169 719L163 722L157 737L146 736L150 758L136 777L142 789L135 797L122 806L121 817L108 822L96 813L81 811L94 788L98 768L88 761L86 747L96 727L109 719L116 707L127 690L132 676L131 663L133 652Z",
+    "M121 817L122 806L135 797L142 789L136 777L150 758L146 736L157 737L163 722L169 719L177 694L191 689L189 671L176 665L170 668L157 663L156 646L145 647L133 652L143 630L138 613L178 601L204 616L235 625L259 638L278 642L316 653L322 668L362 693L373 688L397 708L425 709L423 729L396 746L363 747L358 757L339 772L323 797L329 817L311 829L300 848L279 850L254 870L196 855L177 861L163 870L151 864L145 850L143 829L121 817Z",
+    "M321 287L317 311L293 335L253 343L227 328L255 301L256 265L309 238L307 257L297 273L309 276L321 287Z",
+    "M620 585L633 591L636 585L659 580L663 592L695 603L692 619L697 634L679 628L659 639L659 656L656 665L663 683L684 701L695 730L722 758L741 758L747 765L740 772L781 794L803 812L806 818L801 830L787 814L765 809L754 831L772 843L769 860L758 862L744 891L733 893L733 883L739 865L745 858L727 822L717 817L710 803L694 796L683 782L665 779L646 763L625 739L610 719L605 685L594 680L576 667L564 670L549 684L539 685L543 671L531 665L528 638L538 629L532 616L535 606L544 615L555 615L569 605L572 611L583 611L590 598L606 603L617 599L620 585Z",
+    "M709 885L729 882L719 909L723 919L716 936L696 923L683 919L646 900L651 883L682 888L709 885Z",
+    "M559 782L573 773L585 798L578 842L566 839L554 849L545 839L549 799L545 779L559 782Z",
+    "M633 311L621 315L607 309L601 289L604 255L615 237L631 237L638 228L653 220L651 237L645 248L646 257L656 263L650 275L645 271L630 294L633 311Z",
+    "M682 277L687 294L674 320L655 300L654 286L682 277Z",
+    "M321 287L309 276L297 273L307 257L309 238L324 242L338 268L321 287Z",
+    "M375 319L383 301L376 277L355 265L353 255L364 242L361 231L347 244L355 212L351 193L368 162L389 140L401 146L422 149L394 179L413 180L432 185L421 210L397 235L415 242L423 288L434 297L438 337L440 351L463 363L456 383L444 391L448 410L426 423L399 417L362 417L354 408L337 420L319 411L301 419L292 410L332 384L352 382L322 368L320 353L344 349L338 328L348 308L375 319Z",
+    "M1481 623L1483 623L1520 713L1513 697L1500 696L1487 692L1489 679L1473 673L1474 664L1463 662L1455 655L1459 648L1480 650L1493 647L1490 639L1477 630L1481 623Z",
+    "M1514 723L1495 725L1478 716L1469 705L1474 702L1484 708L1495 704L1497 709L1514 723Z",
+    "M1314 626L1316 621L1337 621L1373 615L1409 619L1416 623L1428 613L1452 612L1464 622L1481 623L1477 630L1490 639L1493 647L1480 650L1459 648L1455 655L1424 672L1396 665L1371 675L1370 660L1357 640L1340 633L1326 633L1314 626Z",
+    "M695 603L714 606L726 599L746 598L750 593L754 593L758 604L740 613L737 627L729 630L729 640L720 639L712 633L708 639L692 637L697 634L692 619L695 603Z",
+    "M989 30L994 33L991 50L952 119L922 126L894 141L867 150L856 133L840 123L841 90L832 61L836 48Z",
+    "M888 513L883 522L880 536L875 540L851 531L844 533L839 541L829 546L827 544L816 549L807 551L806 557L787 562L779 558L768 550L765 538L770 526L780 527L787 523L788 520L792 518L793 510L798 509L801 503L808 503L809 505L818 500L829 511L841 504L852 507L867 501L888 513Z",
+    "M727 448L736 459L752 462L751 472L762 479L765 470L780 474L782 484L798 486L808 503L801 503L798 509L793 510L792 518L788 520L787 523L780 527L770 526L767 534L757 527L747 529L730 518L722 520L710 534L694 522L682 507L672 499L670 484L667 474L683 467L691 459L707 453L712 447L717 451L727 448Z",
+    "M1202 941L1207 942L1214 937L1219 936L1223 941L1233 936L1236 936L1238 939L1212 958L1198 957L1189 945L1202 941Z",
+    "M241 919L246 942L243 962L244 993L39 932L48 927L80 922L104 915L132 888L147 872L166 878L178 896L204 901L230 915L241 919Z",
+    "M806 734L784 722L775 708L766 700L755 688L750 677L739 661L744 647L752 655L757 648L768 647L788 653L804 652L815 659L824 659L818 674L830 687L827 703L817 708L809 716L806 734Z",
+    "M901 741L914 751L917 773L912 775L909 781L895 781L886 789L870 793L859 785L855 771L857 759L860 759L861 753L889 742L901 741Z",
+    "M810 624L828 615L842 616L855 628L858 639L873 646L875 660L890 669L897 661L903 665L898 671L903 676L897 684L900 696L913 710L905 721L901 732L904 736L901 741L881 745L880 742L885 730L881 730L876 724L872 723L869 718L864 716L860 711L856 714L853 725L848 728L849 725L840 718L832 715L822 704L827 703L830 687L818 674L824 659L815 659L824 647L816 637L810 624Z",
+    "M843 735L837 738L835 732L825 749L827 760L822 757L814 747L804 740L806 734L809 716L822 704L832 715L840 718L849 725L843 735Z",
+    "M857 759L855 747L849 744L843 735L848 728L853 725L856 714L860 711L864 716L869 718L872 723L876 724L881 730L885 730L880 742L881 745L861 753L860 759L857 759Z",
+  ],
+  lakes:[
+    "M977 91L990 70L1021 86L1031 100L1030 106L1026 105L1028 116L1013 118L1012 128L1005 129L1004 122L992 108L990 101L977 91Z",
+    "M716 174L715 184L703 194L695 197L688 196L690 184L693 182L699 181L709 170L716 174Z",
+    "M1063 38L1081 67L1079 76L1067 82L1058 78L1070 76L1055 64L1047 55L1041 45L1041 42L1047 43L1045 36L1054 44L1059 39L1042 26L1048 25L1052 27L1063 38Z",
+  ]
+};
+const CITIES_EUR = {
+  EDI:{name:"Edinburgh", x:396, y:235},
+  LON:{name:"London", x:418, y:396},
+  DIE:{name:"Dieppe", x:431, y:454},
+  BRE:{name:"Brest", x:302, y:475},
+  PAR:{name:"Paris", x:451, y:494},
+  PAM:{name:"Pamplona", x:317, y:674},
+  MAD:{name:"Madrid", x:247, y:739},
+  LIS:{name:"Lisboa", x:96, y:751},
+  CAD:{name:"Cádiz", x:145, y:844},
+  BAR:{name:"Barcelona", x:399, y:741},
+  MAR:{name:"Marseille", x:487, y:692},
+  ZUR:{name:"Zürich", x:579, y:565},
+  BRU:{name:"Bruxelles", x:505, y:435},
+  AMS:{name:"Amsterdam", x:524, y:386},
+  ESS:{name:"Essen", x:563, y:423},
+  FRA:{name:"Frankfurt", x:592, y:473},
+  MUN:{name:"München", x:648, y:545},
+  VEN:{name:"Venezia", x:659, y:637},
+  ROM:{name:"Roma", x:656, y:757},
+  PAL:{name:"Palermo", x:672, y:884},
+  BRI:{name:"Brindisi", x:792, y:802},
+  WIE:{name:"Wien", x:754, y:547},
+  BER:{name:"Berlin", x:695, y:399},
+  DAN:{name:"Danzig", x:800, y:338},
+  WAR:{name:"Warszawa", x:849, y:408},
+  KYI:{name:"Kyiv", x:1051, y:446},
+  MOS:{name:"Moskva", x:1150, y:239},
+  PET:{name:"Petrograd", x:993, y:132},
+  RIG:{name:"Riga", x:897, y:245},
+  STO:{name:"Stockholm", x:786, y:171},
+  KOB:{name:"København", x:685, y:291},
+  PRA:{name:"Praha", x:714, y:482},
+  BUD:{name:"Budapest", x:814, y:570},
+  ZAG:{name:"Zagreb", x:744, y:628},
+  SAR:{name:"Sarajevo", x:802, y:694},
+  SOF:{name:"Sofia", x:923, y:727},
+  BUC:{name:"Bucureşti", x:983, y:662},
+  CON:{name:"Constantinople", x:1069, y:766},
+  SMY:{name:"Smyrna", x:1034, y:859},
+  ATH:{name:"Athina", x:946, y:883},
+  SMO:{name:"Smolensk", x:1055, y:296},
+  WIL:{name:"Wilno", x:927, y:319},
+  ERZ:{name:"Erzurum", x:1382, y:729},
+  SOC:{name:"Sochi", x:1308, y:622},
+  ROS:{name:"Rostov", x:1271, y:505},
+  KHA:{name:"Kharkov", x:1173, y:435},
+  SEV:{name:"Sevastopol", x:1156, y:626},
+  ANG:{name:"Angora", x:1173, y:784},
+};
+
+/* ---------- CARTE ÉTATS-UNIS (générée) ----------
+   Les villes sont placées à leurs vraies coordonnées géographiques (projection
+   conique d'Albers, parallèles 29,5° / 45,5°) ; le fond de carte est tracé en SVG. */
+const ROUTES_USA = [
+  {id:"u1",  a:"VAN", b:"SEA", len:1, color:"gris",   dbl:"u2"},
+  {id:"u2",  a:"VAN", b:"SEA", len:1, color:"gris",   dbl:"u1"},
+  {id:"u3",  a:"VAN", b:"CAL", len:3, color:"gris"},
+  {id:"u4",  a:"CAL", b:"WIN", len:6, color:"blanc"},
+  {id:"u5",  a:"CAL", b:"HEL", len:4, color:"gris"},
+  {id:"u6",  a:"CAL", b:"SEA", len:4, color:"gris"},
+  {id:"u7",  a:"SEA", b:"POR", len:1, color:"gris",   dbl:"u8"},
+  {id:"u8",  a:"SEA", b:"POR", len:1, color:"gris",   dbl:"u7"},
+  {id:"u9",  a:"SEA", b:"HEL", len:6, color:"jaune"},
+  {id:"u10", a:"POR", b:"SFO", len:5, color:"vert",   dbl:"u11"},
+  {id:"u11", a:"POR", b:"SFO", len:5, color:"violet", dbl:"u10"},
+  {id:"u12", a:"POR", b:"SLC", len:6, color:"bleu"},
+  {id:"u13", a:"SFO", b:"SLC", len:5, color:"orange", dbl:"u14"},
+  {id:"u14", a:"SFO", b:"SLC", len:5, color:"blanc",  dbl:"u13"},
+  {id:"u15", a:"SFO", b:"LAX", len:3, color:"violet", dbl:"u16"},
+  {id:"u16", a:"SFO", b:"LAX", len:3, color:"jaune",  dbl:"u15"},
+  {id:"u17", a:"LAX", b:"LVG", len:2, color:"gris"},
+  {id:"u18", a:"LAX", b:"PHX", len:3, color:"gris"},
+  {id:"u19", a:"LAX", b:"ELP", len:6, color:"noir"},
+  {id:"u20", a:"LVG", b:"SLC", len:3, color:"orange"},
+  {id:"u21", a:"SLC", b:"HEL", len:3, color:"violet"},
+  {id:"u22", a:"SLC", b:"DEN", len:3, color:"rouge",  dbl:"u23"},
+  {id:"u23", a:"SLC", b:"DEN", len:3, color:"jaune",  dbl:"u22"},
+  {id:"u24", a:"HEL", b:"WIN", len:4, color:"bleu"},
+  {id:"u25", a:"HEL", b:"DUL", len:6, color:"orange"},
+  {id:"u26", a:"HEL", b:"OMA", len:5, color:"rouge"},
+  {id:"u27", a:"HEL", b:"DEN", len:4, color:"vert"},
+  {id:"u28", a:"WIN", b:"SSM", len:6, color:"gris"},
+  {id:"u29", a:"WIN", b:"DUL", len:4, color:"noir"},
+  {id:"u30", a:"DUL", b:"SSM", len:3, color:"gris"},
+  {id:"u31", a:"DUL", b:"TOR", len:6, color:"violet"},
+  {id:"u32", a:"DUL", b:"CHI", len:3, color:"rouge"},
+  {id:"u33", a:"DUL", b:"OMA", len:2, color:"gris",   dbl:"u34"},
+  {id:"u34", a:"DUL", b:"OMA", len:2, color:"gris",   dbl:"u33"},
+  {id:"u35", a:"OMA", b:"CHI", len:4, color:"bleu"},
+  {id:"u36", a:"OMA", b:"KAN", len:1, color:"gris",   dbl:"u37"},
+  {id:"u37", a:"OMA", b:"KAN", len:1, color:"gris",   dbl:"u36"},
+  {id:"u38", a:"OMA", b:"DEN", len:4, color:"violet"},
+  {id:"u39", a:"DEN", b:"KAN", len:4, color:"noir",   dbl:"u40"},
+  {id:"u40", a:"DEN", b:"KAN", len:4, color:"orange", dbl:"u39"},
+  {id:"u41", a:"DEN", b:"OKC", len:4, color:"rouge"},
+  {id:"u42", a:"DEN", b:"SFE", len:2, color:"gris"},
+  {id:"u43", a:"DEN", b:"PHX", len:5, color:"blanc"},
+  {id:"u44", a:"PHX", b:"SFE", len:3, color:"gris"},
+  {id:"u45", a:"PHX", b:"ELP", len:3, color:"gris"},
+  {id:"u46", a:"SFE", b:"ELP", len:2, color:"gris"},
+  {id:"u47", a:"SFE", b:"OKC", len:3, color:"bleu"},
+  {id:"u48", a:"ELP", b:"OKC", len:5, color:"jaune"},
+  {id:"u49", a:"ELP", b:"DAL", len:4, color:"rouge"},
+  {id:"u50", a:"ELP", b:"HOU", len:6, color:"vert"},
+  {id:"u51", a:"OKC", b:"KAN", len:2, color:"gris",   dbl:"u52"},
+  {id:"u52", a:"OKC", b:"KAN", len:2, color:"gris",   dbl:"u51"},
+  {id:"u53", a:"OKC", b:"LRK", len:2, color:"gris"},
+  {id:"u54", a:"OKC", b:"DAL", len:2, color:"gris",   dbl:"u55"},
+  {id:"u55", a:"OKC", b:"DAL", len:2, color:"gris",   dbl:"u54"},
+  {id:"u56", a:"KAN", b:"STL", len:2, color:"bleu",   dbl:"u57"},
+  {id:"u57", a:"KAN", b:"STL", len:2, color:"violet", dbl:"u56"},
+  {id:"u58", a:"DAL", b:"LRK", len:2, color:"gris"},
+  {id:"u59", a:"DAL", b:"HOU", len:1, color:"gris",   dbl:"u60"},
+  {id:"u60", a:"DAL", b:"HOU", len:1, color:"gris",   dbl:"u59"},
+  {id:"u61", a:"HOU", b:"NOR", len:2, color:"gris"},
+  {id:"u62", a:"LRK", b:"STL", len:2, color:"gris"},
+  {id:"u63", a:"LRK", b:"NSH", len:3, color:"blanc"},
+  {id:"u64", a:"LRK", b:"NOR", len:3, color:"vert"},
+  {id:"u65", a:"NOR", b:"ATL", len:4, color:"jaune",  dbl:"u66"},
+  {id:"u66", a:"NOR", b:"ATL", len:4, color:"orange", dbl:"u65"},
+  {id:"u67", a:"NOR", b:"MIA", len:6, color:"rouge"},
+  {id:"u68", a:"STL", b:"CHI", len:2, color:"vert",   dbl:"u69"},
+  {id:"u69", a:"STL", b:"CHI", len:2, color:"blanc",  dbl:"u68"},
+  {id:"u70", a:"STL", b:"PIT", len:5, color:"vert"},
+  {id:"u71", a:"STL", b:"NSH", len:2, color:"gris"},
+  {id:"u72", a:"CHI", b:"TOR", len:4, color:"blanc"},
+  {id:"u73", a:"CHI", b:"PIT", len:3, color:"orange", dbl:"u74"},
+  {id:"u74", a:"CHI", b:"PIT", len:3, color:"noir",   dbl:"u73"},
+  {id:"u75", a:"NSH", b:"ATL", len:1, color:"gris"},
+  {id:"u76", a:"NSH", b:"RAL", len:3, color:"noir"},
+  {id:"u77", a:"NSH", b:"PIT", len:4, color:"jaune"},
+  {id:"u78", a:"ATL", b:"MIA", len:5, color:"bleu"},
+  {id:"u79", a:"ATL", b:"CHA", len:2, color:"gris"},
+  {id:"u80", a:"ATL", b:"RAL", len:2, color:"gris",   dbl:"u81"},
+  {id:"u81", a:"ATL", b:"RAL", len:2, color:"gris",   dbl:"u80"},
+  {id:"u82", a:"CHA", b:"MIA", len:4, color:"violet"},
+  {id:"u83", a:"CHA", b:"RAL", len:2, color:"gris"},
+  {id:"u84", a:"RAL", b:"WAS", len:2, color:"gris",   dbl:"u85"},
+  {id:"u85", a:"RAL", b:"WAS", len:2, color:"gris",   dbl:"u84"},
+  {id:"u86", a:"RAL", b:"PIT", len:2, color:"gris"},
+  {id:"u87", a:"WAS", b:"PIT", len:2, color:"gris"},
+  {id:"u88", a:"WAS", b:"NYC", len:2, color:"orange", dbl:"u89"},
+  {id:"u89", a:"WAS", b:"NYC", len:2, color:"noir",   dbl:"u88"},
+  {id:"u90", a:"PIT", b:"NYC", len:2, color:"blanc",  dbl:"u91"},
+  {id:"u91", a:"PIT", b:"NYC", len:2, color:"vert",   dbl:"u90"},
+  {id:"u92", a:"PIT", b:"TOR", len:2, color:"gris"},
+  {id:"u93", a:"TOR", b:"MTL", len:3, color:"gris"},
+  {id:"u94", a:"TOR", b:"SSM", len:2, color:"gris"},
+  {id:"u95", a:"SSM", b:"MTL", len:5, color:"noir"},
+  {id:"u96", a:"MTL", b:"NYC", len:3, color:"bleu"},
+  {id:"u97", a:"MTL", b:"BOS", len:2, color:"gris",   dbl:"u98"},
+  {id:"u98", a:"MTL", b:"BOS", len:2, color:"gris",   dbl:"u97"},
+  {id:"u99", a:"BOS", b:"NYC", len:2, color:"jaune",  dbl:"u100"},
+  {id:"u100",a:"BOS", b:"NYC", len:2, color:"rouge",  dbl:"u99"}
+];
+const TICKETS_USA = [
+  {a:"DEN", b:"ELP", pts:4},
+  {a:"KAN", b:"HOU", pts:5},
+  {a:"NYC", b:"ATL", pts:6},
+  {a:"CHI", b:"NOR", pts:7},
+  {a:"CAL", b:"SLC", pts:7},
+  {a:"HEL", b:"LAX", pts:8},
+  {a:"DUL", b:"HOU", pts:8},
+  {a:"SSM", b:"NSH", pts:8},
+  {a:"MTL", b:"ATL", pts:9},
+  {a:"SSM", b:"OKC", pts:9},
+  {a:"SEA", b:"LAX", pts:9},
+  {a:"CHI", b:"SFE", pts:9},
+  {a:"DUL", b:"ELP", pts:10},
+  {a:"TOR", b:"MIA", pts:10},
+  {a:"POR", b:"PHX", pts:11},
+  {a:"DAL", b:"NYC", pts:11},
+  {a:"DEN", b:"PIT", pts:11},
+  {a:"WIN", b:"LRK", pts:11},
+  {a:"WIN", b:"HOU", pts:12},
+  {a:"BOS", b:"MIA", pts:12},
+  {a:"VAN", b:"SFE", pts:13},
+  {a:"CAL", b:"PHX", pts:13},
+  {a:"MTL", b:"NOR", pts:13},
+  {a:"LAX", b:"CHI", pts:16},
+  {a:"SFO", b:"ATL", pts:17},
+  {a:"POR", b:"NSH", pts:17},
+  {a:"LAX", b:"MIA", pts:20},
+  {a:"VAN", b:"MTL", pts:20},
+  {a:"LAX", b:"NYC", pts:21},
+  {a:"SEA", b:"NYC", pts:22}
+];
+
+/* ---------- CARTE EUROPE (générée) ---------- */
+const ROUTES_EUR = [
+  {id:"e1",  a:"EDI", b:"LON", len:4, color:"noir",   dbl:"e2"},
+  {id:"e2",  a:"EDI", b:"LON", len:4, color:"orange", dbl:"e1"},
+  {id:"e3",  a:"LON", b:"DIE", len:2, color:"gris",   dbl:"e4"},
+  {id:"e4",  a:"LON", b:"DIE", len:2, color:"gris",   dbl:"e3"},
+  {id:"e5",  a:"LON", b:"AMS", len:2, color:"gris"},
+  {id:"e6",  a:"DIE", b:"PAR", len:1, color:"gris",   dbl:"e7"},
+  {id:"e7",  a:"DIE", b:"PAR", len:1, color:"gris",   dbl:"e6"},
+  {id:"e8",  a:"DIE", b:"BRU", len:2, color:"vert"},
+  {id:"e9",  a:"DIE", b:"BRE", len:2, color:"orange"},
+  {id:"e10", a:"BRE", b:"PAR", len:3, color:"noir"},
+  {id:"e11", a:"BRE", b:"PAM", len:4, color:"violet"},
+  {id:"e12", a:"PAR", b:"PAM", len:4, color:"bleu",   dbl:"e13"},
+  {id:"e13", a:"PAR", b:"PAM", len:4, color:"vert",   dbl:"e12"},
+  {id:"e14", a:"PAR", b:"MAR", len:4, color:"gris"},
+  {id:"e15", a:"PAR", b:"ZUR", len:3, color:"gris"},
+  {id:"e16", a:"PAR", b:"FRA", len:3, color:"blanc",  dbl:"e17"},
+  {id:"e17", a:"PAR", b:"FRA", len:3, color:"orange", dbl:"e16"},
+  {id:"e18", a:"PAR", b:"BRU", len:2, color:"jaune",  dbl:"e19"},
+  {id:"e19", a:"PAR", b:"BRU", len:2, color:"rouge",  dbl:"e18"},
+  {id:"e20", a:"BRU", b:"AMS", len:1, color:"noir"},
+  {id:"e21", a:"BRU", b:"FRA", len:2, color:"bleu"},
+  {id:"e22", a:"AMS", b:"ESS", len:3, color:"jaune"},
+  {id:"e23", a:"AMS", b:"FRA", len:2, color:"blanc"},
+  {id:"e24", a:"ESS", b:"FRA", len:2, color:"vert"},
+  {id:"e25", a:"ESS", b:"BER", len:2, color:"bleu"},
+  {id:"e26", a:"ESS", b:"KOB", len:3, color:"gris"},
+  {id:"e27", a:"FRA", b:"MUN", len:2, color:"violet"},
+  {id:"e28", a:"FRA", b:"BER", len:3, color:"noir",   dbl:"e29"},
+  {id:"e29", a:"FRA", b:"BER", len:3, color:"rouge",  dbl:"e28"},
+  {id:"e30", a:"BER", b:"DAN", len:4, color:"gris"},
+  {id:"e31", a:"BER", b:"WAR", len:4, color:"violet", dbl:"e32"},
+  {id:"e32", a:"BER", b:"WAR", len:4, color:"jaune",  dbl:"e31"},
+  {id:"e33", a:"BER", b:"PRA", len:2, color:"vert"},
+  {id:"e34", a:"PRA", b:"WIE", len:2, color:"gris"},
+  {id:"e35", a:"PRA", b:"MUN", len:3, color:"blanc"},
+  {id:"e36", a:"PRA", b:"WAR", len:4, color:"gris"},
+  {id:"e37", a:"DAN", b:"WAR", len:2, color:"gris"},
+  {id:"e38", a:"DAN", b:"RIG", len:3, color:"noir"},
+  {id:"e39", a:"WAR", b:"WIE", len:4, color:"bleu"},
+  {id:"e40", a:"WAR", b:"WIL", len:3, color:"rouge"},
+  {id:"e41", a:"WAR", b:"KYI", len:4, color:"gris"},
+  {id:"e42", a:"WIE", b:"MUN", len:3, color:"orange"},
+  {id:"e43", a:"WIE", b:"ZAG", len:2, color:"gris"},
+  {id:"e44", a:"WIE", b:"BUD", len:1, color:"rouge",  dbl:"e45"},
+  {id:"e45", a:"WIE", b:"BUD", len:1, color:"blanc",  dbl:"e44"},
+  {id:"e46", a:"MUN", b:"ZUR", len:2, color:"jaune"},
+  {id:"e47", a:"MUN", b:"VEN", len:2, color:"bleu"},
+  {id:"e48", a:"ZUR", b:"VEN", len:2, color:"vert"},
+  {id:"e49", a:"ZUR", b:"MAR", len:2, color:"violet"},
+  {id:"e50", a:"MAR", b:"BAR", len:4, color:"gris"},
+  {id:"e51", a:"MAR", b:"ROM", len:4, color:"gris"},
+  {id:"e52", a:"BAR", b:"PAM", len:2, color:"gris"},
+  {id:"e53", a:"BAR", b:"MAD", len:2, color:"jaune"},
+  {id:"e54", a:"MAD", b:"PAM", len:3, color:"noir",   dbl:"e55"},
+  {id:"e55", a:"MAD", b:"PAM", len:3, color:"blanc",  dbl:"e54"},
+  {id:"e56", a:"MAD", b:"LIS", len:3, color:"violet"},
+  {id:"e57", a:"MAD", b:"CAD", len:3, color:"orange"},
+  {id:"e58", a:"LIS", b:"CAD", len:2, color:"bleu"},
+  {id:"e59", a:"ROM", b:"VEN", len:2, color:"noir"},
+  {id:"e60", a:"ROM", b:"BRI", len:2, color:"blanc"},
+  {id:"e61", a:"ROM", b:"PAL", len:4, color:"gris"},
+  {id:"e62", a:"PAL", b:"BRI", len:3, color:"gris"},
+  {id:"e63", a:"PAL", b:"SMY", len:6, color:"gris"},
+  {id:"e64", a:"BRI", b:"ATH", len:4, color:"gris"},
+  {id:"e65", a:"VEN", b:"ZAG", len:2, color:"gris"},
+  {id:"e66", a:"ZAG", b:"BUD", len:2, color:"orange"},
+  {id:"e67", a:"ZAG", b:"SAR", len:3, color:"rouge"},
+  {id:"e68", a:"BUD", b:"SAR", len:3, color:"violet"},
+  {id:"e69", a:"BUD", b:"BUC", len:4, color:"gris"},
+  {id:"e70", a:"BUD", b:"KYI", len:6, color:"gris"},
+  {id:"e71", a:"SAR", b:"SOF", len:2, color:"gris"},
+  {id:"e72", a:"SAR", b:"ATH", len:4, color:"vert"},
+  {id:"e73", a:"SOF", b:"ATH", len:3, color:"violet"},
+  {id:"e74", a:"SOF", b:"BUC", len:2, color:"gris"},
+  {id:"e75", a:"SOF", b:"CON", len:3, color:"bleu"},
+  {id:"e76", a:"BUC", b:"CON", len:3, color:"jaune"},
+  {id:"e77", a:"BUC", b:"KYI", len:4, color:"gris"},
+  {id:"e78", a:"BUC", b:"SEV", len:4, color:"blanc"},
+  {id:"e79", a:"CON", b:"SMY", len:2, color:"gris"},
+  {id:"e80", a:"CON", b:"ANG", len:2, color:"gris"},
+  {id:"e81", a:"CON", b:"SEV", len:4, color:"gris"},
+  {id:"e82", a:"SMY", b:"ANG", len:3, color:"orange"},
+  {id:"e83", a:"SMY", b:"ATH", len:2, color:"gris"},
+  {id:"e84", a:"ANG", b:"ERZ", len:3, color:"noir"},
+  {id:"e85", a:"ERZ", b:"SOC", len:3, color:"gris"},
+  {id:"e86", a:"ERZ", b:"SEV", len:4, color:"gris"},
+  {id:"e87", a:"SOC", b:"SEV", len:2, color:"gris"},
+  {id:"e88", a:"SOC", b:"ROS", len:2, color:"gris"},
+  {id:"e89", a:"ROS", b:"SEV", len:4, color:"gris"},
+  {id:"e90", a:"ROS", b:"KHA", len:2, color:"vert"},
+  {id:"e91", a:"KHA", b:"KYI", len:4, color:"gris"},
+  {id:"e92", a:"KHA", b:"MOS", len:4, color:"gris"},
+  {id:"e93", a:"MOS", b:"SMO", len:2, color:"orange"},
+  {id:"e94", a:"MOS", b:"PET", len:4, color:"blanc"},
+  {id:"e95", a:"SMO", b:"KYI", len:3, color:"rouge"},
+  {id:"e96", a:"SMO", b:"WIL", len:3, color:"jaune"},
+  {id:"e97", a:"WIL", b:"RIG", len:4, color:"vert"},
+  {id:"e98", a:"WIL", b:"PET", len:4, color:"gris"},
+  {id:"e99", a:"WIL", b:"KYI", len:2, color:"gris"},
+  {id:"e100",a:"RIG", b:"PET", len:4, color:"gris"},
+  {id:"e101",a:"PET", b:"STO", len:8, color:"gris"},
+  {id:"e102",a:"STO", b:"KOB", len:3, color:"jaune",  dbl:"e103"},
+  {id:"e103",a:"STO", b:"KOB", len:3, color:"blanc",  dbl:"e102"}
+];
+const TICKETS_EUR = [
+  {a:"ATH", b:"ANG", pts:5},
+  {a:"BUD", b:"SOF", pts:5},
+  {a:"FRA", b:"KOB", pts:5},
+  {a:"ROS", b:"ERZ", pts:5},
+  {a:"SOF", b:"SMY", pts:5},
+  {a:"BUC", b:"SOC", pts:5},
+  {a:"KYI", b:"PET", pts:6},
+  {a:"WAR", b:"SMO", pts:6},
+  {a:"ZAG", b:"BRI", pts:6},
+  {a:"ZUR", b:"BRI", pts:6},
+  {a:"ZUR", b:"BUD", pts:6},
+  {a:"AMS", b:"PAM", pts:7},
+  {a:"BRE", b:"MAR", pts:7},
+  {a:"EDI", b:"PAR", pts:7},
+  {a:"LON", b:"BER", pts:7},
+  {a:"PAR", b:"ZAG", pts:7},
+  {a:"BAR", b:"BRU", pts:8},
+  {a:"BAR", b:"MUN", pts:8},
+  {a:"BER", b:"BUC", pts:8},
+  {a:"BRE", b:"VEN", pts:8},
+  {a:"KYI", b:"SOC", pts:8},
+  {a:"MAD", b:"DIE", pts:8},
+  {a:"MAD", b:"ZUR", pts:8},
+  {a:"MAR", b:"ESS", pts:8},
+  {a:"PAL", b:"CON", pts:8},
+  {a:"PAR", b:"WIE", pts:8},
+  {a:"ROM", b:"SMY", pts:8},
+  {a:"SAR", b:"SEV", pts:8},
+  {a:"SMO", b:"ROS", pts:8},
+  {a:"BER", b:"ROM", pts:9},
+  {a:"BRU", b:"DAN", pts:9},
+  {a:"PRA", b:"ATH", pts:9},
+  {a:"ANG", b:"KHA", pts:10},
+  {a:"ESS", b:"KYI", pts:10},
+  {a:"LON", b:"WIE", pts:10},
+  {a:"RIG", b:"BUC", pts:10},
+  {a:"VEN", b:"CON", pts:10},
+  {a:"PRA", b:"BRE", pts:10},
+  {a:"ATH", b:"WIL", pts:11},
+  {a:"AMS", b:"WIL", pts:12},
+  {a:"BER", b:"MOS", pts:12},
+  {a:"FRA", b:"SMO", pts:13},
+  {a:"BRE", b:"PET", pts:20},
+  {a:"LIS", b:"DAN", pts:20},
+  {a:"PAL", b:"MOS", pts:20},
+  {a:"CAD", b:"STO", pts:21},
+  {a:"KOB", b:"ERZ", pts:21},
+  {a:"EDI", b:"ATH", pts:21},
+  {a:"STO", b:"WIE", pts:21}
+];
+
+/* ---------- registre des cartes ---------- */
+const MAPS = {
+  hp: {
+    id:"hp", name:"Harry Potter", tag:"⚡", sub:"plateau illustré",
+    desc:"Le plateau imprimé de l'édition Harry Potter : Poudlard, Pré-au-Lard, Azkaban…",
+    img:"asset/aventurierRailPlato.png", drawn:false, wagons:40,
+    cities:CITIES_HP, routes:ROUTES_HP, tickets:TICKETS_HP
+  },
+  usa: {
+    id:"usa", name:"États-Unis", tag:"🗽", sub:"carte générée",
+    desc:"La carte classique du jeu : 36 villes d'Amérique du Nord, de Vancouver à Miami.",
+    drawn:true, wagons:45, geo:GEO_USA,
+    cities:CITIES_USA, routes:ROUTES_USA, tickets:TICKETS_USA
+  },
+  eur: {
+    id:"eur", name:"Europe", tag:"🏰", sub:"carte générée",
+    desc:"La carte classique du jeu : 48 villes d'Europe, de Lisboa à Erzurum.",
+    drawn:true, wagons:45, geo:GEO_EUR,
+    cities:CITIES_EUR, routes:ROUTES_EUR, tickets:TICKETS_EUR
+  }
+};
+const MAP_ORDER = ["hp","usa","eur"];
+
+/* la carte courante : CITIES / ROUTES / TICKETS pointent dessus, tout le reste du
+   jeu (IA, score, réseau) travaille sans savoir quelle carte est en place */
+let MAP_ID = "hp";
+let MAPDEF = MAPS.hp;
+let CITIES = MAPDEF.cities;
+let ROUTES = MAPDEF.routes;
+let TICKETS = MAPDEF.tickets;
+let START_WAGONS = MAPDEF.wagons;
+let ROUTE_BY_ID = {};
+function setMap(id){
+  if(!MAPS[id]) id = "hp";
+  MAP_ID = id;
+  MAPDEF = MAPS[id];
+  CITIES = MAPDEF.cities;
+  ROUTES = MAPDEF.routes;
+  TICKETS = MAPDEF.tickets;
+  START_WAGONS = MAPDEF.wagons;
+  ROUTE_BY_ID = {};
+  ROUTES.forEach(r=>ROUTE_BY_ID[r.id]=r);
+  boardBuilt = false;   /* le plateau sera redessiné au prochain rendu */
+  const svg = document.getElementById("boardSvg");
+  if(svg) svg.innerHTML = "";
+}
+
+
 function ticketKey(t){ return [t.a, t.b].sort().join("|"); }
 /* paquet dédupliqué : impossible d'avoir deux cartes avec la même paire de lieux */
 function buildTicketDeck(){
@@ -531,7 +1075,6 @@ function dealOffer(pIdx, n){
   return offer;
 }
 
-const START_WAGONS = 40;
 const CARD_TYPES = COLORS.concat(["loco"]);
 
 /* ---------- sprites de la planche de cartes ---------- */
@@ -594,8 +1137,8 @@ function log(msg){
 function renderLog(list){
   const el = document.getElementById("log");
   el.innerHTML = "";
-  list.slice(-60).forEach(m=>{ const d=document.createElement("div"); d.textContent=m; el.appendChild(d); });
-  el.scrollTop = el.scrollHeight;
+  list.slice(-60).reverse().forEach(m=>{ const d=document.createElement("div"); d.textContent=m; el.appendChild(d); }); // plus récent en premier
+  el.scrollTop = 0;
 }
 
 /* ---------- création de partie ---------- */
@@ -1095,22 +1638,87 @@ function polyAt(info, dist){
   }
 }
 
+/* ---------- tracé des routes sur une carte générée ----------
+   Deux corrections automatiques, pour éviter d'avoir à saisir des points de
+   passage à la main sur les 100 (USA) / 103 (Europe) tronçons :
+   - les deux voies d'une route double sont écartées de part et d'autre ;
+   - un tronçon qui frôlerait une AUTRE ville est courbé pour la contourner. */
+function drawnRoutePts(r){
+  const A = CITIES[r.a], B = CITIES[r.b];
+  let pts = [[A.x,A.y]].concat(r.via||[]).concat([[B.x,B.y]]);
+  const dx = B.x-A.x, dy = B.y-A.y, L = Math.hypot(dx,dy) || 1;
+  const nx = -dy/L, ny = dx/L;                       /* normale au segment */
+
+  /* route double : on décale la voie d'un côté ou de l'autre (ordre des id) */
+  if(r.dbl && !r.via){
+    const side = r.id < r.dbl ? 1 : -1;
+    pts = [[A.x,A.y], [(A.x+B.x)/2 + nx*11*side, (A.y+B.y)/2 + ny*11*side], [B.x,B.y]];
+  }
+  if(r.via) return pts;
+
+  /* évitement des villes tierges : on repousse le tracé à 30 px minimum */
+  const MIN = 30;
+  const bends = [];
+  Object.keys(CITIES).forEach(id=>{
+    if(id===r.a || id===r.b) return;
+    const C = CITIES[id];
+    const t = ((C.x-A.x)*dx + (C.y-A.y)*dy) / (L*L);
+    if(t<=0.06 || t>=0.94) return;
+    const px = A.x+dx*t, py = A.y+dy*t;
+    const d = Math.hypot(C.x-px, C.y-py);
+    if(d>=MIN) return;
+    const side = ((C.x-A.x)*ny - (C.y-A.y)*nx) > 0 ? -1 : 1;  /* on s'écarte de C */
+    bends.push({t, x:px + nx*(MIN-d)*side, y:py + ny*(MIN-d)*side, d});
+  });
+  if(!bends.length) return pts;
+  bends.sort((a,b)=>a.t-b.t);
+  const keep = bends.length<=2 ? bends
+             : [bends[0], bends[bends.length-1]];
+  const mid = pts.slice(1,-1);
+  return [pts[0]].concat(keep.map(b=>[b.x,b.y])).concat(mid).concat([pts[pts.length-1]]);
+}
+
+/* fond de carte dessiné (continents, mers, lacs) */
+function drawGeo(svg){
+  const sea = document.createElementNS(svgNS,"rect");
+  sea.setAttribute("width","1536"); sea.setAttribute("height","1024");
+  sea.setAttribute("class","geo-sea");
+  svg.appendChild(sea);
+  MAPDEF.geo.land.forEach(d=>{
+    const p = document.createElementNS(svgNS,"path");
+    p.setAttribute("d", d); p.setAttribute("class","geo-land");
+    svg.appendChild(p);
+  });
+  MAPDEF.geo.lakes.forEach(d=>{
+    const p = document.createElementNS(svgNS,"path");
+    p.setAttribute("d", d); p.setAttribute("class","geo-lake");
+    svg.appendChild(p);
+  });
+}
+
 function buildBoard(){
   if(boardBuilt) return;
   boardBuilt = true;
   const svg = document.getElementById("boardSvg");
   svg.innerHTML = "";
-  const img = document.createElementNS(svgNS,"image");
-  img.setAttribute("href", "asset/aventurierRailPlato.png");
-  img.setAttribute("width","1536"); img.setAttribute("height","1024");
-  svg.appendChild(img);
+  const drawn = !!MAPDEF.drawn;
+  if(drawn){
+    drawGeo(svg);
+  } else {
+    const img = document.createElementNS(svgNS,"image");
+    img.setAttribute("href", MAPDEF.img);
+    img.setAttribute("width","1536"); img.setAttribute("height","1024");
+    svg.appendChild(img);
+  }
 
-  /* routes : emplacements invisibles calés sur les wagons imprimés */
+  /* routes : emplacements de wagons le long du tracé
+     (invisibles sur le plateau imprimé, coloriés sur une carte générée) */
   ROUTES.forEach(r=>{
     const A = CITIES[r.a], B = CITIES[r.b];
-    const pts = [[A.x,A.y]].concat(r.via||[]).concat([[B.x,B.y]]);
+    const pts = drawn ? drawnRoutePts(r)
+                      : [[A.x,A.y]].concat(r.via||[]).concat([[B.x,B.y]]);
     const info = polyInfo(pts);
-    const inset = 20;
+    const inset = drawn ? Math.min(22, info.total*0.16) : 20;
     const usable = info.total - inset*2;
     const g = document.createElementNS(svgNS,"g");
     g.setAttribute("class","route");
@@ -1122,9 +1730,17 @@ function buildBoard(){
     glow.setAttribute("class","route-glow");
     g.appendChild(glow);
 
+    /* carte générée : fine voie ferrée sous les wagons */
+    if(drawn){
+      const line = document.createElementNS(svgNS,"polyline");
+      line.setAttribute("points", pts.map(p=>p.join(",")).join(" "));
+      line.setAttribute("class","route-line");
+      g.appendChild(line);
+    }
+
     for(let i=0;i<r.len;i++){
       const p = polyAt(info, inset + usable*(i+0.5)/r.len);
-      const w = Math.max(24, Math.min(44, usable/r.len - 5)), h = 17;
+      const w = Math.max(drawn?13:24, Math.min(44, usable/r.len - 5)), h = drawn?15:17;
       const car = document.createElementNS(svgNS,"rect");
       car.setAttribute("x", p.x-w/2); car.setAttribute("y", p.y-h/2);
       car.setAttribute("width", w); car.setAttribute("height", h);
@@ -1134,8 +1750,8 @@ function buildBoard(){
       car.dataset.hintFill = COLOR_HEX[r.color];
       g.appendChild(car);
       const win = document.createElementNS(svgNS,"rect");
-      win.setAttribute("x", p.x-w/2+5); win.setAttribute("y", p.y-h/2+3.5);
-      win.setAttribute("width", w-10); win.setAttribute("height", 5);
+      win.setAttribute("x", p.x-w*0.31); win.setAttribute("y", p.y-h/2+3.5);
+      win.setAttribute("width", w*0.62); win.setAttribute("height", 5);
       win.setAttribute("rx","2.5");
       win.setAttribute("class","route-win");
       win.setAttribute("transform",`rotate(${p.angle} ${p.x} ${p.y})`);
@@ -1161,6 +1777,75 @@ function buildBoard(){
     glow.dataset.city = id;
     svg.appendChild(glow);
   });
+
+  /* carte générée : pastille + nom de chaque ville.
+     L'étiquette est posée du côté le plus dégagé (à l'opposé des routes qui
+     partent de la ville), pour ne pas se poser sur un tracé. */
+  if(drawn){
+    const dirs = {};
+    Object.keys(CITIES).forEach(id=>{ dirs[id] = [0,0]; });
+    ROUTES.forEach(r=>{
+      const A = CITIES[r.a], B = CITIES[r.b];
+      const L = Math.hypot(B.x-A.x, B.y-A.y) || 1;
+      dirs[r.a][0] += (B.x-A.x)/L; dirs[r.a][1] += (B.y-A.y)/L;
+      dirs[r.b][0] += (A.x-B.x)/L; dirs[r.b][1] += (A.y-B.y)/L;
+    });
+    /* les étiquettes sont placées une par une : on essaie la direction dégagée,
+       puis on tourne autour de la ville jusqu'à ne plus chevaucher les
+       étiquettes déjà posées ni les pastilles des villes */
+    const placed = [];
+    const dotBoxes = Object.keys(CITIES).map(id=>{
+      const c = CITIES[id];
+      return {x:c.x-10, y:c.y-10, w:20, h:20};
+    });
+    const overlaps = (a,b)=> a.x < b.x+b.w && b.x < a.x+a.w && a.y < b.y+b.h && b.y < a.y+a.h;
+    Object.keys(CITIES).forEach(id=>{
+      const c = CITIES[id];
+      const g = document.createElementNS(svgNS,"g");
+      g.setAttribute("pointer-events","none");
+      let [dx,dy] = dirs[id];
+      const L = Math.hypot(dx,dy);
+      let base = (L<0.25) ? -Math.PI/2 : Math.atan2(-dy/L, -dx/L);
+      const txt = document.createElementNS(svgNS,"text");
+      txt.setAttribute("class","city-lbl");
+      txt.textContent = c.name;
+      g.appendChild(txt);
+      svg.appendChild(g);
+
+      let best = null, bestCost = Infinity;
+      const tries = [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.2, -2.2, Math.PI];
+      for(let k=0;k<tries.length;k++){
+        const a = base + tries[k];
+        const vx = Math.cos(a), vy = Math.sin(a);
+        const rad = 22 + (Math.abs(vy)>0.7 ? 0 : 4);
+        const x = Math.max(70, Math.min(1466, c.x + vx*rad));
+        const y = Math.max(26, Math.min(1006, c.y + vy*rad + 5));
+        txt.setAttribute("x", x); txt.setAttribute("y", y);
+        txt.setAttribute("text-anchor", vx>0.35 ? "start" : (vx<-0.35 ? "end" : "middle"));
+        const bb = txt.getBBox();
+        const box = {x:bb.x-6, y:bb.y-2, w:bb.width+12, h:bb.height+4};
+        let cost = k*0.2;
+        placed.forEach(p=>{ if(overlaps(box,p)) cost += 10; });
+        dotBoxes.forEach(p=>{ if(overlaps(box,p)) cost += 6; });
+        if(cost < bestCost){ bestCost = cost; best = {x,y,anchor:txt.getAttribute("text-anchor"),box}; }
+        if(cost < 0.001) break;
+      }
+      txt.setAttribute("x", best.x); txt.setAttribute("y", best.y);
+      txt.setAttribute("text-anchor", best.anchor);
+      placed.push(best.box);
+      const plate = document.createElementNS(svgNS,"rect");
+      plate.setAttribute("x", best.box.x); plate.setAttribute("y", best.box.y);
+      plate.setAttribute("width", best.box.w); plate.setAttribute("height", best.box.h);
+      plate.setAttribute("rx","5");
+      plate.setAttribute("class","city-plate");
+      g.insertBefore(plate, txt);
+      const dot = document.createElementNS(svgNS,"circle");
+      dot.setAttribute("cx",c.x); dot.setAttribute("cy",c.y); dot.setAttribute("r","8");
+      dot.setAttribute("class","city-dot");
+      g.appendChild(dot);
+    });
+    return;
+  }
 
   /* plaques de nom pour les jonctions non étiquetées + pastille Fleur Delacour */
   Object.keys(CITIES).forEach(id=>{
@@ -1346,6 +2031,8 @@ function renderAll(){
   if(tl.children.length===0) tl.innerHTML = '<span class="hint">Aucune destination pour l\'instant.</span>';
 
   /* plateau : routes (invisibles tant qu'elles ne sont pas prises — la carte imprimée sert de visuel) */
+  /* sur une carte générée les couleurs sont déjà visibles : le bouton 👁 n'a plus lieu d'être */
+  document.getElementById("hintsBtn").style.display = MAPDEF.drawn ? "none" : "";
   document.getElementById("hintsBtn").classList.toggle("on", HINTS);
   document.querySelectorAll("#boardSvg g.route").forEach(g=>{
     const r = ROUTE_BY_ID[g.dataset.route];
@@ -1368,6 +2055,12 @@ function renderAll(){
         s.style.stroke = "#241a08";
         s.style.strokeWidth = "1";
         s.style.fillOpacity = "0.4";
+      } else if(MAPDEF.drawn){
+        /* carte générée : les emplacements libres montrent la couleur à payer */
+        s.style.fill = s.dataset.hintFill;
+        s.style.stroke = "#3a2708";
+        s.style.strokeWidth = "1.4";
+        s.style.fillOpacity = lockedForMe ? "0.35" : "0.95";
       } else {
         s.style.fill = "transparent";
         s.style.stroke = "none";
@@ -1547,6 +2240,29 @@ document.getElementById("netLocalBtn").onclick = ()=>{
 };
 document.getElementById("hintsBtn").onclick = ()=>{ HINTS = !HINTS; renderAll(); };
 
+/* ---------- choix de la carte ---------- */
+let PICKED_MAP = "hp";
+function renderMapOpts(){
+  const box = document.getElementById("mapOpts");
+  box.innerHTML = "";
+  MAP_ORDER.forEach(id=>{
+    const m = MAPS[id];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "map-opt" + (id===PICKED_MAP ? " sel" : "");
+    b.innerHTML = `<span class="mo-tag">${m.tag}</span>
+      <span class="mo-name">${m.name}</span><br><span class="mo-sub">${m.sub}</span>`;
+    b.onclick = ()=>{
+      PICKED_MAP = id; renderMapOpts();
+      if(NET.mode==="host" && !NET.started) netBroadcast({t:"mapPick", map:id});
+    };
+    box.appendChild(b);
+  });
+  document.getElementById("mapDesc").textContent = MAPS[PICKED_MAP].desc;
+}
+setMap("hp");
+renderMapOpts();
+
 /* ---------- lignes de joueurs (mode local : 2 à 5, humain ou IA) ---------- */
 const AI_NAMES = ["Vous-Savez-Qui 🤖","Bellatrix 🤖","Drago 🤖","Dobby 🤖"];
 const AI_NAME0 = "Hermione 🤖";
@@ -1626,6 +2342,7 @@ document.getElementById("startBtn").onclick = ()=>{
   }
   document.getElementById("setup").style.display = "none";
   document.getElementById("game").classList.add("active");
+  setMap(PICKED_MAP);
   newGame(players);
   if(NET.mode==="host") NET.started = true;
   renderAll();
@@ -1637,8 +2354,67 @@ document.getElementById("startBtn").onclick = ()=>{
    ============================================================ */
 function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
 function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+
+/* ============================================================
+   FIABILITÉ DE LA CONNEXION (navigateurs / réseaux)
+   Les relais TURN livrés par défaut avec PeerJS
+   (eu-0/us-0.turn.peerjs.com) ne résolvent plus en DNS : sans relais, la
+   liaison directe échoue sur les réseaux fermés ou derrière un VPN — dont
+   le VPN intégré d'Opera. On fournit donc des STUN qui répondent vraiment,
+   plus un relais TURN facultatif que l'utilisateur peut ajouter lui-même.
+   ============================================================ */
+const NET_STUN = [
+  {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]},
+  {urls:"stun:stun.cloudflare.com:3478"}
+];
+function netTurnGet(){
+  try{
+    const t = JSON.parse(localStorage.getItem("netTurn")||"null");
+    return (t && t.urls) ? t : null;
+  }catch(e){ return null; }
+}
+function netPeerOpts(){
+  const ice = NET_STUN.slice();
+  const t = netTurnGet();
+  if(t) ice.push(t);
+  return {config:{iceServers:ice, sdpSemantics:"unified-plan", iceCandidatePoolSize:4}};
+}
+/* Issue de secours quand le réseau bloque toute liaison directe :
+   un relais TURN (compte gratuit chez expressturn.com, metered.ca…).
+   Il suffit de le configurer sur UN des deux ordinateurs. */
+function netTurnSetup(){
+  const cur = netTurnGet() || {};
+  const curUrl = Array.isArray(cur.urls) ? cur.urls[0] : (cur.urls||"");
+  const urls = prompt("Adresse du relais TURN\nex : turn:relay1.expressturn.com:3478\n\n(compte gratuit en 2 min sur expressturn.com — laisse vide pour supprimer le relais)", curUrl);
+  if(urls===null) return;
+  if(!urls.trim()){ localStorage.removeItem("netTurn"); alert("Relais TURN supprimé."); return; }
+  const username = prompt("Identifiant (username) fourni par le relais :", cur.username||"") || "";
+  const credential = prompt("Mot de passe (credential/password) du relais :", cur.credential||"") || "";
+  localStorage.setItem("netTurn", JSON.stringify({urls:urls.trim(), username, credential}));
+  alert("Relais enregistré ✅\nRecharge la page, puis refais « Héberger » ou « Rejoindre ».");
+}
+function netStatusHelp(id, msg){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg+" ";
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = "⚙️ Ajouter un relais TURN";
+  b.style.cssText = "margin-left:4px;padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid #999;background:#eee;color:#222;cursor:pointer;";
+  b.onclick = netTurnSetup;
+  el.appendChild(b);
+}
+/* Un bloqueur de pub (Opera, Brave…) peut empêcher le chargement de
+   peerjs.min.js : sans ce test, le bouton semblerait juste ne rien faire. */
+function netLibMissing(statusId){
+  if(typeof Peer !== "undefined") return false;
+  netStatus(statusId, "❌ Le module de connexion (PeerJS) n'a pas pu être chargé : un bloqueur de publicités ou une extension bloque cdn.jsdelivr.net. Désactive-le pour ce site, puis recharge la page.");
+  return true;
+}
+const NET_ERR_SIGNAL = "❌ Impossible de joindre le serveur de mise en relation (0.peerjs.com). Sur Opera : désactive le VPN intégré et le bloqueur de publicités pour ce site, puis recharge la page. Sinon : pare-feu, antivirus ou réseau d'entreprise.";
+const NET_ERR_P2P = "❌ Le serveur répond mais la liaison directe entre les deux ordinateurs ne s'établit pas (VPN, pare-feu ou réseau très fermé). Sur Opera : désactive le VPN intégré (icône VPN dans la barre d'adresse) puis réessaie. Autres pistes : un autre navigateur, le partage de connexion du téléphone, ou un relais TURN.";
 function netGenCode(){
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ"; // lettres uniquement, sans I ni O (confondus avec 1 et 0)
   let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
   return c;
 }
@@ -1680,11 +2456,16 @@ document.getElementById("netConnectBtn").onclick = ()=>{
 
 function netHost(attempt){
   NET.mode = "host";
+  if(netLibMissing("netHostStatus")) return;
   const code = netGenCode();
   netStatus("netHostStatus","Création de la partie…");
-  const peer = new Peer("adr-"+code);
+  const peer = new Peer("adr-"+code, netPeerOpts());
   NET.peer = peer;
+  let opened = false;
+  const openTo = setTimeout(()=>{ if(!opened) netStatus("netHostStatus", NET_ERR_SIGNAL); }, 12000);
   peer.on("open", ()=>{
+    opened = true;
+    clearTimeout(openTo);
     NET.code = code;
     document.getElementById("netCode").textContent = code;
     netStatus("netHostStatus",`En attente des autres joueurs (jusqu'à ${NET_MAX_GUESTS})… Envoie-leur ce code !`);
@@ -1738,7 +2519,7 @@ function netHostOnData(c, msg){
       entry = {c, slot, side:"g"+slot, seat:null, name, color:DEF_COLORS[(slot+1)%DEF_COLORS.length]};
       NET.conns.push(entry);
       netSendTo(entry, {t:"welcome", code:NET.code});
-      netSendTo(entry, {t:"setup", guestColor:entry.color, guestName:entry.name, code:NET.code});
+      netSendTo(entry, {t:"setup", guestColor:entry.color, guestName:entry.name, code:NET.code, map:PICKED_MAP});
       netShowSetupAsHost();
     }
     return;
@@ -1749,7 +2530,7 @@ function netHostOnData(c, msg){
     entry.name = netEsc(msg.name).slice(0,20) || entry.name;
     if(msg.color && /^#[0-9a-fA-F]{6}$/.test(msg.color)) entry.color = msg.color;
     netShowSetupAsHost();
-    netSendTo(entry, {t:"setup", guestColor:entry.color, guestName:entry.name, code:NET.code});
+    netSendTo(entry, {t:"setup", guestColor:entry.color, guestName:entry.name, code:NET.code, map:PICKED_MAP});
   } else if(msg.t==="action"){
     netHandleGuestAction(entry, msg);
   }
@@ -1801,7 +2582,7 @@ function netSendState(){
   if(NET.mode!=="host" || !NET.started || NET.ended || !G) return;
   NET.conns.forEach(entry=>{
     if(entry.seat===null) return;
-    netSendTo(entry, {t:"state", code:NET.code, view: viewFor(entry.seat)});
+    netSendTo(entry, {t:"state", code:NET.code, map:MAP_ID, view: viewFor(entry.seat)});
   });
 }
 
@@ -1812,23 +2593,37 @@ function netJoin(code, name){
   netConnectAsGuest(false);
 }
 function netConnectAsGuest(isReconnect){
-  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
-  const peer = new Peer();
+  if(!isReconnect){
+    if(netLibMissing("netJoinStatus")){ document.getElementById("netConnectBtn").disabled = false; return; }
+    netStatus("netJoinStatus","Connexion…");
+  }
+  const peer = new Peer(undefined, netPeerOpts());
   NET.peer = peer;
   let settled = false;
-  const fail = (msg)=>{
+  let openTo = null, to = null;
+  /* isP2P : l'étape « liaison directe » a échoué -> on propose un relais TURN */
+  const fail = (msg, isP2P)=>{
     if(settled) return; settled = true;
+    clearTimeout(openTo); clearTimeout(to);
     try{ peer.destroy(); }catch(e){}
     if(isReconnect) netScheduleGuestRetry();
-    else { netStatus("netJoinStatus", msg); document.getElementById("netConnectBtn").disabled = false; }
+    else {
+      if(isP2P) netStatusHelp("netJoinStatus", msg); else netStatus("netJoinStatus", msg);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
   };
   peer.on("error", (e)=>{
-    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+    if(e.type==="peer-unavailable") fail("Partie introuvable. Vérifie le code, et que l'hôte a bien laissé son onglet ouvert.");
+    else if(e.type==="network" || e.type==="server-error" || e.type==="socket-error") fail(NET_ERR_SIGNAL);
+    else fail("Erreur de connexion ("+e.type+"). Réessaie.");
   });
+  openTo = setTimeout(()=>fail(NET_ERR_SIGNAL), 12000);
   peer.on("open", ()=>{
+    clearTimeout(openTo);
+    if(!isReconnect) netStatus("netJoinStatus","Serveur trouvé — établissement de la liaison directe…");
     const c = peer.connect("adr-"+NET.joinCode, {reliable:true});
     NET.conn = c;
-    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    to = setTimeout(()=>fail(NET_ERR_P2P, true), 25000);
     c.on("open", ()=>{
       clearTimeout(to); settled = true; NET.reconnecting = false;
       netHideBanner();
@@ -1838,7 +2633,7 @@ function netConnectAsGuest(isReconnect){
       c.on("close", netOnConnLost);
       c.on("error", netOnConnLost);
     });
-    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+    c.on("error", ()=>{ clearTimeout(to); fail(NET_ERR_P2P, true); });
   });
 }
 function netScheduleGuestRetry(){
@@ -1874,9 +2669,16 @@ function netGuestOnData(msg){
       netStatus("netJoinStatus", txt);
       document.getElementById("netConnectBtn").disabled = false;
     }
+  } else if(msg.t==="mapPick"){
+    if(NET.started) return;
+    const m = MAPS[msg.map] || MAPS.hp;
+    const el = document.getElementById("guestMapInfo");
+    if(el) el.textContent = `🗺️ Carte choisie par l'hôte : ${m.tag} ${m.name}`;
   } else if(msg.t==="state"){
     if(NET.ended) return;
     if(msg.code && msg.code!==NET.code){ NET.code = msg.code; }
+    /* la carte est imposée par l'hôte : on la met en place avant de dessiner */
+    if(msg.map && msg.map!==MAP_ID) setMap(msg.map);
     if(!NET.started){
       NET.started = true;
       document.getElementById("netHome").style.display = "none";
@@ -1895,6 +2697,9 @@ function netGuestOnData(msg){
     if(document.activeElement !== colorEl && msg.guestColor) colorEl.value = msg.guestColor;
     const nameEl = document.getElementById("netGuestNameLive");
     if(document.activeElement !== nameEl) nameEl.value = msg.guestName;
+    const m = MAPS[msg.map] || MAPS.hp;
+    const mi = document.getElementById("guestMapInfo");
+    if(mi) mi.textContent = `🗺️ Carte choisie par l'hôte : ${m.tag} ${m.name}`;
   }
 }
 let netGuestSetupTimer = null;

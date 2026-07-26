@@ -195,7 +195,7 @@
   .p-name{flex:1;font-weight:600;font-size:14px;}
   .p-count{font-size:12.5px;font-weight:700;color:#555;}
   .graveyard{font-size:11.5px;color:#666;margin:2px 0 6px 22px;line-height:1.5;min-height:14px;}
-  #log{max-height:170px;overflow-y:auto;font-size:12.5px;display:flex;flex-direction:column-reverse;}
+  #log{max-height:170px;overflow-y:auto;font-size:12.5px;}
   #log div{padding:3px 2px;border-bottom:1px solid #eee;}
 
   #victory-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;overflow:hidden;}
@@ -437,7 +437,7 @@ function log(msg){
   const logEl = document.getElementById("log");
   const div = document.createElement("div");
   div.textContent = msg;
-  logEl.appendChild(div);
+  logEl.insertBefore(div, logEl.firstChild); // le coup le plus récent toujours en haut
   logEl.scrollTop = 0;
   netScheduleSync();
 }
@@ -1271,8 +1271,67 @@ function showVictory(){
    ============================================================ */
 function netEsc(s){ return String(s||"").replace(/[<>&"']/g,""); }
 function netStatus(id, msg){ const el = document.getElementById(id); if(el) el.textContent = msg; }
+
+/* ============================================================
+   FIABILITÉ DE LA CONNEXION (navigateurs / réseaux)
+   Les relais TURN livrés par défaut avec PeerJS
+   (eu-0/us-0.turn.peerjs.com) ne résolvent plus en DNS : sans relais, la
+   liaison directe échoue sur les réseaux fermés ou derrière un VPN — dont
+   le VPN intégré d'Opera. On fournit donc des STUN qui répondent vraiment,
+   plus un relais TURN facultatif que l'utilisateur peut ajouter lui-même.
+   ============================================================ */
+const NET_STUN = [
+  {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]},
+  {urls:"stun:stun.cloudflare.com:3478"}
+];
+function netTurnGet(){
+  try{
+    const t = JSON.parse(localStorage.getItem("netTurn")||"null");
+    return (t && t.urls) ? t : null;
+  }catch(e){ return null; }
+}
+function netPeerOpts(){
+  const ice = NET_STUN.slice();
+  const t = netTurnGet();
+  if(t) ice.push(t);
+  return {config:{iceServers:ice, sdpSemantics:"unified-plan", iceCandidatePoolSize:4}};
+}
+/* Issue de secours quand le réseau bloque toute liaison directe :
+   un relais TURN (compte gratuit chez expressturn.com, metered.ca…).
+   Il suffit de le configurer sur UN des deux ordinateurs. */
+function netTurnSetup(){
+  const cur = netTurnGet() || {};
+  const curUrl = Array.isArray(cur.urls) ? cur.urls[0] : (cur.urls||"");
+  const urls = prompt("Adresse du relais TURN\nex : turn:relay1.expressturn.com:3478\n\n(compte gratuit en 2 min sur expressturn.com — laisse vide pour supprimer le relais)", curUrl);
+  if(urls===null) return;
+  if(!urls.trim()){ localStorage.removeItem("netTurn"); alert("Relais TURN supprimé."); return; }
+  const username = prompt("Identifiant (username) fourni par le relais :", cur.username||"") || "";
+  const credential = prompt("Mot de passe (credential/password) du relais :", cur.credential||"") || "";
+  localStorage.setItem("netTurn", JSON.stringify({urls:urls.trim(), username, credential}));
+  alert("Relais enregistré ✅\nRecharge la page, puis refais « Héberger » ou « Rejoindre ».");
+}
+function netStatusHelp(id, msg){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg+" ";
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = "⚙️ Ajouter un relais TURN";
+  b.style.cssText = "margin-left:4px;padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid #999;background:#eee;color:#222;cursor:pointer;";
+  b.onclick = netTurnSetup;
+  el.appendChild(b);
+}
+/* Un bloqueur de pub (Opera, Brave…) peut empêcher le chargement de
+   peerjs.min.js : sans ce test, le bouton semblerait juste ne rien faire. */
+function netLibMissing(statusId){
+  if(typeof Peer !== "undefined") return false;
+  netStatus(statusId, "❌ Le module de connexion (PeerJS) n'a pas pu être chargé : un bloqueur de publicités ou une extension bloque cdn.jsdelivr.net. Désactive-le pour ce site, puis recharge la page.");
+  return true;
+}
+const NET_ERR_SIGNAL = "❌ Impossible de joindre le serveur de mise en relation (0.peerjs.com). Sur Opera : désactive le VPN intégré et le bloqueur de publicités pour ce site, puis recharge la page. Sinon : pare-feu, antivirus ou réseau d'entreprise.";
+const NET_ERR_P2P = "❌ Le serveur répond mais la liaison directe entre les deux ordinateurs ne s'établit pas (VPN, pare-feu ou réseau très fermé). Sur Opera : désactive le VPN intégré (icône VPN dans la barre d'adresse) puis réessaie. Autres pistes : un autre navigateur, le partage de connexion du téléphone, ou un relais TURN.";
 function netGenCode(){
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ"; // lettres uniquement, sans I ni O (confondus avec 1 et 0)
   let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
   return c;
 }
@@ -1315,11 +1374,16 @@ document.getElementById("netConnectBtn").onclick = ()=>{
 
 function netHost(attempt){
   NET.mode = "host"; NET.mySide = "host";
+  if(netLibMissing("netHostStatus")) return;
   const code = netGenCode();
   netStatus("netHostStatus","Création de la partie…");
-  const peer = new Peer("str-"+code);
+  const peer = new Peer("str-"+code, netPeerOpts());
   NET.peer = peer;
+  let opened = false;
+  const openTo = setTimeout(()=>{ if(!opened) netStatus("netHostStatus", NET_ERR_SIGNAL); }, 12000);
   peer.on("open", ()=>{
+    opened = true;
+    clearTimeout(openTo);
     NET.code = code;
     document.getElementById("netCode").textContent = code;
     netStatus("netHostStatus","En attente de l'autre joueur… Envoie-lui ce code !");
@@ -1438,23 +1502,37 @@ function netJoin(code, name){
   netConnectAsGuest(false);
 }
 function netConnectAsGuest(isReconnect){
-  if(!isReconnect) netStatus("netJoinStatus","Connexion…");
-  const peer = new Peer();
+  if(!isReconnect){
+    if(netLibMissing("netJoinStatus")){ document.getElementById("netConnectBtn").disabled = false; return; }
+    netStatus("netJoinStatus","Connexion…");
+  }
+  const peer = new Peer(undefined, netPeerOpts());
   NET.peer = peer;
   let settled = false;
-  const fail = (msg)=>{
+  let openTo = null, to = null;
+  /* isP2P : l'étape « liaison directe » a échoué -> on propose un relais TURN */
+  const fail = (msg, isP2P)=>{
     if(settled) return; settled = true;
+    clearTimeout(openTo); clearTimeout(to);
     try{ peer.destroy(); }catch(e){}
     if(isReconnect) netScheduleGuestRetry();
-    else { netStatus("netJoinStatus", msg); document.getElementById("netConnectBtn").disabled = false; }
+    else {
+      if(isP2P) netStatusHelp("netJoinStatus", msg); else netStatus("netJoinStatus", msg);
+      document.getElementById("netConnectBtn").disabled = false;
+    }
   };
   peer.on("error", (e)=>{
-    fail(e.type==="peer-unavailable" ? "Partie introuvable. Vérifie le code et réessaie." : "Erreur de connexion ("+e.type+"). Réessaie.");
+    if(e.type==="peer-unavailable") fail("Partie introuvable. Vérifie le code, et que l'hôte a bien laissé son onglet ouvert.");
+    else if(e.type==="network" || e.type==="server-error" || e.type==="socket-error") fail(NET_ERR_SIGNAL);
+    else fail("Erreur de connexion ("+e.type+"). Réessaie.");
   });
+  openTo = setTimeout(()=>fail(NET_ERR_SIGNAL), 12000);
   peer.on("open", ()=>{
+    clearTimeout(openTo);
+    if(!isReconnect) netStatus("netJoinStatus","Serveur trouvé — établissement de la liaison directe…");
     const c = peer.connect("str-"+NET.joinCode, {reliable:true});
     NET.conn = c;
-    const to = setTimeout(()=>fail("La connexion prend du temps… vérifie le code et réessaie."), 8000);
+    to = setTimeout(()=>fail(NET_ERR_P2P, true), 25000);
     c.on("open", ()=>{
       clearTimeout(to); settled = true; NET.reconnecting = false;
       netHideBanner();
@@ -1467,7 +1545,7 @@ function netConnectAsGuest(isReconnect){
       c.on("close", netOnConnLost);
       c.on("error", netOnConnLost);
     });
-    c.on("error", ()=>{ clearTimeout(to); fail("Erreur de connexion. Réessaie."); });
+    c.on("error", ()=>{ clearTimeout(to); fail(NET_ERR_P2P, true); });
   });
 }
 function netScheduleGuestRetry(){
@@ -1561,7 +1639,8 @@ function netApplySnapshot(s){
   if(logEl.dataset.key !== key){
     logEl.dataset.key = key;
     logEl.innerHTML = "";
-    s.log.forEach(m=>{ const d=document.createElement("div"); d.textContent=m; logEl.appendChild(d); });
+    s.log.slice().reverse().forEach(m=>{ const d=document.createElement("div"); d.textContent=m; logEl.appendChild(d); }); // plus récent en premier
+    logEl.scrollTop = 0;
   }
 }
 
