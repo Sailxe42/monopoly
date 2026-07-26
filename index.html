@@ -113,6 +113,37 @@
   #railCard:hover{border-color:#c9971f;}
   #chevauxCard{background:linear-gradient(160deg, rgba(138,90,43,.45), rgba(42,157,63,.15));}
   #chevauxCard:hover{border-color:#d6a24a;}
+  #zombiesCard{background:linear-gradient(160deg, rgba(60,110,40,.45), rgba(160,40,30,.22));}
+  #zombiesCard:hover{border-color:#8ee34a;}
+
+  .section-title{
+    width:100%;
+    max-width:900px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin:44px 0 18px;
+    color:#8ea3b8;
+    font-size:13px;
+    font-weight:800;
+    letter-spacing:3px;
+    text-transform:uppercase;
+  }
+  .section-title:first-of-type{margin-top:0;}
+  .section-title::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:linear-gradient(90deg, rgba(255,255,255,.18), transparent);
+  }
+  .badge-new{
+    background:#8ee34a;
+    color:#0b2312;
+    border-radius:20px;
+    padding:2px 9px;
+    font-size:10px;
+    letter-spacing:1px;
+  }
 
   footer{
     margin-top:46px;
@@ -130,6 +161,8 @@
 
 <h1>🎲 Nos jeux</h1>
 <p class="subtitle">Choisis une partie — solo, en famille, ou à distance avec un code à partager.</p>
+
+<div class="section-title">🎲 Jeux de société</div>
 
 <div class="games">
   <a class="game-card" id="monopolyCard" href="monopoly.html">
@@ -200,6 +233,22 @@
       <span class="tag">2-4 joueurs</span>
       <span class="tag">🌐 En ligne</span>
       <span class="tag">🤖 IA</span>
+    </div>
+    <span class="play-btn">Jouer</span>
+  </a>
+</div>
+
+<div class="section-title">🎮 Jeux vidéo <span class="badge-new">Nouveau</span></div>
+
+<div class="games">
+  <a class="game-card" id="zombiesCard" href="jeux-video/zombies.html">
+    <span class="icon">🧟</span>
+    <h2>Zone Morte 3D</h2>
+    <p>Jeu de tir en 3D à la première personne : survivez à des vagues de zombies de plus en plus féroces dans une arène fermée à trois niveaux. Chaque zombie abattu rapporte de l'argent — achetez de meilleures armes, des blindages et des exosquelettes entre les vagues.</p>
+    <div class="tags">
+      <span class="tag">1-4 joueurs</span>
+      <span class="tag">🌐 Coopératif en ligne</span>
+      <span class="tag">🕹️ 3D — clavier + souris</span>
     </div>
     <span class="play-btn">Jouer</span>
   </a>
