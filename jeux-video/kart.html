@@ -15,13 +15,20 @@
   canvas#gl{display:block;position:fixed;inset:0;width:100%;height:100%;}
 
   /* ---------------- écrans ---------------- */
+  /* `align-items:center` + débordement = le haut du panneau devient
+     INACCESSIBLE au défilement (bug classique du centrage flex, très
+     visible au téléphone où la liste des circuits dépasse toujours).
+     On aligne en haut et c'est `margin:auto` sur le panneau qui le
+     recentre quand il y a la place. */
   .screen{
-    position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
-    padding:24px 16px;overflow-y:auto;
+    position:fixed;inset:0;z-index:50;display:none;align-items:flex-start;justify-content:center;
+    padding:24px 16px calc(24px + env(safe-area-inset-bottom));
+    overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
     background:radial-gradient(circle at 28% 12%, #2a2140, #07060c 68%);
   }
   .screen.active{display:flex;}
   .panel{
+    margin:auto;flex:0 0 auto;
     width:min(880px,96vw);
     background:linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
     border:1px solid rgba(255,255,255,.13);border-radius:20px;padding:26px 26px 22px;
@@ -47,7 +54,7 @@
     color:#fff;font-weight:800;font-size:15px;font-family:inherit;padding:11px 20px;border-radius:12px;
     cursor:pointer;transition:transform .12s ease, filter .12s ease;
   }
-  .btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.15);}
+  @media (hover:hover){ .btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.15);} }
   .btn:disabled{opacity:.45;cursor:not-allowed;}
   .btn.alt{background:linear-gradient(180deg,#3a4a7e,#26304f);}
   .btn.small{padding:7px 13px;font-size:13px;border-radius:9px;}
@@ -74,7 +81,7 @@
     border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:11px;cursor:pointer;
     transition:transform .12s, border-color .12s;
   }
-  .tcard:hover{transform:translateY(-3px);border-color:#ffb03a;}
+  @media (hover:hover){ .tcard:hover{transform:translateY(-3px);border-color:#ffb03a;} }
   .tcard.sel{border-color:#41d9ff;background:linear-gradient(160deg,rgba(65,217,255,.16),rgba(255,255,255,.02));}
   .tcard canvas{width:100%;height:104px;display:block;border-radius:9px;background:#0c0a14;}
   .tcard .tname{font-weight:800;font-size:14.5px;margin:8px 0 2px;}
@@ -84,6 +91,19 @@
   .tcard .ttags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
   .tcard .ttags span{font-size:10px;font-weight:700;color:#d8e2f2;background:rgba(255,255,255,.09);
     border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:2px 6px;white-space:nowrap;}
+  /* téléphone : panneaux plus compacts, sinon on passe son temps à
+     faire défiler pour atteindre les derniers circuits */
+  @media (max-width:700px){
+    .screen{padding:12px 10px calc(14px + env(safe-area-inset-bottom));}
+    .panel{padding:16px 15px 14px;border-radius:16px;}
+    .panel .sub{font-size:12.5px;margin-bottom:12px;}
+    .row{gap:9px;margin-bottom:10px;}
+    .tracks{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;}
+    .tcard{padding:8px;}
+    .tcard canvas{height:78px;}
+    .tcard .tdesc{min-height:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+    .keys{display:none;}
+  }
 
   /* ---------------- HUD ---------------- */
   #hud{position:fixed;inset:0;z-index:20;pointer-events:none;display:none;font-size:13px;}
@@ -334,6 +354,27 @@
     <h2>🌐 Course en ligne — vous êtes l'hôte</h2>
     <p class="sub">Transmettez ce code à vos amis : ils choisissent « Rejoindre une course » et le saisissent. Jusqu'à 4 pilotes humains (complétés par des karts de l'ordinateur). Gardez cet onglet ouvert, c'est lui qui fait tourner la course.</p>
     <div class="code-box" id="hostCode">·····</div>
+    <!-- l'hôte doit pouvoir se renommer ici : au téléphone le champ de
+         l'accueil est loin, et c'est ce nom que voient les invités -->
+    <div class="row">
+      <div>
+        <label for="hostName">Votre nom</label>
+        <input type="text" id="hostName" maxlength="14" placeholder="Pilote">
+      </div>
+      <div>
+        <label for="hostColor">Couleur du kart</label>
+        <select id="hostColor">
+          <option value="#ff5f4a">Rouge</option>
+          <option value="#41d9ff">Cyan</option>
+          <option value="#8ee34a">Vert</option>
+          <option value="#ffb03a">Orange</option>
+          <option value="#e0609a">Rose</option>
+          <option value="#c7a0ff">Violet</option>
+          <option value="#f2e05a">Jaune</option>
+          <option value="#ffffff">Blanc</option>
+        </select>
+      </div>
+    </div>
     <div class="players-list" id="hostPlayers"></div>
     <div class="row">
       <button class="btn" id="btnHostSetup">🏁 Choisir le circuit et lancer</button>
@@ -739,7 +780,10 @@ const TRACKS = [
   {
     id:"arcenciel", name:"Arc-en-ciel Cosmique", stars:4,
     desc:"Un ruban de lumière suspendu dans le vide, deux loopings complets, des virages relevés en demi-tube et des accélérateurs partout. Ni sol, ni filet : que des étoiles.",
-    width:20, run:3, laps:3, theme:"rainbow", fall:true,
+    /* `shoulder:"slim"` : plus de large bas-côté de verre étoilé, juste
+       un liseré néon étroit — mais la zone de dégagement reste la même,
+       sinon on tombe dans le vide à chaque virage relevé */
+    width:20, run:3, laps:3, theme:"rainbow", fall:true, shoulder:"slim",
     sky:[0x160b38,0x03030c], fog:[0x0a0620,420,1500],
     ground:0x0a0a18, grass:0x2a1a4a, road:0x2a1050, curb:0xffffff, wall:0x9a5cff,
     scale:0.88, void:true, weather:"stars",
@@ -753,8 +797,10 @@ const TRACKS = [
          [-206,32,44],[-256,38,112],[-212,44,176],[-110,42,206]],
     pads:[{s:0.09},{s:0.24},{s:0.40},{s:0.58},{s:0.71},{s:0.88}],
     ramps:[{s:0.475,up:9,h:1.6}],
-    loops:[{s:0.185,r:9},{s:0.655,r:9}],
-    boxRows:[0.05,0.20,0.33,0.45,0.60,0.75,0.92],
+    /* anneaux de 15 m de rayon (30 m de haut) : en dessous, un ruban
+       aussi large que la piste donnait un anneau plus large que haut */
+    loops:[{s:0.185,r:15},{s:0.655,r:15}],
+    boxRows:[0.05,0.13,0.33,0.45,0.60,0.75,0.92],
     props:{crystal:70, orb:48},
     landmarks:[
       {kind:"ring", s:0.30}, {kind:"ring", s:0.44}, {kind:"ring", s:0.80},
@@ -887,6 +933,14 @@ function buildTrack(t){
   /* circuit sans filet : au-delà du bas-côté il n'y a rien, on tombe */
   TR.fall = !!t.fall;
   TR.voidOff = TR.hw + 1.2 + TR.run + 1.5;
+  /* `shoulder:"slim"` : bas-côté réduit à un liseré néon. La zone de
+     dégagement (voidOff) ne bouge PAS — mesuré : la raccourcir faisait
+     passer une course de 1 à 30 chutes dans le vide, les karts montent
+     très haut sur les demi-tubes. Seul le bord DESSINÉ se rapproche,
+     et il est calé juste après voidOff pour qu'on ne tombe plus alors
+     qu'on voit encore du sol sous les roues. */
+  TR.slimEdge = t.shoulder === "slim";
+  TR.outOff = TR.slimEdge ? TR.voidOff + 0.3 : TR.hw + 1.2 + TR.run + 6;
   let minY = Infinity;
   for(const p of TR.pos) minY = Math.min(minY, p.y);
   TR.baseY = minY - 3.2;      // hauteur du sol lointain
@@ -913,12 +967,39 @@ function buildTrack(t){
      joué comme une figure (voir stepLoop) : le kart tourne dans le plan
      vertical pendant que sa position au sol reste sous l'anneau. */
   TR.loops = (t.loops||[]).map(o=>{
-    const i = sIdx(o.s), r = o.r||9;
-    /* `adv` = décalage entre l'entrée et la sortie. Sans lui, l'anneau
-       retombe exactement sur son point de départ : il traverse la route
-       et on ressort là où on est entré. */
-    return {i, s:TR.cum[i], r, adv:o.adv || r*2};
+    const i = sIdx(o.s), r = o.r||15;
+    /* Le ruban de l'anneau est plus ÉTROIT que la piste : c'est ce qui
+       permet d'entrer par un côté de la chaussée et de ressortir par
+       l'autre (`lat`). Avec un anneau pleine largeur, l'entrée et la
+       sortie se superposaient : la boucle se refermait sur son point de
+       départ et on la traversait.
+       `adv` (l'avance au sol entre l'entrée et la sortie) ne sert donc
+       plus qu'à pencher un peu l'anneau vers l'avant, et il doit rester
+       PETIT : c'est un cisaillement, à 2 r il écrasait le cercle en une
+       arche haute et étroite. `lead`/`out` sont les entonnoirs peints
+       sur la route qui raccordent la figure au tracé. */
+    const hw = Math.min(TR.hw*0.5, 6.5);
+    const lat = Math.min(TR.hw - hw, hw*1.05);
+    const lead = o.lead || 26, out = o.out || 22;
+    return {i, s:TR.cum[i], r, hw, lat, lead, out,
+            adv:o.adv || r,
+            sIn:(TR.cum[i] - lead + TR.len) % TR.len};
   });
+  /* ---- trous dans la chaussée ----
+     sous un looping la route s'arrête : elle monte dans l'anneau à
+     l'entrée et redescend à la sortie, et entre les deux il n'y a que
+     le vide. Impossible d'éviter la figure. */
+  TR.holes = [];
+  if(t.void) for(const L of TR.loops){
+    /* la découpe est quantifiée tout de suite sur les quads (3 m) :
+       géométrie et physique doivent s'arrêter EXACTEMENT au même
+       endroit, sinon on tombe sur du bitume encore visible — ou pire,
+       on roule sur du vide. */
+    const i0 = Math.ceil(L.s/TR.step) % n;
+    const i1 = (Math.floor((L.s + L.adv)/TR.step) - 1 + n) % n;
+    const cnt = (i1 - i0 + n) % n;
+    TR.holes.push({i0, cnt, sA:TR.cum[i0], len:(cnt+1)*TR.step});
+  }
   /* ---- plaques de glace (piste de ski) : adhérence divisée ---- */
   TR.slick = (t.slick||[]).map(o=>({s:TR.cum[sIdx(o.s)], len:(o.len||0.06)*TR.len}));
   /* ---- fleuve : il creuse le TERRAIN (jamais la chaussée), donc la
@@ -1041,25 +1122,83 @@ function sDist(a, b){
   if(d < -TR.len/2) d += TR.len;
   return d;
 }
-/* le kart entre-t-il dans un looping ? (déclenché juste après l'entrée) */
-function loopAt(s, prevS){
+/* le kart entre-t-il dans un looping ? (déclenché dans l'entonnoir,
+   `lead` mètres avant l'anneau lui-même)
+   C'est une FENÊTRE et non l'instant précis du franchissement : sur les
+   virages relevés les karts décollent sans arrêt de quelques dizaines
+   de centimètres, et un kart en l'air à cet instant-là ratait la figure
+   (mesuré : 20 refus sur 48 passages). On le rattrape quelques mètres
+   plus loin, et `loopEnter` reprend l'entonnoir là où il en est. */
+function loopAt(s){
   for(const L of (TR.loops||[])){
-    const a = sDist(prevS, L.s), b = sDist(s, L.s);
-    if(a < 0 && b >= 0 && b < 12) return L;
+    const b = sDist(s, L.sIn);
+    if(b >= 0 && b < L.lead-1) return L;
   }
   return null;
 }
-/* point du monde sur l'anneau d'un looping : angle `th` (0 = entrée au
-   sol, π = sommet, 2π = sortie), décalage latéral `off`. Sert à la fois
-   à la géométrie, à l'affichage du kart et à la caméra. */
-function loopPoint(L, th, off, out){
-  const i = L.i, p = TR.pos[i], tg = TR.tan[i], nr = TR.nor[i];
-  const a = Math.sin(th)*L.r + L.adv*th/(Math.PI*2);
+/* échantillon de piste à une abscisse quelconque (bouclage compris) */
+function sAt(s){ let x = s % TR.len; if(x<0) x += TR.len; return Math.floor(x/TR.step)%TR.n; }
+/* repère de piste à une abscisse quelconque, INTERPOLÉ entre les deux
+   échantillons voisins. Les échantillons sont espacés de 3 m : s'arrêter
+   au plus proche (Math.round) dessinait les loopings en escalier et
+   faisait trembler le kart, qui sautait de palier en palier. */
+const _fr = {i:0, j:0, t:0, nx:0, nz:0, tx:0, tz:0};
+function frameAt(s){
+  const n = TR.n;
+  let x = s % TR.len; if(x < 0) x += TR.len;
+  const f = x/TR.step, fi = Math.floor(f);
+  const i = fi % n, j = (i+1) % n, t = f - fi;
+  const na = TR.nor[i], nb = TR.nor[j], ta = TR.tan[i], tb = TR.tan[j];
+  let nx = lerp(na.x, nb.x, t), nz = lerp(na.z, nb.z, t);
+  let l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+  let tx = lerp(ta.x, tb.x, t), tz = lerp(ta.z, tb.z, t);
+  l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+  _fr.i = i; _fr.j = j; _fr.t = t; _fr.nx = nx; _fr.nz = nz; _fr.tx = tx; _fr.tz = tz;
+  return _fr;
+}
+/* point du monde à l'abscisse `s`, décalage latéral `o` (interpolé) */
+function trackPointS(s, o, out){
+  const f = frameAt(s), a = TR.pos[f.i], b = TR.pos[f.j];
   const v = out || new THREE.Vector3();
-  v.set(p.x + tg.x*a + nr.x*off,
-        surfY(i,0) + L.r*(1-Math.cos(th)),
-        p.z + tg.z*a + nr.z*off);
+  v.set(lerp(a.x, b.x, f.t) + f.nx*o,
+        lerp(surfY(f.i, o), surfY(f.j, o), f.t),
+        lerp(a.z, b.z, f.t) + f.nz*o);
   return v;
+}
+/* avance au sol depuis l'entrée de l'anneau, pour un angle donné */
+function loopAdv(L, th){ return Math.sin(th)*L.r + L.adv*th/(Math.PI*2); }
+/* décalage latéral du milieu du ruban : −lat à l'entrée, 0 au sommet,
+   +lat à la sortie. C'est lui qui fait ressortir de l'autre côté. */
+function loopLat(L, th){ return -L.lat*Math.cos(th/2); }
+/* point du monde sur l'anneau d'un looping : angle `th` (0 = entrée au
+   sol, π = sommet, 2π = sortie), `u` = position DANS le ruban (0 = son
+   milieu). Sert à la fois à la géométrie, à l'affichage du kart et à la
+   caméra.
+   L'empreinte au sol suit le tracé (et non une droite figée) : l'anneau
+   ne quitte donc jamais la chaussée même posé dans une longue courbe,
+   et ses deux extrémités retombent pile sur le revêtement — dévers et
+   pente compris, puisque la hauteur de départ vient de surfY. */
+function loopPoint(L, th, u, out){
+  const v = trackPointS(L.s + loopAdv(L, th), loopLat(L, th) + (u||0), out);
+  v.y += L.r*(1-Math.cos(th));
+  return v;
+}
+/* trou dans la chaussée (sous un looping) : rien sous les roues.
+   La marge de 25 cm garde la chute STRICTEMENT à l'intérieur du trou
+   dessiné — on ne doit jamais tomber là où l'on voit encore du bitume. */
+function inHole(s){
+  for(const h of (TR.holes||[])){
+    const d = sDist(s, h.sA);
+    if(d > 0.25 && d < h.len - 0.25) return true;
+  }
+  return false;
+}
+/* le quad qui va de l'échantillon i à i+1 est-il dans un trou ? */
+function holed(i){
+  for(const h of (TR.holes||[])){
+    if((i - h.i0 + TR.n) % TR.n <= h.cnt) return true;
+  }
+  return false;
 }
 function nearestLoop(s){
   let best = null, bd = Infinity;
@@ -1083,6 +1222,8 @@ function slickAt(s){
 function groundAt(loc){
   const n = TR.n;
   if(TR.fall && Math.abs(loc.off) > TR.voidOff) return -1e5;
+  /* sous un looping il n'y a plus de route du tout */
+  if(TR.holes && TR.holes.length && inHole(loc.s)) return -1e5;
   const f = clamp(loc.along/TR.step, -1, 1);
   const i = loc.i, j = (i+(f>=0?1:-1)+n)%n;
   const t = Math.abs(f);
@@ -1298,6 +1439,10 @@ function ribbon(o0, o1, dy, uRepeat, vScale){
     }
   }
   for(let i=0;i<n;i++){
+    /* on saute les quads qui tombent dans un trou (sous un looping) :
+       la route s'arrête net à l'entrée de l'anneau et reprend à sa
+       sortie — c'est ce qui rend la figure obligatoire. */
+    if(holed(i)) continue;
     const a = i*2, b = a+1, c = a+2, d = a+3;
     idx.push(a,b,c, b,d,c);
   }
@@ -1357,6 +1502,7 @@ function wallGeom(off, h, flip){
     uv.push(v,0, v,1);
   }
   for(let i=0;i<n;i++){
+    if(holed(i)) continue;
     const a = i*2, b = a+1, c = a+2, d = a+3;
     if(flip) idx.push(a,c,b, b,c,d); else idx.push(a,b,c, b,d,c);
   }
@@ -1526,16 +1672,24 @@ function shoulderMaterial(T){
     return new THREE.MeshLambertMaterial({map:t, side:THREE.DoubleSide});
   }
   if(TH==="rainbow"){
-    /* accotement de verre sombre semé d'étoiles : la piste doit sembler
-       flotter, donc pas de terre, pas d'herbe */
+    /* liseré néon : le bas-côté de verre sombre semé d'étoiles faisait
+       une large bordure noire tout autour du ruban (l'utilisateur ne
+       l'aimait pas). C'est maintenant un dégradé lumineux qui prolonge
+       la chaussée — u = 0 côté vibreur, u = 1 côté vide. */
     const t = tex((g,S)=>{
-      g.fillStyle = "#150a30"; g.fillRect(0,0,S,S);
-      for(let i=0;i<70;i++){
-        g.fillStyle = "rgba(255,255,255,"+(0.25+Math.random()*0.6)+")";
-        g.beginPath(); g.arc(Math.random()*S, Math.random()*S, Math.random()*1.7+0.5, 0, 7); g.fill();
-      }
-      g.strokeStyle = "rgba(120,90,255,.55)"; g.lineWidth = 4;
-      g.beginPath(); g.moveTo(0,4); g.lineTo(S,4); g.stroke();
+      const gr = g.createLinearGradient(0,0,S,0);
+      gr.addColorStop(0,   "#ffffff");
+      gr.addColorStop(0.10,"#c9a6ff");
+      gr.addColorStop(0.45,"#8b5cf0");
+      gr.addColorStop(0.82,"#5a2ec4");
+      gr.addColorStop(1,   "#ffffff");
+      g.fillStyle = gr; g.fillRect(0,0,S,S);
+      /* filets de lumière dans le sens de la marche */
+      g.fillStyle = "rgba(255,255,255,.30)";
+      for(let i=0;i<5;i++) g.fillRect(S*(0.18+i*0.15), 0, 2, S);
+      /* pointillés réguliers : ils donnent la vitesse */
+      g.fillStyle = "rgba(255,255,255,.85)";
+      for(let i=0;i<4;i++) g.fillRect(S*0.55, i*S/4+S/8, S*0.16, 4);
     }, 1, 1, true);
     return new THREE.MeshBasicMaterial({map:t, side:THREE.DoubleSide});
   }
@@ -1682,17 +1836,20 @@ function buildRoad(T){
   /* --- bas-côtés --- */
   const grassMat = shoulderMaterial(T);
   for(const sgn of [-1,1]){
-    const s0 = sgn*(hw+1.2), s1 = sgn*(hw+1.2+TR.run+6);
+    const s0 = sgn*(hw+1.2), s1 = sgn*TR.outOff;
     /* dy calé sur celui du vibreur : un décalage vertical laissait une
        fente ouverte tout le long de la piste, on voyait à travers le
        terrain et la route semblait flotter */
-    const gm = new THREE.Mesh(ribbon(s0, s1, 0.02, 3, 1/9), grassMat);
+    /* un seul motif en travers du liseré néon (contre 3 répétitions sur
+       un vrai bas-côté) : c'est un dégradé, pas une texture qui pave */
+    const gm = new THREE.Mesh(ribbon(s0, s1, 0.02, TR.slimEdge?1:3, 1/9), grassMat);
     gm.receiveShadow = G.quality==="high";
     trackGroup.add(gm);
   }
   /* --- bord lumineux des circuits sans filet : pas de mur, on tombe --- */
   if(TR.fall){
-    const edge = TR.hw+1.2+TR.run;
+    /* le liseré marque le BORD DESSINÉ, celui où l'on tombe vraiment */
+    const edge = TR.outOff;
     const eTex = tex((g,S)=>{
       g.fillStyle = "#ffffff"; g.fillRect(0,0,S,S);
       for(let i=0;i<6;i++){
@@ -1701,8 +1858,9 @@ function buildRoad(T){
       }
     }, 1, 1, true);
     const eMat = new THREE.MeshBasicMaterial({map:eTex, side:THREE.DoubleSide});
+    const eIn = edge-1.4;
     for(const sgn of [-1,1]){
-      trackGroup.add(new THREE.Mesh(ribbon(sgn*(edge-1.4), sgn*edge, 0.10, 1, 1/3), eMat));
+      trackGroup.add(new THREE.Mesh(ribbon(sgn*eIn, sgn*edge, 0.10, 1, 1/3), eMat));
       const lip = new THREE.Mesh(wallGeom(sgn*edge, 0.34, sgn>0), eMat);
       trackGroup.add(lip);
     }
@@ -1751,26 +1909,33 @@ function buildRoad(T){
       g.fillRect(x*c,y*c,c,c);
     }
   }, 5, 1);
-  const lineGeo = new THREE.PlaneGeometry(TR.hw*2, 5);
-  const lm = new THREE.Mesh(lineGeo, new THREE.MeshBasicMaterial({map:chk}));
-  const i0 = 0, p0 = TR.pos[0], t0 = TR.tan[0];
-  lm.position.set(p0.x, p0.y+0.06, p0.z);
-  lm.rotation.set(-Math.PI/2, 0, Math.atan2(t0.x, t0.z));
+  /* un simple PlaneGeometry posé à l'horizontale décollait d'un côté et
+     s'enfonçait de l'autre dès que la piste avait du dévers ou de la
+     pente : la ligne suit maintenant le revêtement échantillon par
+     échantillon, exactement comme les accélérateurs (surfY). */
+  const p0 = TR.pos[0], nr0 = TR.nor[0];
+  const lineLen = 2;                                  // ≈ 6 m de damier
+  const lm = new THREE.Mesh(ribbonSpan(TR.n-1, lineLen, -TR.hw, TR.hw, 0.05),
+    new THREE.MeshBasicMaterial({map:chk}));
   trackGroup.add(lm);
   /* portique de départ (aux couleurs du circuit) */
   const GC = {delfino:[0xf0e3cd,0xc0563f], snow:[0xffffff,0x3f6ed8],
               rainbow:[0x6a3ad0,0xb44dff], fun:[0xfff2a8,0xff5fa8]}[TH] || [0xdddddd,0xff8a3c];
-  const pil = new THREE.BoxGeometry(1.4, 8, 1.4);
   const pm = new THREE.MeshLambertMaterial({color:GC[0]});
+  /* les pieds des piliers doivent se poser sur le BORD relevé, pas au
+     niveau du milieu de la chaussée */
+  const pilO = TR.hw+1.5;
+  const yL = surfY(0, -pilO), yR = surfY(0, pilO);
+  const yTop = Math.max(yL, yR) + 8;
   for(const sgn of [-1,1]){
-    const q = new THREE.Mesh(pil, pm);
-    const nr = TR.nor[0];
-    q.position.set(p0.x+nr.x*sgn*(TR.hw+1.5), p0.y+4, p0.z+nr.z*sgn*(TR.hw+1.5));
+    const foot = sgn<0 ? yL : yR, h = yTop-foot;
+    const q = new THREE.Mesh(new THREE.BoxGeometry(1.4, h, 1.4), pm);
+    q.position.set(p0.x+nr0.x*sgn*pilO, foot+h/2, p0.z+nr0.z*sgn*pilO);
     trackGroup.add(q);
   }
   const beam = new THREE.Mesh(new THREE.BoxGeometry(TR.hw*2+4, 1.8, 1.2),
     new THREE.MeshLambertMaterial({color:GC[1]}));
-  beam.position.set(p0.x, p0.y+8.2, p0.z);
+  beam.position.set(p0.x, yTop+0.2, p0.z);
   beam.rotation.y = Math.atan2(TR.nor[0].x, TR.nor[0].z)+Math.PI/2;
   trackGroup.add(beam);
 
@@ -1838,33 +2003,68 @@ function buildRoad(T){
     }
   }
 
-  /* --- loopings --- */
-  for(const L of (TR.loops||[])) trackGroup.add(loopMesh(L, T));
+  /* --- loopings (même revêtement que la chaussée) --- */
+  for(const L of (TR.loops||[])) trackGroup.add(loopMesh(L, T, surf));
 }
 
 /* ------------------------------------------------------------
-   LOOPING : anneau vertical posé sur la piste. La surface de
+   LOOPING : anneau vertical posé sur la piste, plus étroit qu'elle.
+   On y entre par un côté de la chaussée et on ressort par l'autre,
+   raccordé au tracé par deux entonnoirs peints au sol. La surface de
    roulement regarde vers l'intérieur du cercle ; deux tubes de
    lumière longent les bords pour qu'on le voie de loin.
    ------------------------------------------------------------ */
-function loopMesh(L, T){
+/* ruban peint sur la chaussée dont les deux bords s'écartent
+   progressivement : le raccord entre la route et l'anneau */
+function loopApron(s0, lenM, a0, a1, b0, b1, dy){
+  const cnt = Math.max(8, Math.round(lenM/1.5));
+  const pos = [], uv = [], idx = [], nrm = [], _p = new THREE.Vector3();
+  for(let k=0;k<=cnt;k++){
+    const f = k/cnt, w = f*f*(3-2*f);
+    const s = s0 + f*lenM;
+    const e0 = lerp(a0,b0,w), e1 = lerp(a1,b1,w);
+    for(const o of [e0,e1]){
+      trackPointS(s, o, _p);
+      pos.push(_p.x, _p.y+dy, _p.z);
+      nrm.push(0,1,0);
+      uv.push(o===e0?0:1, f*lenM/7);      // ≈ 7 m par chevron
+    }
+  }
+  for(let k=0;k<cnt;k++){ const a=k*2,b=a+1,c=a+2,d=a+3; idx.push(a,b,c, b,d,c); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(nrm,3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);
+  return g;
+}
+function loopMesh(L, T, surf){
   const grp = new THREE.Group();
-  const i = L.i, r = L.r, hw = TR.hw;
-  const p = TR.pos[i], tg = TR.tan[i], nr = TR.nor[i];
-  const y0 = surfY(i, 0);
-  const seg = 56;
+  const r = L.r, hw = L.hw;
+  /* 128 segments : à 80 on distinguait encore les facettes du cercle */
+  const seg = 128;
+  /* l'anneau est décollé de 7 cm : près de l'entrée et de la sortie il
+     est tangent au sol et rasait la chaussée sur 2 m (z-fighting) */
+  const lift = 0.07;
+  const uRep = surf.uRep || 1, vScale = surf.vScale || 1/12;
   const pos = [], uv = [], idx = [], nrm = [];
   const _q = new THREE.Vector3();
   for(let k=0;k<=seg;k++){
     const th = k/seg*Math.PI*2;
-    const s = Math.sin(th), c = Math.cos(th);
+    const sn = Math.sin(th), cs = Math.cos(th);
+    const fr = frameAt(L.s + loopAdv(L, th));
     /* normale = vers le centre du cercle */
-    const nx = -tg.x*s, ny = c, nz = -tg.z*s;
-    for(const o of [-hw, hw]){
-      loopPoint(L, th, o, _q);
-      pos.push(_q.x, _q.y, _q.z);
+    const nx = -fr.tx*sn, ny = cs, nz = -fr.tz*sn;
+    const lat = loopLat(L, th);
+    for(const u of [-hw, hw]){
+      loopPoint(L, th, u, _q);
+      pos.push(_q.x, _q.y+lift, _q.z);
       nrm.push(nx, ny, nz);
-      uv.push(o<0?0:1, k/seg*6);
+      /* uv PRIS SUR LA ROUTE, à la position latérale que l'anneau
+         occupe : l'anneau montre donc exactement les mêmes couleurs que
+         la chaussée sous lui, et il n'y a plus d'écart de teinte aux
+         deux raccords (l'anneau avait sa propre palette avant). */
+      uv.push((lat + u + TR.hw)/(2*TR.hw)*uRep, (L.s + r*th)*vScale);
     }
   }
   for(let k=0;k<seg;k++){ const a=k*2,b=a+1,c2=a+2,d=a+3; idx.push(a,b,c2, b,d,c2); }
@@ -1873,35 +2073,72 @@ function loopMesh(L, T){
   g.setAttribute("normal", new THREE.Float32BufferAttribute(nrm,3));
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv,2));
   g.setIndex(idx);
-  const t = tex((gg,S)=>{
-    const cols = ["#ff2d6f","#ff8a1e","#ffe32e","#39e06a","#2ad4ff","#3a63ff","#b44dff"];
-    const band = S/cols.length;
-    cols.forEach((c,j)=>{ gg.fillStyle = c; gg.fillRect(j*band,0,band+1,S); });
-    gg.fillStyle = "#ffffff"; gg.fillRect(0,0,S*0.05,S); gg.fillRect(S-S*0.05,0,S*0.05,S);
-    gg.fillStyle = "rgba(255,255,255,.9)";
-    for(let j=0;j<6;j++) gg.fillRect(S/2-3, j*S/6+5, 6, S/6-10);
+  grp.add(new THREE.Mesh(g, surf.mat));
+
+  /* --- les deux entonnoirs : c'est eux qui relient l'anneau à la
+     route. À l'entrée on part de toute la largeur pour finir sur le
+     ruban ; à la sortie, l'inverse, de l'autre côté de la chaussée. --- */
+  /* transparent : la chaussée arc-en-ciel reste visible, on ne pose
+     par-dessus que deux rails lumineux et des chevrons */
+  const apTex = tex((gg,S)=>{
+    gg.clearRect(0,0,S,S);
+    const rail = (x,w,c)=>{ gg.fillStyle=c; gg.fillRect(x,0,w,S); };
+    rail(0, S*0.05, "#ffffff"); rail(S*0.05, S*0.035, "rgba(120,230,255,.75)");
+    rail(S-S*0.05, S*0.05, "#ffffff"); rail(S-S*0.085, S*0.035, "rgba(120,230,255,.75)");
+    /* chevrons qui montrent le sens de la figure (v croît vers l'avant,
+       donc vers le HAUT de la toile) */
+    gg.strokeStyle = "rgba(255,255,255,.8)"; gg.lineWidth = S*0.055;
+    gg.lineCap = "round"; gg.lineJoin = "round";
+    gg.beginPath();
+    gg.moveTo(S*0.26, S*0.72); gg.lineTo(S*0.5, S*0.24); gg.lineTo(S*0.74, S*0.72);
+    gg.stroke();
+    gg.globalAlpha = .4;
+    gg.beginPath();
+    gg.moveTo(S*0.26, S*0.99); gg.lineTo(S*0.5, S*0.51); gg.lineTo(S*0.74, S*0.99);
+    gg.stroke();
   }, 1, 1, true);
-  grp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({map:t, side:THREE.DoubleSide})));
-  /* tubes lumineux sur les deux bords : l'anneau étant décalé entre
-     l'entrée et la sortie, ce n'est plus un tore mais une hélice */
+  const apMat = new THREE.MeshBasicMaterial({map:apTex, transparent:true, depthWrite:false});
+  grp.add(new THREE.Mesh(loopApron(L.sIn, L.lead,
+    -TR.hw, TR.hw, -L.lat-hw, -L.lat+hw, 0.045), apMat));
+  /* (entre l'entrée et la sortie il n'y a plus de chaussée à peindre :
+     c'est le trou, cf. TR.holes) */
+  grp.add(new THREE.Mesh(loopApron(L.s+L.adv, L.out,
+    L.lat-hw, L.lat+hw, -TR.hw, TR.hw, 0.045), apMat));
+
+  /* tubes lumineux sur les deux bords : l'anneau se décalant en travers
+     de la piste, ce n'est plus un tore mais une hélice */
   const rimMat = new THREE.MeshBasicMaterial({color:0xffffff});
-  for(const o of [-hw-0.35, hw+0.35]){
+  for(const u of [-hw-0.35, hw+0.35]){
     const pts = [];
-    for(let k=0;k<=seg;k++) pts.push(loopPoint(L, k/seg*Math.PI*2, o));
+    for(let k=0;k<=seg;k++){ const q = loopPoint(L, k/seg*Math.PI*2, u); q.y += lift; pts.push(q); }
     const curve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
     grp.add(new THREE.Mesh(new THREE.TubeGeometry(curve, seg, 0.5, 7, false), rimMat));
   }
-  /* mâts de soutien sous le sommet de l'anneau */
+  /* portique d'entrée : les pieds doivent se poser sur de la ROUTE, donc
+     juste avant le trou — plantés sous le sommet de l'anneau, ils se
+     retrouvaient au-dessus du vide */
   const legMat = new THREE.MeshBasicMaterial({color:0x7a4ae0});
-  const top = loopPoint(L, Math.PI, 0);
-  for(const o of [-hw-2.8, hw+2.8]){
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.7,r,8), legMat);
-    leg.position.set(top.x+nr.x*o, y0+r/2, top.z+nr.z*o);
+  const gs = L.s - 3;
+  const gf0 = frameAt(gs), gi = gf0.i, gnx = gf0.nx, gnz = gf0.nz;
+  const yTop = surfY(gi, 0) + 2*r + 1.4;
+  const legO = TR.outOff - 0.9;
+  const _g = new THREE.Vector3();
+  for(const sgn of [-1,1]){
+    const o = sgn*legO;
+    trackPointS(gs, o, _g);
+    const h = yTop - _g.y;
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.95,h,8), legMat);
+    leg.position.set(_g.x, _g.y+h/2, _g.z);
     grp.add(leg);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.6,2.6), legMat);
-    foot.position.set(top.x+nr.x*o, y0+0.3, top.z+nr.z*o);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.6,2.2), legMat);
+    foot.position.set(_g.x, _g.y+0.3, _g.z);
     grp.add(foot);
   }
+  trackPointS(gs, 0, _g);
+  const span = new THREE.Mesh(new THREE.BoxGeometry(legO*2, 0.8, 0.8), legMat);
+  span.position.set(_g.x, yTop, _g.z);
+  span.rotation.y = Math.atan2(gnx, gnz)+Math.PI/2;
+  grp.add(span);
   return grp;
 }
 /* petit mur vertical local (bordure d'un terre-plein) */
@@ -1959,15 +2196,37 @@ function buildScenery(T){
      pas de sol, pas de talus : on ferme le dessous de la piste pour
      qu'elle ressemble à un vrai ruban épais et pas à une feuille. */
   if(T.void){
-    const oEdge = TR.hw+1.2+TR.run+6, drop = T.theme==="rainbow" ? 1.6 : 2.4;
+    const oEdge = TR.outOff, drop = T.theme==="rainbow" ? 1.6 : 2.4;
     const underCol = T.theme==="rainbow" ? 0x1a0b3a : 0xd45f9c;
     const underMat = new THREE.MeshLambertMaterial({color:underCol, side:THREE.DoubleSide});
     const under = new THREE.Mesh(ribbon(-oEdge, oEdge, -drop, 4, 1/9), underMat);
     trackGroup.add(under);
+    /* la joue latérale doit s'arrêter PILE au niveau de la chaussée :
+       avec `drop+0.4` elle dépassait de 40 cm et, une fois le bas-côté
+       supprimé, ce petit muret noir bordait toute la piste et cachait
+       le liseré lumineux */
+    const fh = TR.slimEdge ? drop : drop+0.4;
     for(const sgn of [-1,1]){
-      const fascia = new THREE.Mesh(wallGeom(sgn*oEdge, drop+0.4, sgn<0), underMat);
+      const fascia = new THREE.Mesh(wallGeom(sgn*oEdge, fh, sgn<0), underMat);
       fascia.position.y = -drop;
       trackGroup.add(fascia);
+    }
+    /* bouchons aux deux bouts de chaque trou : sans eux on voit à
+       travers la tranche du ruban, comme une feuille découpée */
+    for(const h of (TR.holes||[])){
+      const _c = new THREE.Vector3();
+      for(const s of [h.sA, h.sA + h.len]){
+        const p = [];
+        for(const o of [-oEdge, oEdge]){
+          trackPointS(s, o, _c);
+          p.push(_c.x, _c.y+0.05, _c.z, _c.x, _c.y-drop-0.4, _c.z);
+        }
+        const cg = new THREE.BufferGeometry();
+        cg.setAttribute("position", new THREE.Float32BufferAttribute(p,3));
+        cg.setIndex([0,1,2, 1,3,2]);
+        cg.computeVertexNormals();
+        trackGroup.add(new THREE.Mesh(cg, underMat));
+      }
     }
     if(T.theme==="fun"){
       /* moutonnement de nuages très en dessous : ça donne l'altitude */
@@ -2062,7 +2321,11 @@ function buildScenery(T){
     const rockMat = new THREE.MeshLambertMaterial({color:0xaebfd6, flatShading:true});
     const snowMat = new THREE.MeshLambertMaterial({color:0xffffff, flatShading:true});
     const rockGeo = new THREE.ConeGeometry(1, 1, 6, 1);
-    const capGeo  = new THREE.ConeGeometry(0.52, 0.52, 6, 1);
+    /* la calotte neigeuse doit être un peu PLUS LARGE que le cône de
+       roche à hauteur égale : avec un rayon exactement proportionnel
+       (0.52 pour 0.52) les deux surfaces se confondaient et le haut
+       des montagnes clignotait (z-fighting). 6 % d'écart suffisent. */
+    const capGeo  = new THREE.ConeGeometry(0.552, 0.52, 6, 1);
     const nM = 26;
     const imR = new THREE.InstancedMesh(rockGeo, rockMat, nM);
     const imS = new THREE.InstancedMesh(capGeo, snowMat, nM);
@@ -2076,7 +2339,9 @@ function buildScenery(T){
       const x = Math.cos(a)*rr, z = Math.sin(a)*rr;
       d.position.set(x, baseY+h/2-16, z); d.scale.set(w, h, w);
       d.rotation.set(0, rnd(0,3), 0); d.updateMatrix(); imR.setMatrixAt(k, d.matrix);
-      d.position.set(x, baseY+h-h*0.26-16, z); d.scale.set(w, h, w);
+      /* et la pointe est remontée d'un demi-pour-cent : sinon les deux
+         sommets sont rigoureusement au même endroit */
+      d.position.set(x, baseY+h-h*0.255-16, z); d.scale.set(w, h, w);
       d.updateMatrix(); imS.setMatrixAt(k, d.matrix);
     }
     imR.instanceMatrix.needsUpdate = true; imS.instanceMatrix.needsUpdate = true;
@@ -2400,8 +2665,11 @@ function landmarkMesh(kind, T){
   if(kind==="peak"){
     const m = add(new THREE.ConeGeometry(1,1,7), new THREE.MeshLambertMaterial({color:0x93a6bd, flatShading:true}), 0, 0, 0);
     m.scale.set(78, 130, 78); m.position.y = 63;
-    const c = add(new THREE.ConeGeometry(.42,.42,7), new THREE.MeshLambertMaterial({color:0xffffff, flatShading:true}), 0, 0, 0);
-    c.scale.set(78, 130, 78); c.position.y = 63 + 130*0.29;
+    /* la calotte doit déborder un peu du cône de roche : à rayon
+       exactement proportionnel (.42 pour .42) les deux surfaces se
+       confondent et le sommet clignote (z-fighting) */
+    const c = add(new THREE.ConeGeometry(.446,.42,7), new THREE.MeshLambertMaterial({color:0xffffff, flatShading:true}), 0, 0, 0);
+    c.scale.set(78, 130, 78); c.position.y = 63 + 130*0.293;
     return g;
   }
   if(kind==="ring"){
@@ -3233,45 +3501,75 @@ function driftLevel(k){
    rouler « sous » elle. La figure est donc jouée à part : le kart
    garde sa vitesse et tourne dans le plan vertical pendant que sa
    position au sol suit l'empreinte de l'anneau. Tout le monde y
-   passe (l'anneau barre toute la largeur), et la sortie donne un
-   turbo qui compense le temps de la figure.
+   passe (la figure se déclenche sur toute la largeur, l'entonnoir se
+   charge de ranger le kart dans l'axe), et la sortie donne un turbo
+   qui compense le temps de la figure.
    ------------------------------------------------------------ */
-function loopEnter(k, L, spd, off){
-  k.loop = {L, th:0, spd:Math.max(spd, 11)};
-  k.loopTh = 0.0001;
-  k.loop.off = clamp(off, -TR.hw+2.5, TR.hw-2.5);
+function loopEnter(k, L, spd, off, s){
+  /* ph 0 = entonnoir (encore au sol, on se range dans l'axe de
+     l'anneau), ph 1 = l'anneau lui-même. `u` = place dans le ruban :
+     on garde une part du décalage d'arrivée pour que deux karts côte à
+     côte le restent au lieu de se superposer.
+     `d` démarre à l'endroit exact où le kart est entré dans la fenêtre,
+     sinon un kart rattrapé quelques mètres trop loin reculerait. */
+  const v = Math.max(spd, 12);
+  k.loop = {L, ph:0, d:clamp(sDist(s, L.sIn), 0, L.lead-4), th:0, spd:v, off0:off,
+            /* durée du tour d'anneau : celle qu'imposerait la vitesse
+               d'entrée, mais bornée — à 15 m/s un anneau de 15 m de
+               rayon durerait plus de six secondes */
+            turn:clamp(2*Math.PI*L.r/v, 1.9, 3.0),
+            u:clamp((off + L.lat)*0.35, -L.hw+1.8, L.hw-1.8)};
+  k.loopTh = 0;
   k.drift = 0; k.driftT = 0; k.spin = 0; k.air = false; k.vy = 0;
   if(k===LOCAL) sfx("hop");
 }
+/* pose le kart sur l'empreinte au sol de la figure.
+   Tout est interpolé entre deux échantillons : s'accrocher au plus
+   proche (tous les 3 m) faisait avancer le kart par à-coups. */
+function loopGround(k, s, off, spd){
+  /* on recopie tout de suite : frameAt renvoie un objet partagé, que le
+     trackPointS suivant réécrit */
+  const f = frameAt(s), fi = f.i, tx = f.tx, tz = f.tz;
+  trackPointS(s, off, k.pos);
+  k.si = fi; k.off = off; k.s = s;
+  k.yaw = Math.atan2(tx, tz);
+  k.vel.set(tx*spd, 0, tz*spd);
+  updateProgress(k, {i:fi, s, off, along:0});
+}
 function stepLoop(k, dt){
-  const L = k.loop.L, n = TR.n;
-  k.loop.th += k.loop.spd/L.r*dt;
-  /* on garde un peu la main : on peut se décaler dans l'anneau */
-  k.loop.off = clamp(k.loop.off + clamp(k.input.s,-1,1)*8*dt, -TR.hw+2.5, TR.hw-2.5);
-  const done = k.loop.th >= Math.PI*2;
-  const th = done ? Math.PI*2 : k.loop.th;
-  /* empreinte au sol : le kart avance, recule au sommet, et ressort
-     `adv` mètres plus loin — l'anneau est légèrement penché en avant */
-  const s = (L.s + Math.sin(th)*L.r + L.adv*th/(Math.PI*2) + TR.len) % TR.len;
-  const i = Math.round(s/TR.step)%n;
-  const p = TR.pos[i], nr = TR.nor[i], tg = TR.tan[i];
-  k.pos.set(p.x+nr.x*k.loop.off, surfY(i, k.loop.off), p.z+nr.z*k.loop.off);
-  k.si = i; k.off = k.loop.off; k.s = s;
-  k.yaw = Math.atan2(tg.x, tg.z);
-  k.vel.set(tg.x*k.loop.spd, 0, tg.z*k.loop.spd);
+  const F = k.loop, L = F.L;          /* F et non P : P() est le profil de conduite */
+  /* on garde un peu la main : on peut se décaler dans le ruban */
+  F.u = clamp(F.u + clamp(k.input.s,-1,1)*7*dt, -L.hw+1.6, L.hw-1.6);
+  k.wheelSpin += F.spd*dt*2.2;
+  if(F.ph === 0){
+    /* ---- entonnoir : encore au sol, mais on se range dans l'axe de
+       l'anneau (qui n'occupe qu'un côté de la chaussée). C'est ce
+       raccord qui « colle » le looping à la route. ---- */
+    F.d += F.spd*dt;
+    const f = clamp(F.d/L.lead, 0, 1), w = f*f*(3-2*f);
+    const s = (L.sIn + F.d + TR.len*2) % TR.len;
+    loopGround(k, s, lerp(F.off0, loopLat(L,0) + F.u, w), F.spd);
+    k.loopTh = 0;
+    if(f >= 1){ F.ph = 1; F.th = 0; }
+    return;
+  }
+  F.th += Math.PI*2/F.turn*dt;
+  const done = F.th >= Math.PI*2;
+  const th = done ? Math.PI*2 : F.th;
+  /* empreinte au sol : le kart avance, recule un peu au sommet, et
+     ressort `adv` mètres plus loin ET de l'autre côté de la piste */
+  const s = (L.s + loopAdv(L, th) + TR.len*2) % TR.len;
+  loopGround(k, s, loopLat(L, th) + F.u, F.spd);
   k.loopTh = th;
   k.roll = 0;
-  k.wheelSpin += k.loop.spd*dt*2.2;
-  updateProgress(k, {i, s, off:k.loop.off, along:0});
   if(done){
-    /* sortie : on se pose juste après l'anneau, turbo en récompense */
-    const s2 = (L.s + L.adv + 4) % TR.len, j = Math.round(s2/TR.step)%n;
-    const t2 = TR.tan[j], n2 = TR.nor[j], p2 = TR.pos[j];
-    k.pos.set(p2.x+n2.x*k.loop.off, surfY(j, k.loop.off), p2.z+n2.z*k.loop.off);
-    k.si = j; k.s = s2; k.lastS = s2;
-    k.yaw = Math.atan2(t2.x, t2.z);
-    k.vel.set(t2.x*k.loop.spd, 0, t2.z*k.loop.spd);
-    k.boost = Math.max(k.boost, 1.15);
+    /* sortie : on reste PILE au pied de l'anneau (avancer de quelques
+       mètres faisait sauter le kart de 5 m d'un coup à la fin de la
+       figure), avec un turbo qui compense le temps perdu */
+    const s2 = (L.s + L.adv) % TR.len;
+    loopGround(k, s2, L.lat + F.u, F.spd);
+    k.lastS = s2;
+    k.boost = Math.max(k.boost, 0.9 + L.r*0.045);
     k.loop = null; k.loopTh = 0; k.pitch = 0;
     if(k===LOCAL){ sfx("boost"); showToast("Looping !"); }
   }
@@ -3518,10 +3816,18 @@ function stepKart(k, dt){
     }
   }
 
-  /* ---- entrée dans un looping ---- */
-  if(TR.loops && TR.loops.length && !k.air && Math.abs(k.off) < TR.hw){
-    const L = loopAt(loc2.s, prevS);
-    if(L && vLong > 6){ loopEnter(k, L, vLong, k.off); return; }
+  /* ---- entrée dans un looping ----
+     `!flying` et non `!k.air` : sur les virages relevés de l'arc-en-ciel
+     les karts décollent de quelques centimètres en permanence, et la
+     moitié d'entre eux passaient à côté de la figure (mesuré : 22 refus
+     sur 48 passages). */
+  if(TR.loops && TR.loops.length && Math.abs(k.off) < TR.hw){
+    const L = loopAt(loc2.s);
+    /* sur les derniers mètres on prend le kart MÊME en vol : sinon il
+       file tout droit... dans le trou qui s'ouvre sous l'anneau */
+    if(L && vLong > 6 && (!flying || sDist(loc2.s, L.sIn) > L.lead-8)){
+      loopEnter(k, L, vLong, k.off, loc2.s); return;
+    }
   }
 
   /* ---- remise sur la piste ---- */
@@ -3536,7 +3842,14 @@ function stepKart(k, dt){
 }
 
 function respawn(k){
-  const i = k.si;
+  let i = k.si;
+  /* jamais dans un trou : on serait reposé au-dessus du vide et on
+     retomberait aussitôt, en boucle. On recule avant l'entonnoir du
+     looping, qui reprendra le kart dans la figure. */
+  if(TR.holes) for(const h of TR.holes){
+    const d = sDist(TR.cum[i], h.sA);
+    if(d > -4 && d < h.len + 4) i = sAt(h.sA - 14);
+  }
   const off = clamp(TR.line[i], -TR.hw*0.6, TR.hw*0.6);
   trackPoint(TR.cum[i]/TR.len, off, k.pos);
   k.pos.y += 0.4;
@@ -4184,20 +4497,24 @@ function updateCamera(dt){
   if(LOCAL.loopTh){
     const L = (LOCAL.loop && LOCAL.loop.L) || nearestLoop(LOCAL.s);
     if(L){
-      const th = LOCAL.loopTh, i = L.i, tg = TR.tan[i];
-      const off = LOCAL.loop ? LOCAL.loop.off : LOCAL.off;
+      const th = LOCAL.loopTh;
+      /* tangente INTERPOLÉE : prise sur l'échantillon le plus proche,
+         elle sautait tous les 3 m et la caméra tremblait */
+      const fr = frameAt(L.s + loopAdv(L, th));
+      const tg = {x:fr.tx, z:fr.tz};
+      const u = LOCAL.loop ? LOCAL.loop.u : 0;
       const back = th - 1.28, fwd2 = th + 0.55;
       /* même point qu'un kart placé en retrait sur l'anneau, mais tiré
          de 5,2 m vers le centre du cercle */
       const inw = 5.2;
-      loopPoint(L, back, off, CAM.pos);
+      loopPoint(L, back, u, CAM.pos);
       CAM.pos.x += -tg.x*Math.sin(back)*inw;
       CAM.pos.y += Math.cos(back)*inw;
       CAM.pos.z += -tg.z*Math.sin(back)*inw;
       camera.up.set(-tg.x*Math.sin(th), Math.cos(th), -tg.z*Math.sin(th));
       camera.position.copy(CAM.pos);
       /* on vise un peu plus loin sur l'anneau : on voit où l'on va */
-      const aim = loopPoint(L, fwd2, off, _v4);
+      const aim = loopPoint(L, fwd2, u, _v4);
       camera.lookAt(aim.x, aim.y+0.6, aim.z);
       CAM.yaw = Math.atan2(tg.x, tg.z);
       CAM.look.copy(LOCAL.dp);
@@ -4266,11 +4583,13 @@ function syncKartMesh(k, dt){
        reste au sol sous le looping */
     const L = (k.loop && k.loop.L) || nearestLoop(k.s);
     if(L){
-      const th = k.loopTh, tg = TR.tan[L.i];
-      const off = k.loop ? k.loop.off : k.off;
-      loopPoint(L, th, off, m.position);
-      m.position.y += 0.06;
-      m.rotation.y = Math.atan2(tg.x, tg.z);
+      const th = k.loopTh;
+      const fr = frameAt(L.s + loopAdv(L, th));
+      const yaw = Math.atan2(fr.tx, fr.tz);
+      const u = k.loop ? k.loop.u : (k.loopU||0);
+      loopPoint(L, th, u, m.position);
+      m.position.y += 0.13;
+      m.rotation.y = yaw;
       m.rotation.z = 0;
       pitch = -th;
     }
@@ -4911,8 +5230,23 @@ el("btnOtherTrack").onclick = ()=>{
   buildTrackCards();
 };
 el("btnHost").onclick = ()=>{
+  /* on recopie le nom/la couleur de l'accueil : les deux champs
+     restent synchronisés, c'est toujours `inpName` qui fait foi */
+  el("hostName").value = el("inpName").value;
+  el("hostColor").value = el("inpColor").value;
   showScreen("scrHost");
   netHost(0);
+};
+/* renommage à chaud dans le salon : les invités voient le changement */
+el("hostName").oninput = ()=>{
+  el("inpName").value = el("hostName").value;
+  renderHostPlayers();
+  netBroadcastLobby();
+};
+el("hostColor").onchange = ()=>{
+  el("inpColor").value = el("hostColor").value;
+  renderHostPlayers();
+  netBroadcastLobby();
 };
 el("btnHostBack").onclick = ()=> location.reload();
 el("btnHostSetup").onclick = ()=>{
@@ -5128,7 +5462,7 @@ function netStateMsg(){
       k.boost>0?1:0, k.spin>0?1:0, k.star>0?1:0, k.shrink>0?1:0, k.finished?1:0,
       Math.round(k.prog), isFinite(k.best)?R2(k.best):0, k.name, k.color,
       R2(k.vel.x), R2(k.vel.z), k.rollT>0?1:0, R2(k.lapStart), k.finished?R2(k.finishT):0,
-      k.loopTh?R2(k.loopTh):0
+      k.loopTh?R2(k.loopTh):0, k.loop?R2(k.loop.u):0
     ]),
     O:G.objs.map(o=>[o.kind, R2(o.s), R2(o.off)]),
     B:G.boxes.map(b=>b.alive?"1":"0").join(""),
@@ -5287,9 +5621,9 @@ function netApplySnapshot(s){
     k.name = a[18]; k.color = a[19];
     k.rollT = a[22]?0.3:0;
     k.lapStart = a[23]; k.finishT = a[24];
-    /* angle de looping : sans lui, un kart en pleine figure resterait
-       collé au sol sur l'écran des invités */
-    if(!isMe) k.loopTh = a[25]||0;
+    /* angle de looping (+ place dans le ruban) : sans eux, un kart en
+       pleine figure resterait collé au sol sur l'écran des invités */
+    if(!isMe){ k.loopTh = a[25]||0; k.loopU = a[26]||0; }
   }
   /* objets lancés */
   const O = s.O||[];
