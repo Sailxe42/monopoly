@@ -1,0 +1,3241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Jenga 3D — la tour infernale</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }
+</script>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+  body{
+    font-family:"Segoe UI",Arial,sans-serif;color:#f3e9dc;user-select:none;-webkit-user-select:none;
+    background:radial-gradient(circle at 50% 22%, #4a3524 0%, #2a1d14 45%, #120c08 100%);
+    -webkit-tap-highlight-color:transparent;
+  }
+  canvas#gl{display:block;position:fixed;inset:0;width:100%;height:100%;touch-action:none;}
+
+  /* ============ écrans ============ */
+  /* align-items:flex-start + margin:auto sur le panneau : sinon le haut
+     du panneau devient inaccessible au défilement sur téléphone. */
+  .screen{
+    position:fixed;inset:0;z-index:60;display:none;align-items:flex-start;justify-content:center;
+    padding:22px 14px calc(22px + env(safe-area-inset-bottom));
+    overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+    background:radial-gradient(circle at 50% 15%, rgba(90,62,40,.9), rgba(14,10,7,.955) 70%);
+  }
+  .screen.active{display:flex;}
+  .panel{
+    margin:auto;flex:0 0 auto;width:min(860px,96vw);
+    background:linear-gradient(160deg, rgba(255,240,220,.09), rgba(255,255,255,.02));
+    border:1px solid rgba(255,220,180,.16);border-radius:20px;padding:24px 24px 20px;
+    box-shadow:0 26px 60px rgba(0,0,0,.6);
+  }
+  .panel h1{
+    margin:0 0 4px;font-size:clamp(30px,6vw,52px);letter-spacing:4px;text-transform:uppercase;
+    font-weight:900;font-style:italic;
+    background:linear-gradient(90deg,#ffd48a,#e8913c 45%,#c1622a);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .panel h2{margin:18px 0 10px;font-size:17px;color:#ffd9a8;letter-spacing:.5px;}
+  .panel h2:first-of-type{margin-top:10px;}
+  .panel .sub{color:#c3ad95;font-size:14px;margin:0 0 16px;line-height:1.55;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;}
+  label{font-size:12px;color:#c2a98e;display:block;margin-bottom:4px;font-weight:600;}
+  input[type=text],select{
+    background:#211610;border:1px solid #4a3626;color:#f3e9dc;padding:9px 11px;border-radius:9px;
+    font-size:14px;font-family:inherit;min-width:130px;
+  }
+  input[type=text]:focus,select:focus{outline:none;border-color:#e8913c;}
+  input[type=color]{width:42px;height:38px;padding:2px;border:1px solid #4a3626;border-radius:9px;background:#211610;cursor:pointer;}
+  .btn{
+    background:linear-gradient(180deg,#e8a04a,#c1622a);border:1px solid rgba(255,225,190,.24);
+    color:#2a1608;font-weight:800;font-size:15px;font-family:inherit;padding:11px 20px;border-radius:12px;
+    cursor:pointer;transition:transform .12s ease, filter .12s ease;
+  }
+  @media (hover:hover){ .btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.12);} }
+  .btn:active:not(:disabled){transform:translateY(1px);}
+  .btn:disabled{opacity:.42;cursor:not-allowed;}
+  .btn.alt{background:linear-gradient(180deg,#5b4632,#3b2c1e);color:#f3e9dc;}
+  .btn.ghost{background:rgba(255,255,255,.07);color:#f3e9dc;border-color:rgba(255,255,255,.14);}
+  .btn.small{padding:7px 13px;font-size:13px;border-radius:9px;}
+  .btn.wide{width:100%;}
+  .status{font-size:13px;color:#c3ad95;margin-top:10px;min-height:19px;line-height:1.5;}
+  .code-box{
+    font-size:34px;font-weight:900;letter-spacing:10px;background:#180f0a;border:1px dashed #6b4d33;
+    border-radius:12px;padding:12px 18px;text-align:center;color:#ffc46b;margin:6px 0 12px;
+  }
+  .players-list{display:flex;flex-direction:column;gap:6px;margin:10px 0 14px;}
+  .players-list div{
+    background:rgba(255,255,255,.05);border-radius:8px;padding:7px 12px;font-size:13.5px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none;}
+  .backlink{
+    position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:70;color:#c3ad95;
+    text-decoration:none;font-size:12.5px;background:rgba(0,0,0,.55);padding:5px 11px;border-radius:8px;
+  }
+  .backlink:hover{color:#fff;}
+  /* l'écran de fin laisse voir les décombres derrière lui */
+  #scrEnd{background:radial-gradient(circle at 50% 15%, rgba(90,62,40,.86), rgba(14,10,7,.93) 70%);}
+
+  /* ============ choix du mode ============ */
+  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:6px;}
+  .mcard{
+    background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px;cursor:pointer;
+    transition:transform .12s, border-color .12s, background .12s;
+  }
+  @media (hover:hover){ .mcard:hover{transform:translateY(-3px);border-color:#e8913c;} }
+  .mcard.sel{border-color:#ffc46b;background:linear-gradient(160deg,rgba(232,144,60,.2),rgba(255,255,255,.02));}
+  .mcard .mico{font-size:34px;display:block;margin-bottom:6px;}
+  .mcard .mname{font-weight:800;font-size:16px;margin-bottom:4px;}
+  .mcard .mdesc{font-size:12px;color:#c3ad95;line-height:1.45;}
+
+  /* ============ joueurs ============ */
+  .prow{
+    display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:8px 10px;margin-bottom:7px;flex-wrap:wrap;
+  }
+  .prow input[type=text]{flex:1 1 130px;min-width:110px;}
+  .prow select{flex:0 1 auto;}
+  .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:8px;}
+  .chk{display:flex;align-items:center;gap:7px;font-size:13px;color:#d8c4ac;cursor:pointer;padding:6px 0;}
+  .chk input{width:17px;height:17px;accent-color:#e8913c;}
+
+  /* ============ niveaux démolition ============ */
+  .levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:9px;margin:4px 0 12px;}
+  .lcard{
+    background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.11);border-radius:12px;padding:9px 10px;cursor:pointer;
+    transition:transform .12s, border-color .12s;
+  }
+  @media (hover:hover){ .lcard:hover{transform:translateY(-3px);border-color:#e8913c;} }
+  .lcard.sel{border-color:#ffc46b;background:linear-gradient(160deg,rgba(232,144,60,.18),rgba(255,255,255,.02));}
+  .lcard.lock{opacity:.4;cursor:not-allowed;}
+  .lcard .ln{font-weight:800;font-size:13px;margin-bottom:2px;}
+  .lcard .ld{font-size:11px;color:#bda88f;line-height:1.35;min-height:30px;}
+  .lcard .ls{font-size:13px;color:#ffc46b;letter-spacing:2px;margin-top:3px;}
+  .lcard .ls i{color:rgba(255,255,255,.18);font-style:normal;}
+
+  /* ============ HUD ============ */
+  #hud{position:fixed;inset:0;z-index:40;pointer-events:none;}
+  #hud .clickable{pointer-events:auto;}
+
+  #turnBar{
+    position:absolute;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+    display:flex;gap:8px;align-items:center;background:rgba(20,13,9,.72);border:1px solid rgba(255,220,180,.16);
+    border-radius:30px;padding:6px 15px 6px 8px;backdrop-filter:blur(6px);max-width:min(92vw,560px);
+  }
+  #turnBar .av{width:26px;height:26px;border-radius:50%;flex:none;border:2px solid rgba(255,255,255,.35);}
+  #turnBar .tn{font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #turnBar .ts{font-size:12px;color:#c3ad95;white-space:nowrap;}
+
+  #scoreBox{
+    position:absolute;top:calc(46px + env(safe-area-inset-top));left:10px;
+    background:rgba(20,13,9,.66);border:1px solid rgba(255,220,180,.13);border-radius:12px;
+    padding:7px 10px;font-size:12.5px;min-width:132px;backdrop-filter:blur(6px);
+  }
+  #scoreBox .sl{display:flex;justify-content:space-between;gap:10px;padding:2px 0;}
+  #scoreBox .sl.on{color:#ffc46b;font-weight:800;}
+  #scoreBox .sl.dead{opacity:.4;text-decoration:line-through;}
+  #scoreBox .sn{display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  #goalBox{
+    position:absolute;top:calc(46px + env(safe-area-inset-top));right:10px;max-width:min(46vw,260px);
+    background:rgba(20,13,9,.66);border:1px solid rgba(255,220,180,.13);border-radius:12px;
+    padding:7px 10px;font-size:12.5px;line-height:1.4;backdrop-filter:blur(6px);display:none;
+  }
+  #goalBox b{color:#ffc46b;}
+
+  #logBox{
+    position:absolute;left:10px;bottom:calc(12px + env(safe-area-inset-bottom));
+    width:min(40vw,230px);font-size:11.5px;line-height:1.42;color:#cdb69c;
+    display:flex;flex-direction:column;gap:2px;
+  }
+  #logBox div{background:rgba(20,13,9,.55);border-radius:7px;padding:3px 8px;}
+  #logBox div:first-child{color:#ffdfae;background:rgba(40,26,16,.75);}
+
+  #actionBar{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:94vw;
+  }
+  #actionBar .btn{box-shadow:0 6px 18px rgba(0,0,0,.5);}
+
+  #msgBar{
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(70px + env(safe-area-inset-bottom));
+    background:rgba(20,13,9,.74);border:1px solid rgba(255,220,180,.14);border-radius:11px;
+    padding:7px 15px;font-size:13.5px;text-align:center;max-width:92vw;backdrop-filter:blur(6px);
+  }
+
+  /* jauge de résistance / puissance */
+  #gauge{
+    position:absolute;right:12px;bottom:calc(96px + env(safe-area-inset-bottom));
+    width:16px;height:130px;background:rgba(20,13,9,.6);border:1px solid rgba(255,220,180,.16);
+    border-radius:9px;overflow:hidden;display:none;
+  }
+  #gauge i{position:absolute;left:0;right:0;bottom:0;height:0%;display:block;
+    background:linear-gradient(0deg,#5ad06a,#ffd24a 55%,#ff4b3e);transition:height .06s linear;}
+  #gaugeLbl{
+    position:absolute;right:6px;bottom:calc(78px + env(safe-area-inset-bottom));
+    font-size:10.5px;color:#c3ad95;display:none;text-align:center;width:30px;
+  }
+
+  /* boutons caméra */
+  #camPad{
+    position:absolute;right:10px;bottom:calc(14px + env(safe-area-inset-bottom));
+    display:grid;grid-template-columns:repeat(3,34px);grid-auto-rows:34px;gap:5px;
+  }
+  #camPad button{
+    pointer-events:auto;background:rgba(20,13,9,.66);border:1px solid rgba(255,220,180,.16);
+    color:#e8d5bf;border-radius:9px;font-size:14px;cursor:pointer;padding:0;font-family:inherit;
+  }
+  #camPad button:active{background:rgba(232,144,60,.5);}
+
+  #netCodeBadge{
+    position:fixed;top:calc(8px + env(safe-area-inset-top));left:10px;z-index:70;display:none;
+    background:rgba(20,13,9,.72);border:1px solid rgba(255,220,180,.2);border-radius:9px;
+    padding:5px 10px;font-size:12px;color:#ffc46b;font-weight:700;letter-spacing:1px;
+  }
+  #topBtns{position:fixed;top:calc(8px + env(safe-area-inset-top));right:112px;z-index:70;display:flex;gap:6px;}
+  #topBtns button{
+    background:rgba(0,0,0,.55);border:1px solid rgba(255,220,180,.16);color:#e8d5bf;
+    border-radius:8px;font-size:13px;padding:4px 9px;cursor:pointer;font-family:inherit;
+  }
+
+  #banner{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;display:none;
+    background:rgba(24,15,10,.95);border:1px solid rgba(255,220,180,.24);border-radius:14px;
+    padding:18px 22px;font-size:14px;text-align:center;max-width:min(430px,92vw);line-height:1.55;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);
+  }
+  #banner button{margin-top:12px;}
+
+  #toast{
+    position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:75;
+    background:rgba(24,15,10,.9);border:1px solid rgba(255,220,180,.22);border-radius:11px;
+    padding:9px 18px;font-size:14.5px;font-weight:700;opacity:0;transition:opacity .25s;pointer-events:none;
+    text-align:center;max-width:92vw;
+  }
+  #toast.on{opacity:1;}
+
+  #loading{
+    position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;background:rgba(12,8,5,.92);font-size:15px;color:#e8d5bf;
+  }
+  #loading.on{display:flex;}
+  .spin{
+    width:44px;height:44px;border:4px solid rgba(255,220,180,.18);border-top-color:#e8913c;
+    border-radius:50%;animation:sp 1s linear infinite;
+  }
+  @keyframes sp{to{transform:rotate(360deg);}}
+
+  /* résultats */
+  .res{display:flex;flex-direction:column;gap:8px;margin:12px 0 16px;}
+  .res div{
+    display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);
+    border-radius:11px;padding:10px 13px;font-size:14.5px;
+  }
+  .res div.win{background:linear-gradient(90deg,rgba(255,196,107,.28),rgba(255,255,255,.03));border:1px solid rgba(255,196,107,.4);}
+  .res .rk{font-weight:900;font-size:17px;width:26px;text-align:center;}
+  .res .rp{margin-left:auto;color:#ffc46b;font-weight:800;}
+
+  @media (max-width:700px){
+    .screen{padding:10px 8px calc(12px + env(safe-area-inset-bottom));}
+    .panel{padding:16px 14px 14px;border-radius:16px;}
+    .panel .sub{font-size:12.5px;margin-bottom:12px;}
+    #logBox{width:min(46vw,190px);font-size:10.5px;}
+    #scoreBox{font-size:11.5px;min-width:118px;padding:6px 8px;}
+    #turnBar{padding:5px 12px 5px 6px;}
+    #turnBar .tn{font-size:13px;}
+    #turnBar .ts{display:none;}
+    #topBtns{right:104px;}
+  }
+  @media (max-height:520px){
+    #logBox{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<a class="backlink" href="index.html">← Nos jeux</a>
+<div id="netCodeBadge"></div>
+<div id="topBtns">
+  <button id="btnSound" title="Son">🔊</button>
+  <button id="btnMenu" title="Menu">☰</button>
+</div>
+
+<!-- ================= HUD ================= -->
+<div id="hud" style="display:none">
+  <div id="turnBar"><span class="av"></span><span class="tn">—</span><span class="ts"></span></div>
+  <div id="scoreBox"></div>
+  <div id="goalBox"></div>
+  <div id="logBox"></div>
+  <div id="msgBar"></div>
+  <div id="actionBar"></div>
+  <div id="gauge"><i></i></div>
+  <div id="gaugeLbl"></div>
+  <div id="camPad">
+    <button data-cam="up">▲</button><button data-cam="zin">＋</button><button data-cam="reset">⌖</button>
+    <button data-cam="left">◀</button><button data-cam="down">▼</button><button data-cam="right">▶</button>
+    <button data-cam="zout" style="grid-column:2">－</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="banner"></div>
+<div id="loading"><div class="spin"></div><div id="loadTxt">Chargement du moteur physique…</div></div>
+
+<!-- ================= ACCUEIL ================= -->
+<div class="screen active" id="scrHome">
+  <div class="panel">
+    <h1>Jenga 3D</h1>
+    <p class="sub">Une vraie tour de 54 blocs, vraie physique, vrais effondrements.
+      Retirez un bloc, reposez-le au sommet… et priez.
+      Ou passez en <b>Démolition</b> et envoyez tout valser à coups de boulets.
+      <br><span style="color:#8f7d69">Souris ou doigt : glissez pour tourner la caméra, touchez un bloc pour le tirer.</span></p>
+
+    <h2>Mode de jeu</h2>
+    <div class="modes">
+      <div class="mcard sel" data-mode="tour">
+        <span class="mico">🗼</span>
+        <div class="mname">Tour infernale</div>
+        <div class="mdesc">Le Jenga classique. 18 étages, 54 blocs. Retirez un bloc sous l'étage le plus haut et reposez-le au sommet. Celui qui fait tomber la tour a perdu.</div>
+      </div>
+      <div class="mcard" data-mode="demo">
+        <span class="mico">💣</span>
+        <div class="mname">Démolition</div>
+        <div class="mdesc">À la manière de Boom Blox : 10 constructions à pulvériser à coups de boulets. Bois, pierre, verre, TNT, joyaux… et blocs interdits à ne surtout pas faire tomber.</div>
+      </div>
+    </div>
+
+    <div id="levelPick" style="display:none">
+      <h2>Construction</h2>
+      <div class="levels" id="levelList"></div>
+    </div>
+
+    <h2>Joueurs</h2>
+    <div class="row" style="margin-bottom:8px">
+      <div>
+        <label>Nombre de joueurs</label>
+        <select id="inpCount">
+          <option value="1">1 joueur</option>
+          <option value="2" selected>2 joueurs</option>
+          <option value="3">3 joueurs</option>
+          <option value="4">4 joueurs</option>
+        </select>
+      </div>
+      <div>
+        <label>Qualité graphique</label>
+        <select id="inpQual">
+          <option value="high">Élevée</option>
+          <option value="mid" selected>Moyenne</option>
+          <option value="low">Basse (téléphone lent)</option>
+        </select>
+      </div>
+    </div>
+    <div id="playerRows"></div>
+
+    <h2>Options</h2>
+    <div class="opts">
+      <label class="chk"><input type="checkbox" id="optHelp" checked> Surligner les blocs jouables</label>
+      <label class="chk"><input type="checkbox" id="optTraj" checked> Afficher la trajectoire</label>
+      <label class="chk"><input type="checkbox" id="optWorn"> Tour usée (blocs irréguliers)</label>
+      <label class="chk"><input type="checkbox" id="optTimer"> Chrono de 30 s par tour</label>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="btnLocal">▶ Jouer ici</button>
+      <button class="btn alt" id="btnHostGo">🌐 Héberger une partie</button>
+      <button class="btn alt" id="btnJoinGo">🔗 Rejoindre une partie</button>
+    </div>
+    <div class="status" id="homeStatus"></div>
+  </div>
+</div>
+
+<!-- ================= HÉBERGER ================= -->
+<div class="screen" id="scrHost">
+  <div class="panel">
+    <h1>Héberger</h1>
+    <p class="sub">Donnez ce code aux autres joueurs. Ils le saisissent dans « Rejoindre une partie », depuis n'importe quel appareil.</p>
+    <div class="code-box" id="hostCode">·····</div>
+    <div class="players-list" id="hostPlayers"></div>
+    <div class="row">
+      <button class="btn" id="btnHostStart">▶ Lancer la partie</button>
+      <button class="btn ghost" id="btnHostBack">← Retour</button>
+    </div>
+    <div class="status" id="hostStatus"></div>
+  </div>
+</div>
+
+<!-- ================= REJOINDRE ================= -->
+<div class="screen" id="scrJoin">
+  <div class="panel">
+    <h1>Rejoindre</h1>
+    <p class="sub">Entrez le code de la partie et votre prénom. Si vous avez été déconnecté en cours de partie, reprenez <b>exactement le même prénom</b> pour retrouver votre place.</p>
+    <div class="row">
+      <div><label>Code de la partie</label><input type="text" id="joinCode" maxlength="5" placeholder="ABCDE" style="text-transform:uppercase;letter-spacing:5px;font-weight:800;"></div>
+      <div><label>Votre prénom</label><input type="text" id="joinName" maxlength="14" placeholder="Alex"></div>
+      <div><label>Couleur</label><input type="color" id="joinColor" value="#e8913c"></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnConnect">Se connecter</button>
+      <button class="btn ghost" id="btnJoinBack">← Retour</button>
+    </div>
+    <div class="status" id="joinStatus"></div>
+  </div>
+</div>
+
+<!-- ================= SALON INVITÉ ================= -->
+<div class="screen" id="scrLobby">
+  <div class="panel">
+    <h1>Salon</h1>
+    <p class="sub">Connecté ! On attend que l'hôte lance la partie.</p>
+    <div class="players-list" id="lobbyPlayers"></div>
+    <div class="status" id="lobbyStatus">⏳ En attente de l'hôte…</div>
+  </div>
+</div>
+
+<!-- ================= FIN ================= -->
+<div class="screen" id="scrEnd">
+  <div class="panel">
+    <h1 id="endTitle">Partie terminée</h1>
+    <p class="sub" id="endSub"></p>
+    <div class="res" id="endRes"></div>
+    <div class="row">
+      <button class="btn" id="btnAgain">🔄 Rejouer</button>
+      <button class="btn alt" id="btnSmash">💥 Faire exploser la tour</button>
+      <button class="btn ghost" id="btnHome">🏠 Menu</button>
+    </div>
+    <div class="status" id="endStatus"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "three";
+
+/* ============================================================
+   JENGA 3D — tour infernale + démolition (inspiré de Boom Blox)
+   ------------------------------------------------------------
+   Rendu : three.js.  Physique : Rapier (WASM), chargée à la
+   demande — un invité en ligne n'en a pas besoin, c'est l'hôte
+   qui simule et diffuse les positions.
+
+   Échelle : on garde les proportions exactes d'un vrai Jenga
+   (7,5 x 1,5 x 2,5 cm) mais on les donne à Rapier en mètres —
+   la tour est donc un « Jenga géant » de 2,70 m. C'est la plage
+   de tailles où le solveur est le plus stable ; à l'échelle réelle
+   la tolérance de pénétration des contacts (1 mm) s'accumulerait
+   sur 18 étages et la tour s'enfoncerait toute seule.
+   Gravité un peu forcée (-20) pour que les chutes restent nerveuses.
+   ============================================================ */
+
+/* ---------- PARTIE 0 : utilitaires ---------- */
+const el = id => document.getElementById(id);
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const R3    = v => Math.round(v*1000)/1000;
+const rnd   = (a,b)=> a+Math.random()*(b-a);
+const pick  = a => a[(Math.random()*a.length)|0];
+const esc   = s => String(s==null?"":s).replace(/[<>&"]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+const IS_TOUCH = matchMedia("(hover:none)").matches || "ontouchstart" in window;
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("active", s.id===id));
+  el("hud").style.display = id ? "none" : "";
+}
+function hideScreens(){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  el("hud").style.display = "";
+}
+let toastT = null;
+function showToast(txt, ms){
+  const t = el("toast"); t.innerHTML = txt; t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove("on"), ms||2200);
+}
+function showBanner(html){ const b = el("banner"); b.innerHTML = html; b.style.display = "block"; }
+function hideBanner(){ el("banner").style.display = "none"; }
+
+/* ---------- PARTIE 1 : constantes du jeu ---------- */
+const BL = 0.75, BH = 0.15, BW = 0.25;     /* bloc : longueur, hauteur, largeur */
+const GAP = 0.004;                          /* jeu entre deux blocs d'un même étage */
+const LEVELS = 18;                          /* 18 étages x 3 = 54 blocs */
+const TOWER_H = LEVELS*BH;
+const GRAV = -20;
+const PODIUM_TOP = 0.6;                     /* hauteur du socle en mode démolition */
+
+/* palette bois : plusieurs teintes pour que la tour ne soit pas plate */
+const WOOD_TINTS = ["#d9a765","#cf9a56","#e0b479","#c68f4d","#dcae70","#c98d4e"];
+
+const PCOLORS = ["#e8913c","#4fb3e8","#7ed957","#e85c7a","#c58af0"];
+
+const MAT_TYPES = {
+  bois   : {pts:10,  dens:0.55, fric:0.45, rest:0.06, col:"#cf9a56", wood:true},
+  pierre : {pts:20,  dens:1.9,  fric:0.72, rest:0.03, col:"#98978f", rough:0.95, stone:true},
+  verre  : {pts:15,  dens:0.9,  fric:0.30, rest:0.12, col:"#8fd8ef", glass:true},
+  metal  : {pts:25,  dens:3.2,  fric:0.45, rest:0.14, col:"#b8bec7", metal:0.92, rough:0.28},
+  tnt    : {pts:5,   dens:0.7,  fric:0.60, rest:0.05, col:"#d0392b", tnt:true},
+  joyau  : {pts:100, dens:1.1,  fric:0.35, rest:0.22, col:"#38e0a0", gem:true},
+  noir   : {pts:-80, dens:1.4,  fric:0.65, rest:0.05, col:"#2b2b33", bad:true}
+};
+
+/* tailles disponibles pour les constructions du mode démolition */
+const SIZES = {
+  planche : [1.6, 0.30, 0.70],
+  poutre  : [2.4, 0.34, 0.34],
+  cube    : [0.70, 0.70, 0.70],
+  petit   : [0.42, 0.42, 0.42],
+  pilier  : [0.36, 1.40, 0.36],
+  dalle   : [2.20, 0.26, 1.10],
+  brique  : [0.92, 0.44, 0.50],
+  jenga   : [BL, BH, BW]
+};
+
+/* ---------- PARTIE 2 : état global ---------- */
+const G = {
+  mode:"tour",              /* "tour" | "demo" */
+  phase:"menu",             /* menu | idle | pull | place | settle | aim | fly | over */
+  players:[], cur:0, round:0,
+  blocks:[], byId:new Map(), nextId:1,
+  balls:[],
+  level:0,                  /* construction choisie en démolition */
+  ballsLeft:0,
+  goalDone:false,
+  quality:"mid",
+  help:true, traj:true, worn:false, timer:false,
+  turnEnd:0,
+  moved:null,               /* bloc en cours de manipulation */
+  settleT:0,
+  log:[],
+  started:false,
+  soloBest:0,
+  smash:false               /* mode « bac à sable » après la partie */
+};
+window.G = G;
+
+/* ---------- PARTIE 3 : son (synthèse WebAudio, aucun fichier) ---------- */
+const SND = {ctx:null, on:true};
+function audio(){
+  if(!SND.ctx){
+    try{ SND.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ SND.on = false; }
+  }
+  if(SND.ctx && SND.ctx.state==="suspended") SND.ctx.resume();
+  return SND.ctx;
+}
+let noiseBuf = null;
+function noise(ctx){
+  if(!noiseBuf){
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate*0.5, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  }
+  const s = ctx.createBufferSource(); s.buffer = noiseBuf; return s;
+}
+/* petit « toc » de bois : bruit filtré très court + note basse */
+function sfx(kind, vol){
+  if(!SND.on) return;
+  const ctx = audio(); if(!ctx) return;
+  vol = clamp(vol==null?1:vol, 0, 1);
+  const t = ctx.currentTime, out = ctx.createGain();
+  out.connect(ctx.destination);
+  if(kind==="clack"||kind==="tap"){
+    const f = kind==="tap" ? 900 : 420;
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(0.35*vol+0.001, t+0.004);
+    out.gain.exponentialRampToValueAtTime(0.0001, t+0.13);
+    const n = noise(ctx), bp = ctx.createBiquadFilter();
+    bp.type="bandpass"; bp.frequency.value=f*(0.8+Math.random()*0.5); bp.Q.value=2.2;
+    n.connect(bp); bp.connect(out); n.start(t); n.stop(t+0.15);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type="triangle"; o.frequency.setValueAtTime(f*0.42, t);
+    o.frequency.exponentialRampToValueAtTime(f*0.22, t+0.09);
+    g.gain.setValueAtTime(0.22*vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.1);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.12);
+  } else if(kind==="glass"){
+    out.gain.setValueAtTime(0.3*vol, t); out.gain.exponentialRampToValueAtTime(0.0001, t+0.5);
+    for(let i=0;i<5;i++){
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type="sine"; o.frequency.value = 1800+Math.random()*3400;
+      g.gain.setValueAtTime(0.11*vol, t+i*0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.18+Math.random()*0.3);
+      o.connect(g); g.connect(out); o.start(t+i*0.012); o.stop(t+0.6);
+    }
+  } else if(kind==="boom"){
+    out.gain.setValueAtTime(0.9*vol, t); out.gain.exponentialRampToValueAtTime(0.0001, t+0.9);
+    const n = noise(ctx), lp = ctx.createBiquadFilter();
+    lp.type="lowpass"; lp.frequency.setValueAtTime(1400,t); lp.frequency.exponentialRampToValueAtTime(90, t+0.7);
+    n.connect(lp); lp.connect(out); n.start(t); n.stop(t+0.9);
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type="sine"; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(28,t+0.5);
+    g.gain.setValueAtTime(0.7*vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.7);
+  } else if(kind==="whoosh"){
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(0.22*vol,t+0.05);
+    out.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+    const n=noise(ctx), bp=ctx.createBiquadFilter();
+    bp.type="bandpass"; bp.frequency.setValueAtTime(300,t); bp.frequency.exponentialRampToValueAtTime(1500,t+0.3);
+    bp.Q.value=1.1; n.connect(bp); bp.connect(out); n.start(t); n.stop(t+0.4);
+  } else if(kind==="crash"){
+    out.gain.setValueAtTime(0.55*vol,t); out.gain.exponentialRampToValueAtTime(0.0001,t+1.5);
+    const n=noise(ctx), bp=ctx.createBiquadFilter();
+    bp.type="bandpass"; bp.frequency.setValueAtTime(700,t); bp.frequency.exponentialRampToValueAtTime(180,t+1.2);
+    bp.Q.value=0.8; n.connect(bp); bp.connect(out); n.start(t); n.stop(t+1.5);
+  } else if(kind==="ding"){
+    out.gain.setValueAtTime(0.0001,t);
+    out.gain.exponentialRampToValueAtTime(0.3*vol,t+0.01);
+    out.gain.exponentialRampToValueAtTime(0.0001,t+0.7);
+    [880,1320,1760].forEach((f,i)=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type="sine"; o.frequency.value=f;
+      g.gain.setValueAtTime(0.12/(i+1),t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t+0.7);
+    });
+  }
+}
+
+/* ---------- PARTIE 4 : rendu three.js ---------- */
+const canvas = el("gl");
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x1b120c, 14, 40);
+const camera = new THREE.PerspectiveCamera(46, 1, 0.05, 120);
+
+/* --- textures procédurales --- */
+function cnv(w,h){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
+function tex(c, rep){
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  if(rep){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0],rep[1]); }
+  return t;
+}
+function woodCanvas(base){
+  const c = cnv(256,128), g = c.getContext("2d");
+  g.fillStyle = base; g.fillRect(0,0,256,128);
+  for(let i=0;i<46;i++){
+    const y = Math.random()*128, dark = Math.random()<0.5;
+    g.strokeStyle = dark ? `rgba(80,48,20,${0.05+Math.random()*0.12})` : `rgba(255,225,180,${0.03+Math.random()*0.07})`;
+    g.lineWidth = 0.6+Math.random()*2.6;
+    g.beginPath();
+    for(let x=0;x<=256;x+=6) g.lineTo(x, y + Math.sin(x*0.03+i)*1.6 + Math.sin(x*0.008+i*2.7)*3.4);
+    g.stroke();
+  }
+  for(let i=0;i<420;i++){
+    g.fillStyle = `rgba(70,40,16,${Math.random()*0.09})`;
+    g.fillRect(Math.random()*256, Math.random()*128, 1.4, 1);
+  }
+  /* deux ou trois nœuds */
+  for(let i=0;i<2;i++){
+    const x=Math.random()*256, y=Math.random()*128, r=3+Math.random()*5;
+    const rg=g.createRadialGradient(x,y,0,x,y,r);
+    rg.addColorStop(0,"rgba(90,52,22,.55)"); rg.addColorStop(1,"rgba(90,52,22,0)");
+    g.fillStyle=rg; g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+  }
+  return c;
+}
+function stoneCanvas(){
+  const c = cnv(128,128), g = c.getContext("2d");
+  g.fillStyle="#8d8c85"; g.fillRect(0,0,128,128);
+  for(let i=0;i<900;i++){
+    const v = 120+Math.random()*70|0;
+    g.fillStyle=`rgba(${v},${v},${v-6},${Math.random()*0.4})`;
+    g.fillRect(Math.random()*128, Math.random()*128, 1+Math.random()*3, 1+Math.random()*3);
+  }
+  for(let i=0;i<18;i++){
+    g.strokeStyle=`rgba(60,60,58,${0.1+Math.random()*0.2})`; g.lineWidth=Math.random()*1.6;
+    g.beginPath(); g.moveTo(Math.random()*128,Math.random()*128);
+    g.lineTo(Math.random()*128,Math.random()*128); g.stroke();
+  }
+  return c;
+}
+function tntCanvas(){
+  const c = cnv(128,128), g = c.getContext("2d");
+  g.fillStyle="#b83024"; g.fillRect(0,0,128,128);
+  g.fillStyle="#8f2016"; for(let y=0;y<128;y+=32) g.fillRect(0,y,128,10);
+  g.fillStyle="#f6e7c8"; g.fillRect(10,44,108,40);
+  g.fillStyle="#2b1410"; g.font="bold 30px Arial"; g.textAlign="center"; g.textBaseline="middle";
+  g.fillText("TNT",64,65);
+  return c;
+}
+function badCanvas(){
+  const c = cnv(128,128), g = c.getContext("2d");
+  g.fillStyle="#26262e"; g.fillRect(0,0,128,128);
+  g.strokeStyle="#d2382e"; g.lineWidth=7;
+  for(let i=-128;i<128;i+=30){ g.beginPath(); g.moveTo(i,0); g.lineTo(i+128,128); g.stroke(); }
+  g.fillStyle="rgba(20,20,26,.72)"; g.fillRect(0,44,128,40);
+  g.fillStyle="#ff7a6e"; g.font="bold 26px Arial"; g.textAlign="center"; g.textBaseline="middle";
+  g.fillText("✖",64,64);
+  return c;
+}
+
+let woodTex = [], stoneTex, tntTex, badTex, tableTex;
+function buildTextures(){
+  woodTex = WOOD_TINTS.map(t=>tex(woodCanvas(t)));
+  stoneTex = tex(stoneCanvas());
+  tntTex = tex(tntCanvas());
+  badTex = tex(badCanvas());
+  tableTex = tex(woodCanvas("#5c3d24"), [14,7]);
+}
+
+/* --- environnement (reflets doux) sans fichier externe --- */
+function buildEnv(){
+  const c = cnv(256,128), g = c.getContext("2d");
+  const grd = g.createLinearGradient(0,0,0,128);
+  grd.addColorStop(0,"#fff3dd"); grd.addColorStop(.42,"#cbb193");
+  grd.addColorStop(.52,"#57402d"); grd.addColorStop(1,"#1a120c");
+  g.fillStyle=grd; g.fillRect(0,0,256,128);
+  /* deux « fenêtres » lumineuses -> jolis reflets sur le métal et les joyaux */
+  g.fillStyle="rgba(255,250,235,.95)"; g.fillRect(28,16,44,26); g.fillRect(160,22,34,20);
+  const t = new THREE.CanvasTexture(c);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  const pm = new THREE.PMREMGenerator(renderer);
+  const env = pm.fromEquirectangular(t).texture;
+  pm.dispose(); t.dispose();
+  return env;
+}
+
+/* --- géométrie de boîte à arêtes arrondies --- */
+const geoCache = new Map();
+function roundedBox(w,h,d,r,seg){
+  const key = w.toFixed(3)+"|"+h.toFixed(3)+"|"+d.toFixed(3)+"|"+r;
+  if(geoCache.has(key)) return geoCache.get(key);
+  r = Math.min(r, w/2.05, h/2.05, d/2.05);
+  seg = seg||3;
+  const g = new THREE.BoxGeometry(w,h,d,seg,seg,seg);
+  const p = g.attributes.position;
+  const hx=w/2-r, hy=h/2-r, hz=d/2-r;
+  const v = new THREE.Vector3(), c = new THREE.Vector3();
+  for(let i=0;i<p.count;i++){
+    v.fromBufferAttribute(p,i);
+    c.set(clamp(v.x,-hx,hx), clamp(v.y,-hy,hy), clamp(v.z,-hz,hz));
+    v.sub(c);
+    if(v.lengthSq()>1e-9) v.setLength(r);
+    v.add(c);
+    p.setXYZ(i,v.x,v.y,v.z);
+  }
+  g.computeVertexNormals();
+  geoCache.set(key,g);
+  return g;
+}
+
+/* --- matériaux --- */
+function makeMaterial(type, variant){
+  const def = MAT_TYPES[type] || MAT_TYPES.bois;
+  const o = {color:new THREE.Color(def.col), roughness:def.rough!=null?def.rough:0.72, metalness:def.metal||0.04};
+  if(def.wood){ o.map = woodTex[variant % woodTex.length]; o.color = new THREE.Color(0xffffff); o.roughness = 0.62; }
+  else if(def.stone){ o.map = stoneTex; o.color = new THREE.Color(0xffffff); }
+  else if(def.tnt){ o.map = tntTex; o.color = new THREE.Color(0xffffff); o.roughness = 0.55; }
+  else if(def.bad){ o.map = badTex; o.color = new THREE.Color(0xffffff); o.roughness = 0.5; }
+  const m = new THREE.MeshStandardMaterial(o);
+  if(def.glass){
+    m.transparent = true; m.opacity = 0.42; m.roughness = 0.06; m.metalness = 0.0;
+    m.envMapIntensity = 2.2; m.color = new THREE.Color(def.col);
+  }
+  if(def.gem){
+    m.roughness = 0.08; m.metalness = 0.35; m.envMapIntensity = 2.6;
+    m.emissive = new THREE.Color(def.col); m.emissiveIntensity = 0.28;
+  }
+  if(def.metal){ m.envMapIntensity = 1.6; }
+  return m;
+}
+const matCache = new Map();
+function materialFor(type, variant){
+  const k = type+"|"+variant;
+  if(!matCache.has(k)) matCache.set(k, makeMaterial(type, variant));
+  return matCache.get(k);
+}
+
+/* --- décor --- */
+let sun, tableMesh, podiumMesh, selRing, ghostMesh, trajLine, aimDot;
+function buildScene(){
+  scene.environment = buildEnv();
+
+  const hemi = new THREE.HemisphereLight(0xffe6c4, 0x2a1a10, 0.55);
+  scene.add(hemi);
+
+  sun = new THREE.DirectionalLight(0xfff0d6, 2.5);
+  sun.position.set(4.2, 8.5, 3.4);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048);
+  const sc = sun.shadow.camera;
+  sc.left=-6; sc.right=6; sc.top=8; sc.bottom=-2; sc.near=0.5; sc.far=26;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.012;
+  scene.add(sun);
+
+  const fill = new THREE.DirectionalLight(0x9ec4ff, 0.45);
+  fill.position.set(-5,3.5,-4);
+  scene.add(fill);
+
+  /* la table */
+  const tm = new THREE.MeshStandardMaterial({map:tableTex, roughness:0.78, metalness:0.02, color:0xbf9268});
+  tableMesh = new THREE.Mesh(roundedBox(17,0.7,17,0.1,2), tm);
+  tableMesh.position.y = -0.35;
+  tableMesh.receiveShadow = true;
+  scene.add(tableMesh);
+
+  /* le socle du mode démolition */
+  const pm = new THREE.MeshStandardMaterial({map:stoneTex, color:0xb9b2a6, roughness:0.9});
+  podiumMesh = new THREE.Mesh(roundedBox(4.2, PODIUM_TOP, 4.2, 0.06, 2), pm);
+  podiumMesh.position.y = PODIUM_TOP/2;
+  podiumMesh.receiveShadow = true; podiumMesh.castShadow = true;
+  podiumMesh.visible = false;
+  scene.add(podiumMesh);
+
+  /* anneau de sélection sous le bloc visé */
+  const rg = new THREE.RingGeometry(0.16, 0.23, 28);
+  selRing = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({color:0xffc46b, transparent:true, opacity:0.85, side:THREE.DoubleSide, depthTest:false}));
+  selRing.rotation.x = -Math.PI/2; selRing.visible = false; selRing.renderOrder = 5;
+  scene.add(selRing);
+
+  /* fantôme de pose */
+  ghostMesh = new THREE.Mesh(roundedBox(BL,BH,BW,0.02,2),
+    new THREE.MeshBasicMaterial({color:0x7ed957, transparent:true, opacity:0.3, depthTest:false}));
+  ghostMesh.visible = false; ghostMesh.renderOrder = 4;
+  scene.add(ghostMesh);
+
+  /* trajectoire du lancer */
+  const tg = new THREE.BufferGeometry();
+  tg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(34*3), 3));
+  trajLine = new THREE.Line(tg, new THREE.LineDashedMaterial({color:0xffc46b, dashSize:0.18, gapSize:0.12, transparent:true, opacity:0.85, depthTest:false}));
+  trajLine.visible = false; trajLine.renderOrder = 5; trajLine.frustumCulled = false;
+  scene.add(trajLine);
+
+  aimDot = new THREE.Mesh(new THREE.RingGeometry(0.10,0.16,20),
+    new THREE.MeshBasicMaterial({color:0xff8a4a, transparent:true, opacity:0.9, side:THREE.DoubleSide, depthTest:false}));
+  aimDot.visible = false; aimDot.renderOrder = 6;
+  scene.add(aimDot);
+}
+
+function applyQuality(){
+  const q = G.quality;
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1, q==="low"?1.1:(q==="mid"?1.6:2)));
+  renderer.shadowMap.enabled = q!=="low";
+  if(sun){
+    sun.shadow.mapSize.set(q==="high"?2048:1024, q==="high"?2048:1024);
+    if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; }
+  }
+  scene.traverse(o=>{ if(o.isMesh && o.material) o.material.needsUpdate = true; });
+}
+
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+
+/* ---------- PARTIE 5 : physique (Rapier, chargée à la demande) ---------- */
+let RAPIER = null, world = null;
+async function loadPhysics(){
+  if(world) return true;
+  el("loading").classList.add("on");
+  el("loadTxt").textContent = "Chargement du moteur physique…";
+  try{
+    RAPIER = await import("https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/rapier.es.js");
+    await RAPIER.init();
+  }catch(e){
+    el("loadTxt").innerHTML = "❌ Impossible de charger le moteur physique.<br>"+
+      "<span style='font-size:13px;color:#c3ad95'>Un bloqueur de publicités ou le réseau bloque cdn.jsdelivr.net. "+
+      "Désactivez-le pour ce site puis rechargez la page.</span>";
+    return false;
+  }
+  world = new RAPIER.World({x:0, y:GRAV, z:0});
+  world.timestep = 1/120;
+  /* Réglages critiques pour un empilement de 18 étages : avec les valeurs
+     par défaut chaque contact tolère ~1 mm de pénétration, ce qui fait
+     9 cm d'affaissement cumulé et finit par coucher la tour toute seule.
+     Contacts raides + tolérance réduite -> 5 mm au total, invisible. */
+  const ip = world.integrationParameters;
+  ip.contact_natural_frequency = 240;
+  ip.normalizedAllowedLinearError = 0.0002;
+  ip.numSolverIterations = 12;
+  ip.numAdditionalFrictionIterations = 8;
+  ip.numInternalPgsIterations = 1;
+  /* sol + socle statiques */
+  world.createCollider(RAPIER.ColliderDesc.cuboid(13,0.35,13).setTranslation(0,-0.35,0).setFriction(0.85));
+  physPodium = world.createCollider(RAPIER.ColliderDesc.cuboid(2.1, PODIUM_TOP/2, 2.1).setTranslation(0,PODIUM_TOP/2,0).setFriction(0.8));
+  physPodium.setEnabled(false);
+  el("loading").classList.remove("on");
+  return true;
+}
+let physPodium = null;
+const HAS_PHYS = ()=> !!world;
+
+/* ---------- PARTIE 6 : blocs ---------- */
+/* Un bloc = un descripteur (partagé sur le réseau) + un mesh + éventuellement un corps physique. */
+function makeBlock(desc){
+  const [w,h,d] = desc.d;
+  const type = desc.t || "bois";
+  const def = MAT_TYPES[type] || MAT_TYPES.bois;
+  const mesh = new THREE.Mesh(roundedBox(w,h,d, Math.min(0.035, h*0.28), 3), materialFor(type, desc.v||0));
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.position.set(desc.p[0], desc.p[1], desc.p[2]);
+  if(desc.q) mesh.quaternion.set(desc.q[0],desc.q[1],desc.q[2],desc.q[3]);
+  scene.add(mesh);
+
+  const b = {
+    id: desc.i, type, dim:[w,h,d], mesh, body:null, coll:null,
+    def, alive:true, fallen:false, scored:false, tower:!!desc.tw,
+    variant:desc.v||0, ref:new THREE.Vector3(), refQ:new THREE.Quaternion(),
+    lastImpact:0, fuse:0
+  };
+
+  if(HAS_PHYS()){
+    const bd = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(desc.p[0],desc.p[1],desc.p[2])
+      .setLinearDamping(0.12).setAngularDamping(0.22)
+      .setCcdEnabled(false);
+    if(desc.q) bd.setRotation({x:desc.q[0],y:desc.q[1],z:desc.q[2],w:desc.q[3]});
+    b.body = world.createRigidBody(bd);
+    /* `sh` = bloc « libre » : collisionneur un poil plus plat que le maillage */
+    const cd = RAPIER.ColliderDesc.cuboid(w/2, h/2 - (desc.sh||0), d/2)
+      .setFriction(def.fric).setRestitution(def.rest).setDensity(def.dens);
+    b.coll = world.createCollider(cd, b.body);
+    b.body.userData = b;
+  }
+  G.blocks.push(b);
+  G.byId.set(b.id, b);
+  return b;
+}
+function removeBlock(b, silent){
+  b.alive = false;
+  if(!silent && b.mesh) spawnPuff(b.mesh.position, b.def.col);
+  if(b.mesh) scene.remove(b.mesh);
+  if(b.body && HAS_PHYS()){ try{ world.removeRigidBody(b.body); }catch(e){} b.body = null; }
+}
+function clearBlocks(){
+  G.blocks.forEach(b=>{
+    if(b.mesh) scene.remove(b.mesh);
+    if(b.body && HAS_PHYS()){ try{ world.removeRigidBody(b.body); }catch(e){} }
+  });
+  G.balls.forEach(b=>{
+    if(b.mesh) scene.remove(b.mesh);
+    if(b.body && HAS_PHYS()){ try{ world.removeRigidBody(b.body); }catch(e){} }
+  });
+  G.blocks = []; G.balls = []; G.byId.clear(); G.nextId = 1;
+  /* important : sinon un relancement en pleine manipulation ferait appeler
+     une méthode sur un corps Rapier déjà libéré -> plantage du WASM */
+  G.moved = null; G.turnBlock = null; G.pushBack = 0; G.retry = false;
+  ghostMesh.visible = false; selRing.visible = false;
+  clearFx();
+}
+
+/* ---------- PARTIE 7 : la tour de Jenga ---------- */
+/* étage pair : blocs allongés selon X, décalés en Z. étage impair : l'inverse. */
+function levelYaw(l){ return (l%2===0) ? 0 : Math.PI/2; }
+function slotPos(level, slot){
+  const y = BH/2 + level*BH;
+  const off = (slot-1)*(BW+GAP);
+  return (level%2===0) ? new THREE.Vector3(0,y,off) : new THREE.Vector3(off,y,0);
+}
+/* Un vrai Jenga n'est jamais parfait : dans chaque étage, un bloc est
+   très légèrement plus fin que les deux autres. Résultat, l'étage du
+   dessus ne repose QUE sur deux blocs, et le troisième est « libre » —
+   c'est lui qu'on retire du bout du doigt.
+   Sans ça, tous les blocs d'un étage sont rigoureusement coplanaires :
+   le solveur concentre alors toute la charge sur la colonne du milieu,
+   et tirer ce bloc emmène tout le haut de la tour avec lui.
+   1,1 mm de moins de chaque côté (1,5 % de la hauteur) : invisible à
+   l'œil, décisif pour la physique. */
+const LOOSE_SHRINK = 0.0011;
+function looseSlot(){ return Math.random()<0.68 ? 1 : (Math.random()<0.5 ? 0 : 2); }
+function towerDescriptors(){
+  const list = [];
+  let id = 1;
+  for(let l=0; l<LEVELS; l++){
+    const loose = looseSlot();
+    for(let s=0; s<3; s++){
+      const p = slotPos(l,s);
+      const yaw = levelYaw(l);
+      let jx=0, jz=0, jr=0;
+      if(G.worn){ jx = rnd(-0.005,0.005); jz = rnd(-0.005,0.005); jr = rnd(-0.018,0.018); }
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw+jr, 0));
+      list.push({i:id++, t:"bois", v:(l*3+s)%WOOD_TINTS.length,
+        d:[BL,BH,BW], p:[R3(p.x+jx), R3(p.y), R3(p.z+jz)],
+        q:[R3(q.x),R3(q.y),R3(q.z),R3(q.w)], tw:1,
+        sh: s===loose ? LOOSE_SHRINK : 0});
+    }
+  }
+  return list;
+}
+
+/* niveau réel d'un bloc, recalculé depuis sa position (robuste après un déplacement) */
+function levelOf(b){
+  const y = b.mesh.position.y;
+  return Math.round((y - BH/2)/BH);
+}
+function isFlat(b){
+  UP.set(0,1,0).applyQuaternion(b.mesh.quaternion);
+  return Math.abs(UP.y) > 0.9;
+}
+const UP = new THREE.Vector3();
+
+/* renvoie {levels:Map(level -> [blocs]), topComplete:n, top:n} */
+function towerMap(){
+  const levels = new Map();
+  for(const b of G.blocks){
+    if(!b.alive || !b.tower || b===G.moved || !isFlat(b)) continue;
+    const p = b.mesh.position;
+    /* un bloc éjecté au loin ne fait plus partie de la pile */
+    if(Math.abs(p.x) > BL*0.9 || Math.abs(p.z) > BL*0.9) continue;
+    const l = levelOf(b);
+    if(l < 0 || l > 80) continue;
+    if(Math.abs(p.y - (BH/2 + l*BH)) > BH*0.3) continue;   /* coincé entre deux étages */
+    if(!levels.has(l)) levels.set(l, []);
+    levels.get(l).push(b);
+  }
+  let top = -1, topComplete = -1;
+  for(const [l,arr] of levels){
+    if(l>top) top = l;
+    if(arr.length>=3 && l>topComplete) topComplete = l;
+  }
+  return {levels, top, topComplete};
+}
+/* règle officielle : on ne prend que dans les étages SOUS le plus haut étage complet */
+function grabbableSet(){
+  const tm = towerMap();
+  const ok = new Set();
+  for(const [l,arr] of tm.levels){
+    if(l >= tm.topComplete) continue;
+    if(arr.length <= 1) continue;      /* dernier bloc d'un étage : suicide, on l'interdit */
+    arr.forEach(b=>ok.add(b.id));
+  }
+  return ok;
+}
+
+/* ---------- PARTIE 8 : constructions du mode démolition ---------- */
+function D(type, size, x, y, z, yaw){
+  const d = SIZES[size] || SIZES.cube;
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw||0, 0));
+  return {t:type, d:d.slice(), p:[x, y, z], q:[R3(q.x),R3(q.y),R3(q.z),R3(q.w)], base:size};
+}
+/* pose une pile verticale d'éléments identiques */
+function stack(out, type, size, x, z, n, yaw, y0){
+  const d = SIZES[size]; let y = (y0==null?PODIUM_TOP:y0) + d[1]/2;
+  for(let i=0;i<n;i++){ out.push(D(type,size,x,y,z,yaw)); y += d[1]+0.004; }
+  return y;
+}
+/* un mur : colonnes x lignes de briques */
+function wall(out, type, cols, rows, z, y0, size){
+  size = size||"brique";
+  const d = SIZES[size];
+  for(let r=0;r<rows;r++){
+    const off = (r%2)? d[0]*0.5 : 0;
+    for(let c=0;c<cols;c++){
+      const x = (c-(cols-1)/2)*(d[0]+0.01) + off*0.35;
+      out.push(D(type,size,x, (y0==null?PODIUM_TOP:y0)+d[1]/2+r*(d[1]+0.004), z, 0));
+    }
+  }
+}
+/* deux piliers + une dalle : un portique */
+function arch(out, type, x, z, y0, hgt){
+  const p = SIZES.pilier, dl = SIZES.dalle;
+  let y = y0;
+  for(let i=0;i<hgt;i++){
+    out.push(D(type,"pilier", x-0.85, y+p[1]/2, z));
+    out.push(D(type,"pilier", x+0.85, y+p[1]/2, z));
+    y += p[1]+0.004;
+    out.push(D(type,"dalle", x, y+dl[1]/2, z));
+    y += dl[1]+0.004;
+  }
+  return y;
+}
+
+const STRUCTS = [
+  {
+    name:"Premier lancer", desc:"Un simple mur de bois. Fais tout tomber du socle.",
+    balls:5, goal:{type:"tout"}, par:[2,3],
+    build(){ const o=[]; wall(o,"bois",3,2,0); return o; }
+  },
+  {
+    name:"La tour penchée", desc:"Un joyau tout en haut. Fais-le tomber du socle.",
+    balls:3, goal:{type:"joyaux"}, par:[1,2],
+    build(){
+      const o=[]; let y = PODIUM_TOP;
+      for(let i=0;i<6;i++){
+        o.push(D(i%2?"pierre":"bois","cube", (i%2?0.06:-0.05), y+SIZES.cube[1]/2, (i%3?0.04:-0.04), i*0.12));
+        y += SIZES.cube[1]+0.004;
+      }
+      o.push(D("joyau","petit",0,y+SIZES.petit[1]/2,0,0.4));
+      return o;
+    }
+  },
+  {
+    name:"Le pont", desc:"Deux portiques, des joyaux dessous. Tout doit tomber.",
+    balls:4, goal:{type:"tout"}, par:[2,3],
+    build(){
+      const o=[];
+      arch(o,"bois",-1.0,0,PODIUM_TOP,1);
+      arch(o,"bois", 1.0,0,PODIUM_TOP,1);
+      o.push(D("joyau","petit",-1.0,PODIUM_TOP+0.22,0));
+      o.push(D("joyau","petit", 1.0,PODIUM_TOP+0.22,0));
+      o.push(D("pierre","dalle",0,PODIUM_TOP+SIZES.pilier[1]+SIZES.dalle[1]*1.6,0,Math.PI/2));
+      return o;
+    }
+  },
+  {
+    name:"Château de verre", desc:"Fragile… mais il faut TOUT dégager.",
+    balls:3, goal:{type:"tout"}, par:[1,2],
+    build(){
+      const o=[]; let y=PODIUM_TOP;
+      for(let r=0;r<3;r++){
+        for(const [x,z] of [[-0.7,-0.7],[0.7,-0.7],[-0.7,0.7],[0.7,0.7]])
+          o.push(D("verre","cube",x,y+SIZES.cube[1]/2,z));
+        y += SIZES.cube[1]+0.004;
+        o.push(D(r===2?"joyau":"bois","planche",0,y+SIZES.planche[1]/2,-0.7,0));
+        o.push(D("bois","planche",0,y+SIZES.planche[1]/2,0.7,0));
+        y += SIZES.planche[1]+0.004;
+      }
+      return o;
+    }
+  },
+  {
+    name:"Dynamite", desc:"De la TNT au cœur du fort. Fais sauter le joyau du toit.",
+    balls:3, goal:{type:"joyaux"}, par:[1,2],
+    build(){
+      const o=[];
+      wall(o,"pierre",4,3,-0.9); wall(o,"pierre",4,3,0.9);
+      o.push(D("tnt","cube",-0.5,PODIUM_TOP+SIZES.cube[1]/2,0));
+      o.push(D("tnt","cube", 0.5,PODIUM_TOP+SIZES.cube[1]/2,0));
+      o.push(D("bois","dalle",0,PODIUM_TOP+SIZES.cube[1]+SIZES.dalle[1]/2,0));
+      o.push(D("joyau","petit",0,PODIUM_TOP+SIZES.cube[1]+SIZES.dalle[1]+0.22,0));
+      return o;
+    }
+  },
+  {
+    name:"Attention au noir", desc:"Fais tomber les 3 joyaux — mais pas les blocs interdits !",
+    balls:4, goal:{type:"joyaux"}, par:[2,3],
+    build(){
+      const o=[]; let y=PODIUM_TOP;
+      for(let r=0;r<4;r++){
+        const t = r%2 ? "noir" : "bois";
+        o.push(D(t,"brique",-0.9,y+SIZES.brique[1]/2,0));
+        o.push(D(t,"brique", 0.9,y+SIZES.brique[1]/2,0));
+        y += SIZES.brique[1]+0.004;
+      }
+      o.push(D("bois","poutre",0,y+SIZES.poutre[1]/2,0,0));
+      y += SIZES.poutre[1]+0.004;
+      o.push(D("joyau","petit",-0.8,y+SIZES.petit[1]/2,0));
+      o.push(D("joyau","petit", 0,  y+SIZES.petit[1]/2,0));
+      o.push(D("joyau","petit", 0.8,y+SIZES.petit[1]/2,0));
+      return o;
+    }
+  },
+  {
+    name:"La pyramide", desc:"Massive et basse. Marque un maximum de points.",
+    balls:5, goal:{type:"score", n:220}, par:[3,4],
+    build(){
+      const o=[]; const d=SIZES.cube; let y=PODIUM_TOP;
+      for(let r=0;r<4;r++){
+        const n = 4-r;
+        for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+          const t = (r===3)?"joyau":(r===0?"pierre":"bois");
+          o.push(D(t, r===3?"petit":"cube", (i-(n-1)/2)*(d[0]+0.01), y+(r===3?SIZES.petit[1]:d[1])/2, (j-(n-1)/2)*(d[2]+0.01)));
+        }
+        y += d[1]+0.004;
+      }
+      return o;
+    }
+  },
+  {
+    name:"Les tours jumelles", desc:"Un joyau au sommet de chaque tour. Fais-les tomber.",
+    balls:4, goal:{type:"joyaux"}, par:[2,3],
+    build(){
+      const o=[];
+      for(const x of [-1.2, 1.2]){
+        let y = stack(o, "bois", "cube", x, 0, 5, 0);
+        o.push(D("verre","cube",x,y+SIZES.cube[1]/2,0)); y += SIZES.cube[1]+0.004;
+        o.push(D("joyau","petit",x,y+SIZES.petit[1]/2,0,0.5));
+      }
+      return o;
+    }
+  },
+  {
+    name:"Le colosse", desc:"Un gros bloc de pierre et de métal. Tape fort.",
+    balls:6, goal:{type:"score", n:420}, par:[4,5],
+    build(){
+      const o=[];
+      wall(o,"pierre",4,4,-0.8); wall(o,"pierre",4,4,0.8);
+      let y = PODIUM_TOP + 4*(SIZES.brique[1]+0.004);
+      o.push(D("metal","dalle",0,y+SIZES.dalle[1]/2,-0.8,0));
+      o.push(D("metal","dalle",0,y+SIZES.dalle[1]/2, 0.8,0));
+      y += SIZES.dalle[1]+0.004;
+      stack(o,"verre","cube",-1.0,0,2,0,y);
+      stack(o,"verre","cube", 1.0,0,2,0,y);
+      o.push(D("tnt","cube",0,y+SIZES.cube[1]/2,0));
+      y += SIZES.cube[1]+0.004;
+      o.push(D("joyau","petit",0,y+SIZES.petit[1]/2,0,0.6));
+      return o;
+    }
+  },
+  {
+    name:"Boum final", desc:"TNT, joyaux, blocs interdits. Bonne chance.",
+    balls:3, goal:{type:"joyaux"}, par:[1,2],
+    build(){
+      const o=[]; let y = PODIUM_TOP;
+      for(let r=0;r<3;r++){
+        for(const [x,z] of [[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]])
+          o.push(D(r===1?"tnt":"pierre","cube",x,y+SIZES.cube[1]/2,z));
+        y += SIZES.cube[1]+0.004;
+        o.push(D("bois","dalle",0,y+SIZES.dalle[1]/2,-1.1,0));
+        o.push(D("bois","dalle",0,y+SIZES.dalle[1]/2, 1.1,0));
+        y += SIZES.dalle[1]+0.004;
+      }
+      /* la poutre court selon Z (elle repose sur les deux dalles) :
+         les joyaux doivent donc être alignés en Z, pas en X */
+      o.push(D("noir","poutre",0,y+SIZES.poutre[1]/2,0,Math.PI/2));
+      y += SIZES.poutre[1]+0.004;
+      o.push(D("joyau","petit",0,y+SIZES.petit[1]/2,-0.75));
+      o.push(D("joyau","petit",0,y+SIZES.petit[1]/2, 0.75));
+      o.push(D("tnt","petit",0,y+SIZES.petit[1]/2,0));
+      return o;
+    }
+  }
+];
+
+function structDescriptors(idx){
+  const s = STRUCTS[idx] || STRUCTS[0];
+  const raw = s.build();
+  let id = 1;
+  return raw.map(r=>({
+    i:id++, t:r.t, v:(id*3)%WOOD_TINTS.length, d:r.d.map(R3),
+    p:r.p.map(R3), q:r.q, tw:0
+  }));
+}
+
+/* ---------- PARTIE 9 : effets visuels ---------- */
+const FX = [];
+function clearFx(){ FX.forEach(f=>scene.remove(f.o)); FX.length = 0; }
+const puffGeo = new THREE.SphereGeometry(0.08, 6, 5);
+function spawnPuff(pos, col, n, spread, life){
+  n = n||10; spread = spread||1.4;
+  const m = new THREE.MeshBasicMaterial({color:new THREE.Color(col||"#ffd9a8"), transparent:true, opacity:0.9});
+  for(let i=0;i<n;i++){
+    const o = new THREE.Mesh(puffGeo, m);
+    o.position.copy(pos);
+    o.scale.setScalar(rnd(0.4,1.2));
+    scene.add(o);
+    FX.push({o, v:new THREE.Vector3(rnd(-1,1),rnd(0.2,1.4),rnd(-1,1)).multiplyScalar(spread*rnd(1,3)),
+      t:0, life:life||0.7, mat:m});
+  }
+}
+function spawnFlash(pos, radius){
+  const m = new THREE.MeshBasicMaterial({color:0xffd07a, transparent:true, opacity:0.95});
+  const o = new THREE.Mesh(new THREE.SphereGeometry(radius*0.35, 14, 10), m);
+  o.position.copy(pos); scene.add(o);
+  FX.push({o, v:new THREE.Vector3(), t:0, life:0.45, mat:m, grow:radius*2.6});
+}
+function stepFx(dt){
+  for(let i=FX.length-1;i>=0;i--){
+    const f = FX[i];
+    f.t += dt;
+    const k = f.t/f.life;
+    if(k>=1){ scene.remove(f.o); FX.splice(i,1); continue; }
+    if(f.grow){ f.o.scale.setScalar(1 + k*f.grow); f.mat.opacity = 0.95*(1-k); }
+    else {
+      f.v.y -= 22*dt;
+      f.o.position.addScaledVector(f.v, dt);
+      f.mat.opacity = 0.9*(1-k);
+      f.o.scale.multiplyScalar(1 - dt*0.7);
+    }
+  }
+}
+
+/* ---------- PARTIE 10 : caméra orbitale ---------- */
+const CAM = {
+  tgt:new THREE.Vector3(0,1.2,0), tTgt:new THREE.Vector3(0,1.2,0),
+  th:0.85, phi:1.16, dist:4.6,
+  tTh:0.85, tPhi:1.16, tDist:4.6,
+  minD:1.8, maxD:18, shake:0
+};
+function camPreset(mode){
+  if(mode==="demo"){
+    CAM.tTgt.set(0, PODIUM_TOP+1.1, 0); CAM.tDist = 10.5; CAM.tPhi = 1.22; CAM.tTh = 0.62;
+  } else {
+    CAM.tTgt.set(0, TOWER_H*0.46, 0); CAM.tDist = 4.9; CAM.tPhi = 1.14; CAM.tTh = 0.85;
+  }
+  CAM.tgt.copy(CAM.tTgt); CAM.dist = CAM.tDist; CAM.phi = CAM.tPhi; CAM.th = CAM.tTh;
+}
+function camStep(dt){
+  const k = 1 - Math.exp(-dt*11);
+  CAM.th = lerp(CAM.th, CAM.tTh, k);
+  CAM.phi = lerp(CAM.phi, CAM.tPhi, k);
+  CAM.dist = lerp(CAM.dist, CAM.tDist, k);
+  CAM.tgt.lerp(CAM.tTgt, k);
+  const sp = Math.sin(CAM.phi), cp = Math.cos(CAM.phi);
+  camera.position.set(
+    CAM.tgt.x + CAM.dist*sp*Math.sin(CAM.th),
+    CAM.tgt.y + CAM.dist*cp,
+    CAM.tgt.z + CAM.dist*sp*Math.cos(CAM.th)
+  );
+  if(CAM.shake>0){
+    const s = CAM.shake;
+    camera.position.x += rnd(-s,s); camera.position.y += rnd(-s,s); camera.position.z += rnd(-s,s);
+    CAM.shake = Math.max(0, CAM.shake - dt*0.55);
+  }
+  camera.lookAt(CAM.tgt);
+  /* la lumière suit la scène pour que l'ombre reste nette */
+  sun.position.set(CAM.tgt.x+4.2, CAM.tgt.y+7.5, CAM.tgt.z+3.4);
+  sun.target.position.copy(CAM.tgt);
+  sun.target.updateMatrixWorld();
+}
+function camOrbit(dx, dy){
+  CAM.tTh -= dx*0.0055;
+  CAM.tPhi = clamp(CAM.tPhi - dy*0.0055, 0.14, 1.52);
+}
+function camZoom(f){ CAM.tDist = clamp(CAM.tDist*f, CAM.minD, CAM.maxD); }
+function camLookAtHeight(y){ CAM.tTgt.y = y; }
+
+/* ---------- PARTIE 11 : sélection à l'écran ---------- */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const V = new THREE.Vector3(), V2 = new THREE.Vector3(), Q = new THREE.Quaternion();
+
+function setRay(cx,cy){
+  ndc.set((cx/innerWidth)*2-1, -(cy/innerHeight)*2+1);
+  raycaster.setFromCamera(ndc, camera);
+}
+function pickBlock(cx,cy){
+  setRay(cx,cy);
+  const meshes = [];
+  for(const b of G.blocks) if(b.alive && b.mesh) meshes.push(b.mesh);
+  const hits = raycaster.intersectObjects(meshes, false);
+  if(!hits.length) return null;
+  const m = hits[0].object;
+  for(const b of G.blocks) if(b.mesh===m) return {block:b, point:hits[0].point};
+  return null;
+}
+function pickAim(cx,cy){
+  setRay(cx,cy);
+  const meshes = [podiumMesh, tableMesh];
+  for(const b of G.blocks) if(b.alive && b.mesh) meshes.push(b.mesh);
+  const hits = raycaster.intersectObjects(meshes, false);
+  if(!hits.length) return null;
+  return {point:hits[0].point.clone(), obj:hits[0].object};
+}
+const planeHelper = new THREE.Plane();
+function pickPlane(cx,cy,y){
+  setRay(cx,cy);
+  planeHelper.set(new THREE.Vector3(0,1,0), -y);
+  const out = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(planeHelper, out) ? out : null;
+}
+
+/* ---------- PARTIE 12 : entrées souris / tactile ---------- */
+const PTR = new Map();          /* pointerId -> {x,y,x0,y0} */
+const DRAG = {mode:null, id:null, moved:0, t0:0, block:null, last:null, hold:0, aim:null};
+let pinchD = 0, pinchMid = null;
+
+function localTurn(){
+  const p = G.players[G.cur];
+  if(!p || p.bot) return false;
+  if(NET.mode==="host") return p.side==="host";
+  if(NET.mode==="guest") return p.side===NET.mySide;
+  return true;   /* partie locale : chacun son tour sur le même écran */
+}
+function canAct(){ return G.started && !G.smash ? localTurn() : G.smash; }
+
+canvas.addEventListener("pointerdown", e=>{
+  audio();
+  canvas.setPointerCapture(e.pointerId);
+  PTR.set(e.pointerId, {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY});
+  if(PTR.size===2){
+    endDrag(true);
+    const [a,b] = [...PTR.values()];
+    pinchD = Math.hypot(a.x-b.x, a.y-b.y);
+    pinchMid = {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    DRAG.mode = "pinch";
+    return;
+  }
+  if(PTR.size>2) return;
+
+  DRAG.id = e.pointerId; DRAG.moved = 0; DRAG.t0 = performance.now();
+  DRAG.last = {x:e.clientX, y:e.clientY};
+  DRAG.hold = 0;
+
+  /* Bloc en main : le glisser-déposer pilote le bloc, pas la caméra.
+     Pour tourner autour : clic droit, deux doigts, ou les flèches du HUD. */
+  if(G.phase==="hold" && canAct()){
+    if(e.button===2){ DRAG.mode = "orbit"; return; }
+    DRAG.mode = "hold";
+    dragHold(e.clientX, e.clientY);
+    return;
+  }
+
+  if(G.phase==="idle" && G.mode==="tour" && canAct()){
+    const hit = pickBlock(e.clientX, e.clientY);
+    if(hit && grabbableSet().has(hit.block.id)){
+      DRAG.mode = "hold"; DRAG.block = hit.block;
+      startGrab(hit.block.id, camera.position.distanceTo(hit.point));
+      return;
+    }
+    if(hit){ showToast("🚫 Ce bloc n'est pas jouable", 1200); sfx("tap", 0.4); }
+  }
+
+  if((G.phase==="aim" && canAct()) || (G.smash && G.phase!=="fly")){
+    DRAG.mode = "charge";
+    DRAG.aim = pickAim(e.clientX, e.clientY);
+    return;
+  }
+  DRAG.mode = "orbit";
+}, {passive:true});
+
+canvas.addEventListener("pointermove", e=>{
+  const p = PTR.get(e.pointerId);
+  if(p){ p.x = e.clientX; p.y = e.clientY; }
+
+  if(DRAG.mode==="pinch" && PTR.size>=2){
+    const [a,b] = [...PTR.values()];
+    const d = Math.hypot(a.x-b.x, a.y-b.y);
+    const mid = {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    if(pinchD>0) camZoom(clamp(pinchD/d, 0.85, 1.18));
+    camOrbit(mid.x-pinchMid.x, mid.y-pinchMid.y);
+    pinchD = d; pinchMid = mid;
+    return;
+  }
+  if(!DRAG.mode){
+    if(G.phase==="aim" || G.smash) hoverAim(e.clientX, e.clientY);
+    else hoverIdle(e.clientX, e.clientY);
+    return;
+  }
+  if(e.pointerId!==DRAG.id) return;
+
+  const dx = e.clientX - DRAG.last.x, dy = e.clientY - DRAG.last.y;
+  DRAG.last = {x:e.clientX, y:e.clientY};
+  DRAG.moved += Math.abs(dx)+Math.abs(dy);
+
+  if(DRAG.mode==="orbit"){ camOrbit(dx,dy); }
+  else if(DRAG.mode==="hold"){ dragHold(e.clientX, e.clientY); }
+  else if(DRAG.mode==="charge"){
+    /* on bouge trop -> ce n'était pas une visée mais une rotation de caméra */
+    if(DRAG.moved > 16){ DRAG.mode = "orbit"; hideCharge(); camOrbit(dx,dy); }
+  }
+}, {passive:true});
+
+function endDrag(keepBlock){
+  DRAG.mode = null; DRAG.id = null; DRAG.block = null;
+  hideCharge();
+}
+canvas.addEventListener("pointerup", e=>{
+  const wasMode = DRAG.mode, moved = DRAG.moved, dt = performance.now()-DRAG.t0;
+  PTR.delete(e.pointerId);
+  try{ canvas.releasePointerCapture(e.pointerId); }catch(x){}
+  if(wasMode==="pinch"){ if(PTR.size<2){ DRAG.mode = null; } return; }
+  if(e.pointerId!==DRAG.id){ return; }
+
+  if(wasMode==="charge" && moved<=16){
+    const pw = chargePower(dt);
+    hideCharge();
+    if(DRAG.aim) doThrow(DRAG.aim.point, pw);
+  }
+  endDrag();
+}, {passive:true});
+canvas.addEventListener("pointercancel", e=>{ PTR.delete(e.pointerId); endDrag(); }, {passive:true});
+canvas.addEventListener("wheel", e=>{
+  e.preventDefault();
+  if(G.phase==="hold" && canAct()) holdDepth(e.deltaY>0?1.06:0.945);
+  else camZoom(e.deltaY>0?1.09:0.92);
+}, {passive:false});
+canvas.addEventListener("contextmenu", e=>e.preventDefault());
+
+/* survol : anneau sous le bloc jouable, curseur */
+function hoverIdle(cx,cy){
+  if(G.phase!=="idle" || G.mode!=="tour" || !canAct()){ selRing.visible = false; return; }
+  const hit = pickBlock(cx,cy);
+  if(!hit){ selRing.visible = false; canvas.style.cursor = "grab"; return; }
+  const ok = grabbableSet().has(hit.block.id);
+  selRing.visible = true;
+  selRing.position.copy(hit.block.mesh.position);
+  selRing.position.y -= BH*0.5+0.005;
+  selRing.material.color.set(ok ? 0x7ed957 : 0xff5a4a);
+  canvas.style.cursor = ok ? "pointer" : "not-allowed";
+}
+function hoverAim(cx,cy){
+  if(G.phase!=="aim" || !G.traj) return;
+  const a = pickAim(cx,cy);
+  if(a) drawTraj(a.point, powerValue());
+}
+
+/* jauge de charge : on maintient appuyé pour taper plus fort */
+function chargePower(heldMs){
+  if(heldMs < 220) return powerValue();
+  return clamp(0.25 + (heldMs-220)/1100, 0.25, 1);
+}
+function hideCharge(){ if(G.phase!=="aim") { trajLine.visible = false; aimDot.visible = false; } }
+function powerValue(){ return G.power==null ? 0.6 : G.power; }
+
+/* ============================================================
+   PARTIE 13 — MANIPULATION D'UN BLOC (à la Boom Blox)
+   ------------------------------------------------------------
+   Le bloc n'est PAS contraint sur un rail : il est accroché à une
+   « main » virtuelle par un ressort amorti, et suit librement le
+   curseur en 3D. On le tire de biais, on le fait pivoter contre ses
+   voisins, on le sort en le dandinant… et si on force trop, tout part.
+   La main vise le long du rayon de la caméra, à distance constante
+   (molette ou boutons ± pour rapprocher / éloigner).
+   ============================================================ */
+const HOLD = {
+  dist:0,                       /* distance main <-> caméra */
+  target:new THREE.Vector3(),   /* où la main veut emmener le centre du bloc */
+  home:new THREE.Vector3(),     /* emplacement d'origine, pour « remettre » */
+  yaw:0, yawT:0, resist:0, clear:false, back:false
+};
+const PULL = HOLD;              /* ancien nom, utilisé par la jauge et l'IA */
+/* Le plafond de force est calibré JUSTE sous le moment de basculement de la
+   tour : on ne peut pas renverser l'édifice en tirant comme un bourrin
+   (sauf tout en haut, où le bras de levier devient dangereux). Un bloc
+   porteur ne vient donc tout simplement pas — il faut trouver les blocs
+   libres, exactement comme au vrai Jenga. */
+const HOLD_W = 34, HOLD_FMAX = 9;     /* pulsation (rad/s) ; plafond en « poids de bloc » */
+const HOLD_LEAD = 0.28;               /* avance max de la main sur le bloc */
+
+function startGrab(id, dist){
+  if(NET.mode==="guest"){ netSend({t:"grab", i:id, d:R3(dist)}); return; }
+  hostStartGrab(id, dist);
+}
+function hostStartGrab(id, dist){
+  const b = G.byId.get(id);
+  if(!b || !b.alive) return;
+  snapshotRefs();
+  G.moved = b; G.turnBlock = b;
+  G.phase = "hold";
+  HOLD.home.copy(b.mesh.position);
+  HOLD.target.copy(b.mesh.position);
+  HOLD.dist = dist || camera.position.distanceTo(b.mesh.position);
+  HOLD.yaw = HOLD.yawT = new THREE.Euler().setFromQuaternion(b.mesh.quaternion, "YXZ").y;
+  HOLD.resist = 0; HOLD.clear = false; HOLD.back = false;
+  if(b.body){
+    b.body.setGravityScale(0, true);
+    b.body.setLinearDamping(1.6);
+    b.body.setAngularDamping(6);
+    b.body.wakeUp();
+  }
+  sfx("tap", 0.5);
+  netPhase();
+  updateHud();
+}
+/* la main suit le curseur : point du rayon caméra à distance constante */
+function handFromPointer(cx, cy){
+  setRay(cx, cy);
+  return raycaster.ray.origin.clone().addScaledVector(raycaster.ray.direction, HOLD.dist);
+}
+function dragHold(cx, cy){
+  if(G.phase!=="hold" || !G.moved) return;
+  setHand(handFromPointer(cx, cy));
+}
+function setHand(p){
+  const b = G.moved; if(!b) return;
+  /* la main ne peut pas prendre trop d'avance sur le bloc : sinon un bloc
+     coincé qui se libère partirait comme un projectile */
+  V.copy(p).sub(b.mesh.position);
+  const d = V.length();
+  if(d > HOLD_LEAD) p = b.mesh.position.clone().addScaledVector(V.multiplyScalar(1/d), HOLD_LEAD);
+  HOLD.target.copy(p);
+  HOLD.back = false;
+  if(NET.mode==="guest") netSendHand();
+}
+function holdDepth(f){
+  if(G.phase!=="hold") return;
+  HOLD.dist = clamp(HOLD.dist*f, 0.8, 30);
+}
+/* Asservissement de la main. La force est PLAFONNÉE : c'est elle qui fait
+   tout le sel du jeu — un bloc coincé sous dix étages ne vient pas, et si
+   on insiste, c'est la tour entière qui bascule. */
+function driveHold(dt){
+  const b = G.moved;
+  if(!b || !b.body || G.phase!=="hold") return;
+  const t = b.body.translation(), v = b.body.linvel(), m = b.body.mass();
+  const err = V.copy(HOLD.target).sub(V2.set(t.x,t.y,t.z));
+  const F = err.multiplyScalar(m*HOLD_W*HOLD_W).sub(V2.set(v.x,v.y,v.z).multiplyScalar(2*m*HOLD_W));
+  const fmax = HOLD_FMAX * m * (-GRAV);
+  const fl = F.length();
+  if(fl > fmax) F.multiplyScalar(fmax/fl);
+  HOLD.resist = clamp(fl/fmax, 0, 1);
+  /* rappel : dans Rapier forces et couples sont PERSISTANTS */
+  b.body.resetForces(false);
+  b.body.resetTorques(false);
+  b.body.addForce({x:F.x, y:F.y, z:F.z}, true);
+  /* on bride la vitesse du bloc en main : un bloc trimballé à toute allure
+     fauche la tour au moindre frôlement, et le joueur n'y peut rien */
+  const sp = Math.hypot(v.x, v.y, v.z);
+  if(sp > 1.9) b.body.setLinvel({x:v.x*1.9/sp, y:v.y*1.9/sp, z:v.z*1.9/sp}, true);
+
+  /* La main tient le bloc à plat, dans l'orientation demandée. Le couple est
+     RAMPÉ (on ne pivote pas de 90° d'un coup) et PLAFONNÉ : ces blocs sont si
+     légers qu'un couple mal dosé les ferait tournoyer et faucher la tour. */
+  const dyaw = ((HOLD.yawT - HOLD.yaw + Math.PI*3) % (Math.PI*2)) - Math.PI;
+  const pas = dt*3.2;
+  HOLD.yaw += Math.abs(dyaw)<=pas ? dyaw : Math.sign(dyaw)*pas;
+  Q.setFromEuler(new THREE.Euler(0, HOLD.yaw, 0));
+  QT.copy(Q).multiply(QI.copy(b.mesh.quaternion).invert());
+  const ang = 2*Math.acos(clamp(Math.abs(QT.w), -1, 1));
+  const w = b.body.angvel();
+  const tmax = 0.3 * m * (-GRAV) * BL;
+  V.set(0,0,0);
+  if(ang > 1e-4){
+    const s = Math.sqrt(1 - QT.w*QT.w) || 1;
+    V.set(QT.x, QT.y, QT.z).multiplyScalar((QT.w<0?-1:1)/s).multiplyScalar(ang*m*0.9);
+  }
+  V.x -= w.x*m*0.22; V.y -= w.y*m*0.22; V.z -= w.z*m*0.22;
+  const tl = V.length();
+  if(tl > tmax) V.multiplyScalar(tmax/tl);
+  b.body.addTorque({x:V.x, y:V.y, z:V.z}, true);
+}
+const QT = new THREE.Quaternion(), QI = new THREE.Quaternion();
+
+/* le bloc a-t-il quitté l'emprise de la tour ? */
+function towerTopY(){ const t = towerMap().top; return t<0 ? BH/2 : BH/2 + t*BH; }
+function holdClear(){
+  const b = G.moved; if(!b) return false;
+  const p = b.mesh.position;
+  return Math.hypot(p.x, p.z) > BL*0.62 || p.y > towerTopY() + BH*0.75;
+}
+function rotateHeld(){
+  if(G.phase!=="hold") return;
+  if(NET.mode==="guest"){ netSend({t:"rot"}); return; }
+  HOLD.yawT += Math.PI/2;
+  sfx("tap", 0.4);
+}
+/* « Remettre » : la main ramène le bloc à son emplacement d'origine */
+function cancelPull(){
+  if(G.phase!=="hold") return;
+  if(NET.mode==="guest"){ netSend({t:"cancel"}); return; }
+  hostCancelPull();
+}
+function hostCancelPull(){
+  if(G.phase!=="hold" || !G.moved) return;
+  HOLD.back = true;
+  HOLD.yawT = new THREE.Euler().setFromQuaternion(G.turnBlock.refQ, "YXZ").y;
+  G.pushBack = 0.9;
+}
+/* « Lâcher » : la main s'ouvre, la gravité reprend ses droits */
+function dropPlaced(){
+  if(G.phase!=="hold") return;
+  if(NET.mode==="guest"){ netSend({t:"drop"}); return; }
+  hostDrop();
+}
+function hostDrop(){
+  const b = G.moved;
+  if(!b || G.phase!=="hold") return;
+  /* garde-fou : lâcher le bloc à côté de la tour, c'est le perdre. On
+     prévient plutôt que de sanctionner un geste imprécis. */
+  if(G.mode==="tour" && !G.smash){
+    const p = b.mesh.position;
+    if(Math.abs(p.x) > BL*0.8 || Math.abs(p.z) > BL*0.8 || p.y < towerTopY() - BH*0.3){
+      showToast("⚠️ Amenez d'abord le bloc au-dessus de la tour", 1800);
+      return;
+    }
+  }
+  releaseMoved();
+  G.phase = "settle"; G.settleT = 0;
+  sfx("clack", 0.7);
+  netPhase();
+  updateHud();
+}
+function releaseMoved(){
+  const b = G.moved;
+  if(b && b.body && b.alive){
+    try{
+      b.body.resetForces(true);
+      b.body.resetTorques(true);
+      b.body.setGravityScale(1, true);
+      b.body.setLinearDamping(0.12);
+      b.body.setAngularDamping(0.22);
+    }catch(e){}
+  }
+  G.moved = null;
+}
+
+/* ---------- PARTIE 14 : lancer de boulets (démolition) ---------- */
+const BALL_R = 0.30;
+function ballisticVel(from, to, speed){
+  const d = to.clone().sub(from);
+  const dy = d.y; d.y = 0;
+  const dh = d.length();
+  if(dh < 0.01) return new THREE.Vector3(0, speed, 0);
+  const g = -GRAV, s2 = speed*speed;
+  const disc = s2*s2 - g*(g*dh*dh + 2*dy*s2);
+  if(disc < 0) return null;
+  const ang = Math.atan2(s2 - Math.sqrt(disc), g*dh);
+  const dir = d.normalize();
+  const ch = Math.cos(ang)*speed, sh = Math.sin(ang)*speed;
+  return new THREE.Vector3(dir.x*ch, sh, dir.z*ch);
+}
+function launchOrigin(){
+  const o = camera.position.clone();
+  V.set(0,0,-1).applyQuaternion(camera.quaternion);
+  o.addScaledVector(V, 0.9);
+  o.y -= 0.35;
+  return o;
+}
+const SHOT_V0 = 12, SHOT_V1 = 16;   /* vitesse du boulet : 12 à 28 m/s */
+function solveShot(target, power){
+  const from = launchOrigin();
+  let speed = SHOT_V0 + power*SHOT_V1;
+  let v = ballisticVel(from, target, speed);
+  let guard = 0;
+  while(!v && guard++ < 14){ speed *= 1.16; v = ballisticVel(from, target, speed); }
+  return v ? {from, vel:v} : null;
+}
+function drawTraj(target, power){
+  if(!G.traj){ trajLine.visible = false; aimDot.visible = false; return; }
+  const s = solveShot(target, power);
+  if(!s){ trajLine.visible = false; aimDot.visible = false; return; }
+  const pos = trajLine.geometry.attributes.position;
+  const n = pos.count;
+  const dt = 0.028;
+  const p = s.from.clone(), v = s.vel.clone();
+  for(let i=0;i<n;i++){
+    pos.setXYZ(i, p.x, p.y, p.z);
+    p.addScaledVector(v, dt); v.y += GRAV*dt;
+  }
+  pos.needsUpdate = true;
+  trajLine.geometry.computeBoundingSphere();
+  trajLine.computeLineDistances();
+  trajLine.visible = true;
+  aimDot.visible = true;
+  aimDot.position.copy(target);
+  aimDot.lookAt(target.clone().add(camera.position.clone().sub(target).normalize()));
+}
+function doThrow(target, power){
+  if(NET.mode==="guest"){
+    netSend({t:"throw", p:[R3(target.x),R3(target.y),R3(target.z)], w:R3(power), o:[R3(camera.position.x),R3(camera.position.y),R3(camera.position.z)]});
+    return;
+  }
+  hostThrow(target, power, camera.position.clone());
+}
+function hostThrow(target, power, camPos){
+  if(G.phase!=="aim" && !G.smash) return;
+  const from = camPos ? camPos.clone().add(target.clone().sub(camPos).normalize().multiplyScalar(0.9)).setY(camPos.y-0.35) : launchOrigin();
+  let speed = SHOT_V0 + power*SHOT_V1, v = ballisticVel(from, target, speed), guard=0;
+  while(!v && guard++ < 14){ speed *= 1.16; v = ballisticVel(from, target, speed); }
+  if(!v) return;
+  spawnBall(from, v);
+  if(!G.smash){
+    G.ballsLeft--;
+    const p = G.players[G.cur]; if(p) p.balls = Math.max(0,(p.balls||0)-1);
+    G.phase = "fly"; G.settleT = 0;
+  }
+  trajLine.visible = false; aimDot.visible = false;
+  sfx("whoosh", 0.8);
+  netThrowFx(from, v);
+  netPhase();
+  updateHud();
+}
+const ballGeo = new THREE.SphereGeometry(BALL_R, 22, 16);
+const ballMat = new THREE.MeshStandardMaterial({color:0x4a4f57, roughness:0.32, metalness:0.85, envMapIntensity:1.4});
+function spawnBall(pos, vel){
+  const mesh = new THREE.Mesh(ballGeo, ballMat);
+  mesh.castShadow = true; mesh.position.copy(pos);
+  scene.add(mesh);
+  const o = {mesh, body:null, t:0};
+  if(HAS_PHYS()){
+    const bd = RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x,pos.y,pos.z)
+      .setLinvel(vel.x,vel.y,vel.z).setCcdEnabled(true).setLinearDamping(0.02);
+    o.body = world.createRigidBody(bd);
+    world.createCollider(RAPIER.ColliderDesc.ball(BALL_R).setDensity(3.0).setFriction(0.4).setRestitution(0.22), o.body);
+  } else {
+    o.vel = vel.clone();
+  }
+  G.balls.push(o);
+  return o;
+}
+function stepBalls(dt){
+  for(let i=G.balls.length-1;i>=0;i--){
+    const b = G.balls[i];
+    b.t += dt;
+    if(b.body){
+      const t = b.body.translation();
+      b.mesh.position.set(t.x,t.y,t.z);
+      const r = b.body.rotation(); b.mesh.quaternion.set(r.x,r.y,r.z,r.w);
+      if(t.y < -2 || b.t > 14){ world.removeRigidBody(b.body); scene.remove(b.mesh); G.balls.splice(i,1); }
+    } else if(b.tp){
+      /* invité : on rejoint en douceur la position envoyée par l'hôte */
+      b.mesh.position.lerp(b.tp, 1-Math.exp(-dt*30));
+    }
+  }
+}
+
+/* ---------- PARTIE 15 : verre, TNT, chutes ---------- */
+function explode(pos, radius, force){
+  spawnFlash(pos, radius);
+  spawnPuff(pos, "#ffb347", 26, 3.4, 1.0);
+  sfx("boom", 1);
+  CAM.shake = Math.max(CAM.shake, 0.16);
+  for(const b of G.blocks){
+    if(!b.alive || !b.body) continue;
+    const t = b.body.translation();
+    V.set(t.x-pos.x, t.y-pos.y, t.z-pos.z);
+    const d = V.length();
+    if(d > radius) continue;
+    const k = (1 - d/radius);
+    if(d < 0.01) V.set(0,1,0); else V.normalize();
+    V.y += 0.45;
+    const j = force * k * b.body.mass();
+    b.body.applyImpulse({x:V.x*j, y:V.y*j, z:V.z*j}, true);
+    if(b.def.tnt && b.fuse<=0) b.fuse = rnd(0.05,0.18);
+    if(b.def.glass && k>0.25) shatter(b);
+  }
+  for(const o of G.balls){
+    if(!o.body) continue;
+    const t = o.body.translation();
+    V.set(t.x-pos.x, t.y-pos.y+0.2, t.z-pos.z);
+    const d = V.length(); if(d>radius) continue;
+    V.normalize();
+    const j = force*(1-d/radius)*o.body.mass()*0.6;
+    o.body.applyImpulse({x:V.x*j,y:V.y*j,z:V.z*j}, true);
+  }
+}
+function shatter(b){
+  if(!b.alive) return;
+  spawnPuff(b.mesh.position, "#bfeaff", 14, 2.2, 0.6);
+  sfx("glass", 0.8);
+  scoreBlock(b);
+  removeBlock(b, true);
+  netFx({k:"sh", i:b.id});
+}
+/* surveille les blocs spéciaux : verre qui casse, TNT qui saute */
+function watchSpecials(dt){
+  for(const b of G.blocks){
+    if(!b.alive || !b.body) continue;
+    if(b.fuse>0){
+      b.fuse -= dt;
+      if(b.fuse<=0){
+        const t = b.body.translation();
+        const p = new THREE.Vector3(t.x,t.y,t.z);
+        scoreBlock(b);
+        removeBlock(b, true);
+        netFx({k:"ex", i:b.id, p:[R3(p.x),R3(p.y),R3(p.z)]});
+        explode(p, 2.8, 14);
+      }
+      continue;
+    }
+    const v = b.body.linvel();
+    const sp = Math.hypot(v.x,v.y,v.z);
+    if(b.def.glass && sp > 4.2) shatter(b);
+    else if(b.def.tnt && sp > 2.2) b.fuse = rnd(0.04,0.12);
+  }
+  /* une caisse de TNT coincée au milieu d'un fort ne bouge presque pas :
+     on l'amorce aussi au passage d'un boulet rapide */
+  for(const o of G.balls){
+    if(!o.body) continue;
+    const v = o.body.linvel();
+    if(Math.hypot(v.x,v.y,v.z) < 4) continue;
+    const t = o.body.translation();
+    for(const b of G.blocks){
+      if(!b.alive || !b.def.tnt || b.fuse>0 || !b.body) continue;
+      const p = b.mesh.position;
+      const r = Math.max(b.dim[0],b.dim[1],b.dim[2])*0.6 + BALL_R + 0.14;
+      const dx=p.x-t.x, dy=p.y-t.y, dz=p.z-t.z;
+      if(dx*dx+dy*dy+dz*dz < r*r) b.fuse = rnd(0.03,0.10);
+    }
+  }
+}
+function scoreBlock(b){
+  if(b.scored) return;
+  b.scored = true;
+  if(G.mode!=="demo" || G.smash) return;
+  const p = G.players[G.cur]; if(!p) return;
+  p.score = (p.score||0) + b.def.pts;
+  if(b.def.bad){
+    addLog(`☠️ ${esc(p.name)} fait tomber un bloc interdit (${b.def.pts})`);
+    showToast("☠️ Bloc interdit ! "+b.def.pts+" pts");
+  } else if(b.def.gem){
+    addLog(`💎 ${esc(p.name)} décroche un joyau (+${b.def.pts})`);
+    sfx("ding", 0.9);
+  }
+}
+/* un bloc a-t-il quitté le socle ? */
+function checkFallen(){
+  let any = false;
+  for(const b of G.blocks){
+    if(!b.alive || b.fallen) continue;
+    const y = b.mesh.position.y;
+    const off = Math.abs(b.mesh.position.x)>2.25 || Math.abs(b.mesh.position.z)>2.25;
+    if(y < PODIUM_TOP-0.16 || off){
+      b.fallen = true; any = true;
+      scoreBlock(b);
+    }
+  }
+  return any;
+}
+
+/* ---------- PARTIE 16 : déroulé d'une partie ---------- */
+function snapshotRefs(){
+  let h = 0;
+  for(const b of G.blocks){
+    b.ref.copy(b.mesh.position);
+    b.refQ.copy(b.mesh.quaternion);
+    if(b.alive && b.tower) h = Math.max(h, b.mesh.position.y);
+  }
+  G.refHeight = h;
+}
+function allAsleep(){
+  for(const b of G.blocks) if(b.alive && b.body && !b.body.isSleeping()) return false;
+  for(const b of G.balls) if(b.body && !b.body.isSleeping()) return false;
+  return true;
+}
+/* La tour s'est-elle écroulée ? On compare chaque bloc à la photo prise au
+   début du tour. Attention : tirer un bloc porteur fait GLISSER le haut de
+   la tour de quelques millimètres — c'est le vrai Jenga, pas un
+   effondrement. Ce qui compte, c'est qu'un bloc bascule ou perde un étage. */
+function towerCollapsed(){
+  let bad = 0, haut = 0;
+  for(const b of G.blocks){
+    if(!b.alive || !b.tower) continue;
+    haut = Math.max(haut, b.mesh.position.y);
+    /* on exclut le bloc du tour en cours : lui, il a le droit de bouger.
+       (G.turnBlock et pas G.moved : `moved` est remis à null dès qu'on
+       lâche le bloc, et on relit l'écroulement après.) */
+    if(b===G.turnBlock) continue;
+    if(b.mesh.position.y < b.ref.y - BH*1.1) bad += 4;      /* descendu d'un étage */
+    UP.set(0,1,0).applyQuaternion(b.mesh.quaternion);
+    if(Math.abs(UP.y) < 0.9) bad += 3;                       /* penché de plus de 25° */
+    if(bad >= 4) return true;
+  }
+  return haut < G.refHeight - BH*1.5;                        /* la tour s'est tassée */
+}
+function addLog(html){
+  G.log.unshift(html);
+  if(G.log.length>6) G.log.pop();
+  renderLog();
+  netLog(html);
+}
+function renderLog(){
+  el("logBox").innerHTML = G.log.map(s=>`<div>${s}</div>`).join("");
+}
+
+function nextPlayer(){
+  if(!G.players.length) return;
+  let n = 0;
+  do{ G.cur = (G.cur+1)%G.players.length; n++; }
+  while(G.players[G.cur].out && n<=G.players.length);
+  G.round++;
+  startTurn();
+}
+function startTurn(){
+  releaseMoved();
+  G.phase = (G.mode==="tour") ? "idle" : "aim";
+  HOLD.resist = 0; HOLD.clear = false; HOLD.back = false;
+  G.retry = false; G.pushBack = 0; G.turnBlock = null;
+  snapshotRefs();
+  if(G.timer) G.turnEnd = performance.now() + 30000;
+  const p = G.players[G.cur];
+  if(G.mode==="demo") G.ballsLeft = p ? (p.balls||0) : 0;
+  camLookAtHeight(G.mode==="tour" ? Math.max(1.0, towerHeight()*0.55) : PODIUM_TOP+1.1);
+  netPhase(true);
+  updateHud();
+  if(p && p.bot) aiStart();
+}
+function towerHeight(){
+  let h = 0;
+  for(const b of G.blocks) if(b.alive && b.tower) h = Math.max(h, b.mesh.position.y);
+  return h;
+}
+
+/* fin de tour en mode Tour */
+function resolveTour(){
+  const p = G.players[G.cur];
+  const collapsed = towerCollapsed();
+  releaseMoved();
+  if(collapsed){
+    sfx("crash", 1); CAM.shake = 0.22;
+    addLog(`💥 <b>${esc(p.name)}</b> fait s'écrouler la tour !`);
+    p.crashed = true;
+    endGame("crash");
+    return;
+  }
+  /* le bloc a glissé de la tour et fini sur la table : coup perdu,
+     mais on ne fait pas perdre la partie pour autant */
+  const tb = G.turnBlock;
+  if(tb && tb.alive && tb.mesh.position.y < BH*1.5){
+    addLog(`🙈 ${esc(p.name)} laisse tomber son bloc — coup perdu`);
+    sfx("tap", 0.6);
+    nextPlayer();
+    return;
+  }
+  p.moves = (p.moves||0)+1;
+  p.score = p.moves;
+  addLog(`✅ ${esc(p.name)} pose son bloc (${p.moves})`);
+  sfx("clack", 0.6);
+  /* plus aucun bloc jouable = la tour a été poussée au bout, tout le monde gagne */
+  if(grabbableSet().size===0){
+    addLog("🏆 Plus aucun bloc jouable — la tour a tenu !");
+    endGame("perfect");
+    return;
+  }
+  nextPlayer();
+}
+/* fin de tour en mode Démolition */
+function resolveDemo(){
+  checkFallen();
+  const p = G.players[G.cur];
+  const g = STRUCTS[G.level].goal;
+  const done = goalReached(g);
+  if(done){
+    G.goalDone = true;
+    addLog(`🏆 Objectif atteint par ${esc(p.name)} !`);
+    sfx("ding", 1);
+    endGame("goal");
+    return;
+  }
+  const left = G.players.reduce((s,x)=>s+(x.balls||0), 0);
+  if(left<=0){ endGame("noballs"); return; }
+  addLog(`🎯 ${esc(p.name)} : ${p.score||0} pts (${p.balls} boulet${p.balls>1?"s":""})`);
+  /* on saute les joueurs qui n'ont plus de boulet */
+  let n = 0;
+  do{ G.cur = (G.cur+1)%G.players.length; n++; }
+  while((G.players[G.cur].balls||0)<=0 && n<=G.players.length);
+  G.round++;
+  startTurn();
+}
+function goalReached(g){
+  if(g.type==="tout") return G.blocks.every(b=>!b.alive || b.fallen);
+  if(g.type==="joyaux") return G.blocks.every(b=>b.type!=="joyau" || !b.alive || b.fallen);
+  if(g.type==="score") return G.players.some(p=>(p.score||0) >= g.n);
+  return false;
+}
+
+function endGame(reason){
+  G.phase = "over";
+  G.started = false;
+  releaseMoved();
+  const rank = G.players.slice().sort((a,b)=>{
+    if(G.mode==="tour"){
+      if(a.crashed!==b.crashed) return a.crashed?1:-1;
+      return (b.moves||0)-(a.moves||0);
+    }
+    return (b.score||0)-(a.score||0);
+  });
+  let title = "Partie terminée", sub = "";
+  if(G.mode==="tour"){
+    if(reason==="crash"){
+      const l = G.players.find(p=>p.crashed);
+      title = "💥 La tour s'écroule !";
+      sub = `<b>${esc(l?l.name:"?")}</b> a fait tomber la tour.` +
+        (G.players.length>1 ? ` ${esc(rank[0].name)} l'emporte avec ${rank[0].moves||0} bloc(s) déplacé(s).` : "");
+    } else {
+      title = "🏆 Tour maîtrisée !";
+      sub = "Vous êtes allés au bout de ce qu'il était possible de retirer.";
+    }
+    if(G.players.length===1){
+      const best = Math.max(G.soloBest, G.players[0].moves||0);
+      if(best>G.soloBest){ G.soloBest = best; try{ localStorage.setItem("jengaSoloBest", String(best)); }catch(e){} }
+      sub += ` Record personnel : <b>${G.soloBest}</b> blocs.`;
+    }
+  } else {
+    const st = STRUCTS[G.level];
+    if(reason==="goal"){
+      title = "🏆 Objectif atteint !";
+      const used = st.balls - (G.players[G.cur].balls||0);
+      const stars = starsFor(G.level, used);
+      if(G.players.length===1){
+        saveStars(G.level, stars);
+        sub = `« ${esc(st.name)} » réussi en ${used} boulet(s) — ` +
+          `<span style="color:#ffc46b;letter-spacing:3px">${"★".repeat(stars)}${"☆".repeat(3-stars)}</span>`;
+      } else {
+        sub = `« ${esc(st.name)} » : ${esc(rank[0].name)} l'emporte avec ${rank[0].score||0} points.`;
+      }
+    } else {
+      title = "🎯 Plus de boulets";
+      sub = G.players.length===1
+        ? "Objectif manqué de peu. Réessayez !"
+        : `${esc(rank[0].name)} l'emporte avec ${rank[0].score||0} points.`;
+    }
+  }
+  el("endTitle").innerHTML = title;
+  el("endSub").innerHTML = sub;
+  el("endRes").innerHTML = rank.map((p,i)=>{
+    const v = G.mode==="tour" ? `${p.moves||0} bloc${(p.moves||0)>1?"s":""}` : `${p.score||0} pts`;
+    return `<div class="${i===0?"win":""}"><span class="rk">${i===0?"🥇":(i===1?"🥈":(i===2?"🥉":i+1))}</span>`+
+      `<span class="dot" style="background:${p.color}"></span>${esc(p.name)}${p.bot?" 🤖":""}`+
+      `${p.crashed?' <span style="color:#ff7a6e">💥</span>':""}<span class="rp">${v}</span></div>`;
+  }).join("");
+  el("btnSmash").style.display = (NET.mode==="guest") ? "none" : "";
+  el("btnAgain").style.display = (NET.mode==="guest") ? "none" : "";
+  netOver();
+  /* on laisse le temps d'admirer les dégâts avant d'afficher le tableau */
+  setTimeout(()=>{ if(G.phase==="over") showScreen("scrEnd"); }, reason==="crash" ? 2600 : 1200);
+}
+function starsFor(idx, used){
+  const st = STRUCTS[idx];
+  if(used <= st.par[0]) return 3;
+  if(used <= st.par[1]) return 2;
+  return 1;
+}
+function loadStars(){
+  try{ return JSON.parse(localStorage.getItem("jengaStars")||"{}"); }catch(e){ return {}; }
+}
+function saveStars(idx, n){
+  const s = loadStars();
+  if((s[idx]||0) < n){ s[idx] = n; try{ localStorage.setItem("jengaStars", JSON.stringify(s)); }catch(e){} }
+}
+
+/* ---------- PARTIE 17 : intelligence artificielle ---------- */
+const AI = {on:false, t:0, step:0, speed:0.8, tgt:null, pw:0.7, tries:0, stuck:0, failed:new Set()};
+function aiStart(retry){
+  if(NET.mode==="guest") return;      /* seul l'hôte fait jouer les robots */
+  AI.on = true; AI.t = 0; AI.step = 0; AI.stuck = 0; AI.tgt = null; AI.path = null;
+  if(!retry){ AI.tries = 0; AI.failed.clear(); }
+}
+function aiStop(){ AI.on = false; }
+function aiLevel(){ const p = G.players[G.cur]; return p ? (p.bot||2) : 2; }
+
+/* --- Jenga : quel bloc retirer ? --- */
+function aiChooseBlock(lvl){
+  const ok = grabbableSet();
+  const tm = towerMap();
+  const cands = [];
+  for(const [l, arr] of tm.levels){
+    /* le bloc « libre » de l'étage est un poil plus bas que ses voisins —
+       c'est ce qu'un bon joueur repère en tapotant les blocs du doigt */
+    const yMin = Math.min(...arr.map(x=>x.mesh.position.y));
+    for(const b of arr){
+      if(!ok.has(b.id) || AI.failed.has(b.id)) continue;
+      const off = (l%2===0) ? b.mesh.position.z : b.mesh.position.x;
+      const isMid = Math.abs(off) < (BW+GAP)*0.5;
+      const libre = b.mesh.position.y < yMin + 0.0004;
+      let sc = 0;
+      if(libre) sc += (lvl>=3 ? 8 : (lvl===2 ? 3.5 : 0));
+      if(arr.length>=3) sc += 2.5;
+      if(isMid && arr.length>=3) sc += 3.5;        /* le bloc du milieu porte le moins */
+      if(arr.length===2){ sc -= 3; if(isMid) sc -= 2; }  /* on éviterait de laisser un étage bancal */
+      /* on préfère le tiers médian : ni la base (fondations) ni le sommet (fragile) */
+      const rel = tm.top>0 ? l/tm.top : 0;
+      sc += 2.6*Math.exp(-Math.pow((rel-0.38)/0.30, 2));
+      sc -= Math.max(0, 3-(tm.top-l))*1.6;
+      cands.push({b, sc:sc + rnd(-0.35,0.35)});
+    }
+  }
+  if(!cands.length) return null;
+  cands.sort((a,b)=>b.sc-a.sc);
+  if(lvl>=3) return cands[0].b.id;
+  if(lvl===2) return cands[Math.min(cands.length-1, (Math.random()*2)|0)].b.id;
+  return cands[Math.min(cands.length-1, (Math.random()*cands.length*0.7)|0)].b.id;
+}
+/* --- Démolition : où viser ? --- */
+function aiAimPoint(lvl){
+  const alive = G.blocks.filter(b=>b.alive && !b.fallen);
+  if(!alive.length) return null;
+  const goal = STRUCTS[G.level].goal;
+  let target = null;
+  if(lvl>=2){
+    const tnt = alive.filter(b=>b.def.tnt);
+    if(tnt.length) target = tnt[0];
+  }
+  if(!target && goal.type==="joyaux" && lvl>=2){
+    const gems = alive.filter(b=>b.def.gem);
+    if(gems.length){
+      /* on tape juste sous le joyau le plus bas : ça le fait basculer hors du socle */
+      const g = gems.sort((a,b)=>a.mesh.position.y-b.mesh.position.y)[0];
+      const under = alive.filter(b=>b!==g && b.mesh.position.y < g.mesh.position.y-0.1)
+        .sort((a,b)=>b.mesh.position.y-a.mesh.position.y)[0];
+      target = under || g;
+    }
+  }
+  if(!target){
+    /* sinon : le bloc le plus bas et le plus au bord, pour tout déséquilibrer */
+    const sorted = alive.slice().sort((a,b)=>
+      (a.mesh.position.y - b.mesh.position.y) ||
+      (b.mesh.position.length() - a.mesh.position.length()));
+    target = sorted[0];
+  }
+  const noise = lvl>=3 ? 0.12 : (lvl===2 ? 0.34 : 0.75);
+  return target.mesh.position.clone().add(new THREE.Vector3(rnd(-noise,noise), rnd(-noise,noise)*0.6, rnd(-noise,noise)));
+}
+function aiStep(dt){
+  if(!AI.on || NET.mode==="guest") return;
+  const p = G.players[G.cur];
+  if(!p || !p.bot){ AI.on = false; return; }
+  AI.t += dt;
+  const lvl = p.bot;
+
+  if(G.mode==="demo"){
+    if(G.phase!=="aim"){ if(G.phase!=="fly") AI.on = false; return; }
+    if(AI.step===0){
+      if(AI.t < 0.7) return;
+      AI.tgt = aiAimPoint(lvl);
+      AI.pw = lvl>=3 ? rnd(0.75,1) : (lvl===2 ? rnd(0.55,0.9) : rnd(0.3,0.85));
+      if(!AI.tgt){ AI.on = false; return; }
+      /* on tourne un peu la caméra vers la cible pour que ce soit lisible */
+      CAM.tTh = Math.atan2(AI.tgt.x - CAM.tgt.x, AI.tgt.z - CAM.tgt.z) + Math.PI + rnd(-0.5,0.5);
+      AI.step = 1; AI.t = 0;
+      if(G.traj) drawTraj(AI.tgt, AI.pw);
+      return;
+    }
+    if(AI.step===1 && AI.t > 1.1){
+      trajLine.visible = false; aimDot.visible = false;
+      hostThrow(AI.tgt, AI.pw, camera.position.clone());
+      AI.on = false;
+    }
+    return;
+  }
+
+  /* --- mode Tour --- */
+  if(AI.step===0){
+    if(AI.t < 0.8) return;
+    const id = aiChooseBlock(lvl);
+    if(id==null){ addLog("🤖 Plus rien à retirer…"); AI.on = false; endGame("perfect"); return; }
+    hostStartGrab(id);
+    AI.speed = lvl>=3 ? 1.5 : (lvl===2 ? 1.15 : 0.85);
+    AI.step = 1; AI.t = 0;
+    return;
+  }
+  if(AI.step===1){
+    if(G.phase!=="hold"){ AI.on = false; return; }
+    /* un bon joueur sent quand le bloc est coincé et va en chercher un autre
+       plutôt que d'insister et de coucher la tour */
+    const patience = lvl>=3 ? 0.5 : (lvl===2 ? 1.2 : 2.6);
+    if(HOLD.resist > 0.93){
+      AI.stuck = (AI.stuck||0) + dt;
+      if((AI.tries||0) < 4){
+        if(AI.stuck > patience){
+          AI.tries = (AI.tries||0)+1; AI.stuck = 0;
+          if(G.moved) AI.failed.add(G.moved.id);
+          hostCancelPull();
+          return;
+        }
+        if(lvl>=2) return;    /* on patiente au lieu de forcer */
+      }
+      /* à court de patience : on force, et tant pis pour la tour */
+    } else AI.stuck = 0;
+    /* le robot déplace sa « main » le long d'un itinéraire : dégager la
+       tour, monter au-dessus du sommet, se placer, descendre. Il passe par
+       la même physique que le joueur : si ça coince, ça coince pour lui aussi. */
+    if(!AI.path) aiBuildPath(lvl);
+    const wp = AI.path[AI.wp];
+    if(!wp){ AI.step = 3; AI.t = 0; return; }
+    const jerk = lvl===1 ? (0.72+Math.sin(AI.t*9)*0.55) : 1;
+    if(moveTowards(AI.hand, wp.x, wp.y, wp.z, dt*AI.speed*jerk)) AI.wp++;
+    setHand(AI.hand.clone());
+    if(AI.wp>=1 && !AI.rotDone){ HOLD.yawT = AI.yaw; AI.rotDone = true; }
+    return;
+  }
+  if(AI.step===3 && AI.t > 0.4){ hostDrop(); AI.path = null; AI.on = false; }
+}
+/* itinéraire de la main du robot */
+function aiBuildPath(lvl){
+  const b = G.moved;
+  const nz = lvl>=3 ? 0.01 : (lvl===2 ? 0.035 : 0.075);
+  const ax = new THREE.Vector3(1,0,0).applyQuaternion(b.mesh.quaternion);
+  ax.y = 0; ax.normalize();
+  V.copy(camera.position).sub(b.mesh.position);
+  if(ax.dot(V) < 0) ax.negate();
+  const sortie = HOLD.home.clone().addScaledVector(ax, BL + 0.16);
+  const cruise = towerTopY() + BH*2.0;
+  const niv = towerMap();
+  let l = niv.top;
+  const arr = niv.levels.get(l) || [];
+  if(arr.length>=3) l = niv.top+1;
+  const free = freeSlots(l);
+  const sp = slotPos(l, free.length ? free[0] : 1);
+  AI.yaw = levelYaw(l);
+  AI.hand = b.mesh.position.clone();
+  AI.wp = 0; AI.rotDone = false;
+  AI.path = [
+    sortie,
+    new THREE.Vector3(sortie.x, cruise, sortie.z),
+    new THREE.Vector3(sp.x+rnd(-nz,nz), cruise, sp.z+rnd(-nz,nz)),
+    new THREE.Vector3(sp.x+rnd(-nz,nz), BH/2 + l*BH + 0.03, sp.z+rnd(-nz,nz))
+  ];
+}
+/* emplacements encore libres d'un étage */
+function freeSlots(level){
+  const arr = towerMap().levels.get(level) || [];
+  const used = new Set();
+  for(const b of arr){
+    const off = (level%2===0) ? b.mesh.position.z : b.mesh.position.x;
+    const s = Math.round(off/(BW+GAP))+1;
+    if(s>=0 && s<=2) used.add(s);
+  }
+  return [0,1,2].filter(s=>!used.has(s));
+}
+/* avance `h` vers (x,y,z) d'au plus `pas`, renvoie true à l'arrivée */
+function moveTowards(h, x, y, z, pas){
+  const dx=x-h.x, dy=y-h.y, dz=z-h.z, d=Math.hypot(dx,dy,dz);
+  if(d <= pas || d < 1e-6){ h.set(x,y,z); return true; }
+  h.x += dx/d*pas; h.y += dy/d*pas; h.z += dz/d*pas;
+  return false;
+}
+
+/* ---------- PARTIE 18 : HUD ---------- */
+let hudKey = "";
+function buildActionBar(){
+  const bar = el("actionBar");
+  const mine = localTurn() || G.smash;
+  let h = "";
+  if(G.smash){
+    h = `<button class="btn" data-a="quit">← Terminer</button>`;
+  } else if(G.mode==="tour" && mine){
+    if(G.phase==="hold"){
+      h = `<button class="btn ghost" data-a="cancel">↩️ Remettre</button>`+
+          `<button class="btn ghost" data-a="rot">⟳ Tourner</button>`;
+      if(IS_TOUCH) h += `<button class="btn ghost" data-a="near">⤡</button><button class="btn ghost" data-a="far">⤢</button>`;
+      if(HOLD.clear) h += `<button class="btn" data-a="drop">✅ Lâcher le bloc</button>`;
+    }
+  } else if(G.mode==="demo" && mine && G.phase==="aim"){
+    h = `<div style="display:flex;align-items:center;gap:9px;background:rgba(20,13,9,.74);border:1px solid rgba(255,220,180,.16);border-radius:12px;padding:7px 13px;pointer-events:auto">
+           <span style="font-size:12px;color:#c3ad95">Puissance</span>
+           <input type="range" id="inpPower" min="10" max="100" step="1" value="${Math.round(powerValue()*100)}" style="width:110px;accent-color:#e8913c">
+           <b id="pwLbl" style="font-size:12.5px;color:#ffc46b;width:36px;text-align:right">${Math.round(powerValue()*100)}%</b>
+         </div>`;
+  }
+  bar.innerHTML = h;
+  bar.querySelectorAll("button").forEach(b=>{
+    b.classList.add("clickable");
+    b.onclick = ()=>{
+      const a = b.dataset.a;
+      if(a==="cancel") cancelPull();
+      else if(a==="rot") rotateHeld();
+      else if(a==="near") holdDepth(0.9);
+      else if(a==="far") holdDepth(1.11);
+      else if(a==="drop") dropPlaced();
+      else if(a==="quit") stopSmash();
+    };
+  });
+  const rng = el("inpPower");
+  if(rng){
+    rng.oninput = ()=>{ G.power = rng.value/100; el("pwLbl").textContent = rng.value+"%"; };
+  }
+}
+function updateHud(){
+  const key = [G.phase, G.mode, localTurn(), G.smash, G.started, HOLD.clear].join("|");
+  if(key!==hudKey){ hudKey = key; buildActionBar(); }
+
+  const p = G.players[G.cur];
+  const tb = el("turnBar");
+  if(p){
+    tb.querySelector(".av").style.background = p.color;
+    tb.querySelector(".tn").textContent = (G.smash ? "Démolition libre" : p.name + (p.bot?" 🤖":""));
+    let s = "";
+    if(G.smash) s = "tapez où vous voulez";
+    else if(G.mode==="tour") s = `${p.moves||0} bloc${(p.moves||0)>1?"s":""} · ${towerMap().top+1} étages`;
+    else s = `${p.score||0} pts · ${p.balls||0} boulet${(p.balls||0)>1?"s":""}`;
+    if(G.timer && G.started && !G.smash){
+      const left = Math.max(0, Math.ceil((G.turnEnd-performance.now())/1000));
+      s += ` · ⏱ ${left}s`;
+    }
+    tb.querySelector(".ts").textContent = s;
+  }
+
+  el("scoreBox").innerHTML = G.players.map((x,i)=>{
+    const v = G.mode==="tour" ? (x.moves||0) : (x.score||0);
+    return `<div class="sl ${i===G.cur&&!G.smash?"on":""} ${x.out?"dead":""}">`+
+      `<span class="sn"><span class="dot" style="background:${x.color}"></span>${esc(x.name)}${x.bot?"🤖":""}${x.conn===false?"🔌":""}</span>`+
+      `<span>${v}${G.mode==="demo"?` <span style="opacity:.6">·${x.balls||0}🎯</span>`:""}</span></div>`;
+  }).join("");
+
+  const gb = el("goalBox");
+  if(G.mode==="demo" && !G.smash && STRUCTS[G.level]){
+    const st = STRUCTS[G.level], g = st.goal;
+    let txt;
+    if(g.type==="tout"){
+      const left = G.blocks.filter(b=>b.alive && !b.fallen).length;
+      txt = `<b>Objectif :</b> dégager tout le socle<br>Restants : <b>${left}</b>`;
+    } else if(g.type==="joyaux"){
+      const left = G.blocks.filter(b=>b.type==="joyau" && b.alive && !b.fallen).length;
+      txt = `<b>Objectif :</b> faire tomber les joyaux 💎<br>Restants : <b>${left}</b>`;
+    } else {
+      txt = `<b>Objectif :</b> ${g.n} points`;
+    }
+    gb.innerHTML = `<div style="color:#ffdfae;font-weight:800;margin-bottom:3px">${esc(st.name)}</div>${txt}`;
+    gb.style.display = "block";
+  } else gb.style.display = "none";
+
+  const mine = localTurn() || G.smash;
+  let msg = "";
+  if(G.smash) msg = "💥 Tapez n'importe où pour tirer — maintenez pour taper plus fort";
+  else if(!G.started) msg = "";
+  else if(!mine) msg = p ? `⏳ Au tour de ${p.name}…` : "";
+  else if(G.mode==="tour"){
+    if(G.phase==="idle") msg = IS_TOUCH ? "Touchez un bloc vert et tirez-le vers vous" : "Cliquez-glissez un bloc vert pour l'extraire";
+    else if(G.phase==="hold") msg = HOLD.clear
+      ? "Amenez le bloc au sommet, puis « Lâcher »"
+      : (IS_TOUCH ? "Dégagez le bloc de la tour… doucement" : "Dégagez le bloc (molette : rapprocher / éloigner)");
+    else if(G.phase==="settle") msg = "😬 La tour vacille…";
+  } else {
+    if(G.phase==="aim") msg = IS_TOUCH ? "Visez et touchez la cible (maintenez pour charger)" : "Cliquez la cible (maintenez pour charger) · glissez pour tourner";
+    else if(G.phase==="fly") msg = "💨 …";
+  }
+  const mb = el("msgBar");
+  mb.textContent = msg; mb.style.display = msg ? "" : "none";
+
+  /* jauge : résistance du bloc pendant la traction, puissance pendant la charge */
+  const g = el("gauge"), gl = el("gaugeLbl");
+  if(G.phase==="hold" && (mine || (p&&p.bot))){
+    g.style.display = "block"; gl.style.display = "block";
+    const v = clamp(HOLD.resist,0,1)*100;
+    g.firstElementChild.style.height = v+"%";
+    gl.textContent = v>92 ? "COINCÉ" : (v>60 ? "dur" : "ok");
+  } else if(DRAG.mode==="charge" && DRAG.aim){
+    g.style.display = "block"; gl.style.display = "block";
+    const v = chargePower(performance.now()-DRAG.t0)*100;
+    g.firstElementChild.style.height = v+"%";
+    gl.textContent = Math.round(v)+"%";
+  } else { g.style.display = "none"; gl.style.display = "none"; }
+}
+
+/* ---------- PARTIE 19 : démarrage d'une partie ---------- */
+function readOptions(){
+  G.quality = el("inpQual").value;
+  G.help = el("optHelp").checked;
+  G.traj = el("optTraj").checked;
+  G.worn = el("optWorn").checked;
+  G.timer = el("optTimer").checked;
+  applyQuality();
+}
+function collectPlayers(){
+  const rows = [...document.querySelectorAll("#playerRows .prow")];
+  return rows.map((r,i)=>{
+    const name = (r.querySelector(".pn").value||"").trim().slice(0,14) || ("Joueur "+(i+1));
+    const bot = parseInt(r.querySelector(".pb").value,10);
+    return {name, color:r.querySelector(".pc").value, bot, side:"local",
+      score:0, moves:0, balls:0, out:false, crashed:false, conn:true};
+  });
+}
+function buildPlayerRows(){
+  const n = parseInt(el("inpCount").value,10);
+  const box = el("playerRows");
+  const old = [...box.querySelectorAll(".prow")].map(r=>({
+    n:r.querySelector(".pn").value, c:r.querySelector(".pc").value, b:r.querySelector(".pb").value
+  }));
+  let h = "";
+  for(let i=0;i<n;i++){
+    const o = old[i] || {};
+    h += `<div class="prow">
+      <input type="color" class="pc" value="${o.c||PCOLORS[i%PCOLORS.length]}">
+      <input type="text" class="pn" maxlength="14" placeholder="Joueur ${i+1}" value="${esc(o.n!=null?o.n:(i===0?"Joueur 1":""))}">
+      <select class="pb">
+        <option value="0"${(o.b==="0"||o.b==null&&i===0)?" selected":""}>👤 Humain</option>
+        <option value="1"${o.b==="1"?" selected":""}>🤖 IA facile</option>
+        <option value="2"${(o.b==="2"||o.b==null&&i>0)?" selected":""}>🤖 IA normale</option>
+        <option value="3"${o.b==="3"?" selected":""}>🤖 IA experte</option>
+      </select>
+    </div>`;
+  }
+  box.innerHTML = h;
+}
+function buildLevelList(){
+  const stars = loadStars();
+  el("levelList").innerHTML = STRUCTS.map((s,i)=>{
+    const n = stars[i]||0;
+    return `<div class="lcard ${i===G.level?"sel":""}" data-lv="${i}">
+      <div class="ln">${i+1}. ${esc(s.name)}</div>
+      <div class="ld">${esc(s.desc)}</div>
+      <div class="ls">${"★".repeat(n)}<i>${"★".repeat(3-n)}</i> <span style="color:#bda88f;letter-spacing:0;font-size:11px">${s.balls} 🎯</span></div>
+    </div>`;
+  }).join("");
+  el("levelList").querySelectorAll(".lcard").forEach(c=>{
+    c.onclick = ()=>{ G.level = parseInt(c.dataset.lv,10); buildLevelList(); };
+  });
+}
+
+function startGame(descs, fromNet){
+  clearBlocks();
+  aiStop();
+  G.smash = false;
+  G.goalDone = false;
+  G.log = []; renderLog();
+  podiumMesh.visible = (G.mode==="demo");
+  if(physPodium) physPodium.setEnabled(G.mode==="demo");
+  scene.fog.near = G.mode==="demo" ? 18 : 14;
+
+  const list = descs || (G.mode==="tour" ? towerDescriptors() : structDescriptors(G.level));
+  G.descs = list;
+  list.forEach(makeBlock);
+  G.nextId = list.length+1;
+
+  if(G.mode==="demo"){
+    const st = STRUCTS[G.level];
+    G.players.forEach(p=>{ p.balls = st.balls; p.score = 0; });
+  }
+  G.players.forEach(p=>{ p.moves = 0; p.crashed = false; p.out = false; if(G.mode==="tour") p.score = 0; });
+
+  camPreset(G.mode);
+  G.cur = 0; G.round = 0; G.started = true;
+  G.power = 0.6;
+  hideScreens(); hideBanner();
+  snapshotRefs();
+  if(!fromNet) netStart(list);
+  startTurn();
+}
+async function startLocal(){
+  readOptions();
+  if(!await loadPhysics()) return;
+  G.players = collectPlayers();
+  if(!G.players.length) return;
+  startGame();
+}
+function restart(){
+  if(NET.mode==="guest") return;
+  if(G.mode==="demo") G.players.forEach(p=>{ p.score = 0; });
+  startGame();
+}
+function backHome(){
+  G.started = false; G.smash = false; G.phase = "menu";
+  aiStop(); clearBlocks();
+  podiumMesh.visible = false;
+  if(physPodium) physPodium.setEnabled(false);
+  towerDescriptors().forEach(makeBlock);   /* la petite tour de déco du menu */
+  camPreset("tour");
+  buildLevelList();
+  showScreen("scrHome");
+}
+function startSmash(){
+  if(NET.mode==="guest") return;
+  G.smash = true; G.started = false; G.phase = "aim";
+  G.power = 0.85;
+  hideScreens(); hideBanner();
+  camPreset(G.mode==="tour" ? "tour" : "demo");
+  CAM.tDist = Math.max(CAM.tDist, 7.5);
+  addLog("💥 Démolition libre !");
+  netPhase(true);
+  updateHud();
+}
+function stopSmash(){
+  G.smash = false; G.phase = "over";
+  netPhase(true);
+  showScreen("scrEnd");
+}
+
+/* ---------- PARTIE 20 : boucle principale ---------- */
+let acc = 0, last = performance.now();
+function syncMeshes(){
+  for(const b of G.blocks){
+    if(!b.alive || !b.body) continue;
+    const t = b.body.translation(), r = b.body.rotation();
+    b.mesh.position.set(t.x,t.y,t.z);
+    b.mesh.quaternion.set(r.x,r.y,r.z,r.w);
+  }
+}
+function lerpMeshes(dt){
+  /* invité : on rejoint en douceur la dernière position reçue */
+  const k = 1-Math.exp(-dt*22);
+  for(const b of G.blocks){
+    if(!b.alive || !b.tp) continue;
+    b.mesh.position.lerp(b.tp, k);
+    b.mesh.quaternion.slerp(b.tq, k);
+  }
+}
+function stepPhysics(dt){
+  acc += dt;
+  let n = 0;
+  const h = world.timestep;
+  while(acc >= h && n < 6){
+    driveHold(h);
+    world.step();
+    acc -= h; n++;
+  }
+  if(acc > 0.4) acc = 0;
+  syncMeshes();
+  watchSpecials(dt);
+}
+function updateGame(dt){
+  if(!HAS_PHYS()) return;
+
+  if(G.pushBack>0){
+    G.pushBack -= dt;
+    if(G.pushBack<=0){
+      G.pushBack = 0;
+      if(G.phase==="hold"){
+        releaseMoved();
+        G.phase = "settle"; G.settleT = 0;
+        addLog(`↩️ ${esc(G.players[G.cur].name)} repose son bloc`);
+        G.retry = true;
+        netPhase();
+      }
+    }
+  }
+
+  if(G.phase==="hold"){
+    /* la main ramène le bloc à sa place quand on a demandé « Remettre » */
+    if(HOLD.back && G.moved) HOLD.target.copy(HOLD.home);
+    const c = holdClear();
+    if(c !== HOLD.clear){ HOLD.clear = c; netPhase(); }
+  }
+
+  /* la tour peut très bien partir pendant qu'on manipule */
+  if(G.phase==="hold" && !HOLD.back && towerCollapsed()){
+    releaseMoved();
+    G.phase = "settle"; G.settleT = 0; G.retry = false;
+    netPhase();
+  }
+
+  if(G.phase==="settle"){
+    G.settleT += dt;
+    /* on a juste remis le bloc en place : inutile d'attendre 4 s */
+    const seuil = G.retry ? 0.35 : 0.9;
+    if((G.settleT>seuil && allAsleep()) || G.settleT>(G.retry?2:3.6)){
+      if(G.retry){
+        /* on a remis le bloc : on peut en choisir un autre, sauf si tout est tombé */
+        G.retry = false; releaseMoved();
+        if(towerCollapsed()) resolveTour();
+        else {
+          G.phase = "idle"; snapshotRefs(); netPhase(true); updateHud();
+          const p = G.players[G.cur];
+          if(p && p.bot) aiStart(true);
+        }
+      } else resolveTour();
+    }
+  } else if(G.phase==="fly"){
+    G.settleT += dt;
+    checkFallen();
+    if((G.settleT>1.3 && allAsleep() && !G.balls.length) || G.settleT>7.5) resolveDemo();
+  }
+
+  if(G.timer && G.started && !G.smash && G.players[G.cur] && !G.players[G.cur].bot && performance.now()>G.turnEnd){
+    G.turnEnd = performance.now()+30000;
+    if(G.phase==="hold"){ showToast("⏱ Temps écoulé !"); if(HOLD.clear) hostDrop(); else hostCancelPull(); }
+    else if(G.phase==="idle"){ showToast("⏱ Tour passé !"); addLog(`⏱ ${esc(G.players[G.cur].name)} passe son tour`); nextPlayer(); }
+  }
+}
+let hudT = 0, snapT = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now-last)/1000);
+  last = now;
+  tick(dt);
+}
+function tick(dt){
+  /* on continue à simuler pendant l'écran de fin : on veut VOIR la tour tomber */
+  if(HAS_PHYS() && G.phase!=="menu") stepPhysics(dt);
+  else lerpMeshes(dt);
+
+  if(G.started || G.smash){
+    aiStep(dt);
+    updateGame(dt);
+  }
+  stepBalls(dt);
+  stepFx(dt);
+  camStep(dt);
+  updateAids();
+
+  /* on maintient appuyé pour charger : la trajectoire suit la puissance */
+  if(DRAG.mode==="charge" && DRAG.aim) drawTraj(DRAG.aim.point, chargePower(performance.now()-DRAG.t0));
+
+  hudT += dt;
+  if(hudT > 0.12){ hudT = 0; if(G.started||G.smash) updateHud(); }
+  snapT += dt;
+  if(snapT > 0.05){ snapT = 0; netSendSnap(); }
+
+  renderer.render(scene, camera);
+}
+/* Presque tous les blocs sont jouables : les surligner tous reviendrait à
+   repeindre la tour. On marque donc l'inverse — les 2 ou 3 blocs interdits
+   (l'étage complet du sommet et au-dessus) passent en rouge sourd. */
+let hlKey = "";
+function updateHighlight(){
+  const active = G.help && G.mode==="tour" && G.started && G.phase==="idle" && localTurn();
+  const s = active ? grabbableSet() : null;
+  const key = active ? [...s].join(",") : "off";
+  if(key===hlKey) return;
+  hlKey = key;
+  for(const b of G.blocks){
+    if(!b.alive || !b.mesh || !b.tower) continue;
+    const banni = active && !s.has(b.id);
+    if(banni){
+      if(!b.litMat){
+        b.baseMat = b.mesh.material;
+        b.litMat = b.mesh.material.clone();
+        b.litMat.color = new THREE.Color(0x8a5a52);
+        b.litMat.emissive = new THREE.Color(0x3a0f0a);
+        b.litMat.emissiveIntensity = 0.55;
+      }
+      b.mesh.material = b.litMat;
+    } else if(b.baseMat) b.mesh.material = b.baseMat;
+  }
+}
+/* fantôme vert sur l'emplacement libre le plus proche, pendant la pose */
+function updateAids(){
+  updateHighlight();
+  if(G.phase!=="idle") selRing.visible = false;
+  /* une fois le bloc dégagé, on montre où il peut se poser */
+  if(G.phase==="hold" && HOLD.clear && G.moved){
+    const tm = towerMap();
+    let l = tm.top;
+    if((tm.levels.get(l)||[]).length>=3) l = tm.top+1;
+    const free = freeSlots(l);
+    const p = G.moved.mesh.position;
+    let best = null, bd = 1e9;
+    for(const s of free){
+      const sp = slotPos(l, s);
+      const d = Math.hypot(p.x-sp.x, p.z-sp.z);
+      if(d<bd){ bd = d; best = sp; }
+    }
+    if(best){
+      ghostMesh.visible = true;
+      ghostMesh.position.set(best.x, BH/2 + l*BH, best.z);
+      ghostMesh.quaternion.setFromEuler(new THREE.Euler(0, levelYaw(l), 0));
+      ghostMesh.material.opacity = (0.16 + 0.26*Math.max(0, 1-bd/(BL*0.9)))
+        * (0.75 + 0.25*Math.sin(performance.now()*0.005));
+    } else ghostMesh.visible = false;
+  } else ghostMesh.visible = false;
+}
+
+/* ---------- PARTIE 21 : câblage de l'interface ---------- */
+document.querySelectorAll(".mcard").forEach(c=>{
+  c.onclick = ()=>{
+    G.mode = c.dataset.mode;
+    document.querySelectorAll(".mcard").forEach(x=>x.classList.toggle("sel", x===c));
+    el("levelPick").style.display = (G.mode==="demo") ? "" : "none";
+    el("optWorn").parentElement.style.display = (G.mode==="tour") ? "" : "none";
+    el("optTraj").parentElement.style.display = (G.mode==="demo") ? "" : "none";
+    el("optHelp").parentElement.style.display = (G.mode==="tour") ? "" : "none";
+  };
+});
+el("inpCount").onchange = buildPlayerRows;
+el("btnLocal").onclick = ()=>{ NET.mode = null; startLocal(); };
+el("btnAgain").onclick = ()=>{ hideScreens(); restart(); };
+el("btnHome").onclick = backHome;
+el("btnSmash").onclick = startSmash;
+el("btnMenu").onclick = ()=>{
+  if(!G.started && !G.smash){ backHome(); return; }
+  if(confirm("Quitter la partie en cours ?")) location.reload();
+};
+el("btnSound").onclick = ()=>{
+  SND.on = !SND.on;
+  el("btnSound").textContent = SND.on ? "🔊" : "🔇";
+  if(SND.on){ audio(); sfx("tap",0.5); }
+};
+el("camPad").querySelectorAll("button").forEach(b=>{
+  const act = ()=>{
+    const a = b.dataset.cam;
+    if(a==="left") camOrbit(-90,0);
+    else if(a==="right") camOrbit(90,0);
+    else if(a==="up") camOrbit(0,-60);
+    else if(a==="down") camOrbit(0,60);
+    else if(a==="zin") camZoom(0.85);
+    else if(a==="zout") camZoom(1.18);
+    else if(a==="reset") camPreset(G.mode);
+  };
+  let rep = null;
+  b.addEventListener("pointerdown", e=>{ e.preventDefault(); act(); rep = setInterval(act, 130); });
+  const stop = ()=>{ clearInterval(rep); rep = null; };
+  b.addEventListener("pointerup", stop);
+  b.addEventListener("pointerleave", stop);
+  b.addEventListener("pointercancel", stop);
+});
+addEventListener("keydown", e=>{
+  if(e.key==="r"||e.key==="R") rotateHeld();
+  else if(e.key===" "||e.key==="Enter"){ if(G.phase==="hold"){ e.preventDefault(); dropPlaced(); } }
+  else if(e.key==="Escape"){ if(G.phase==="hold") cancelPull(); }
+  else if(e.key==="ArrowLeft") camOrbit(-40,0);
+  else if(e.key==="ArrowRight") camOrbit(40,0);
+  else if(e.key==="ArrowUp") camOrbit(0,-30);
+  else if(e.key==="ArrowDown") camOrbit(0,30);
+  else if(e.key==="+"||e.key==="=") camZoom(0.88);
+  else if(e.key==="-") camZoom(1.14);
+});
+
+/* ============================================================
+   PARTIE 22 — RÉSEAU (PeerJS)
+   Mêmes conventions que les autres jeux du dossier : code à
+   5 lettres, invités g0/g1/g2, badge du code, reconnexion par
+   prénom, relais TURN facultatif.
+   Ici l'hôte fait autorité : lui seul simule la physique et
+   diffuse les positions. Les invités n'ont même pas besoin de
+   charger le moteur physique.
+   ============================================================ */
+const NET_MAX_GUESTS = 3;
+const NET = {
+  mode:null, mySide:null, peer:null, conn:null, conns:[], code:null,
+  guestName:"Joueur", started:false, ended:false, rejected:false,
+  reconnecting:false, reconnectAttempts:0, joinCode:null
+};
+window.NET = NET;
+function netStatus(id, msg){ const e = el(id); if(e) e.textContent = msg; }
+
+const NET_STUN = [
+  {urls:["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]},
+  {urls:"stun:stun.cloudflare.com:3478"}
+];
+function netTurnGet(){
+  try{ const t = JSON.parse(localStorage.getItem("netTurn")||"null"); return (t&&t.urls)?t:null; }
+  catch(e){ return null; }
+}
+function netPeerOpts(){
+  const ice = NET_STUN.slice();
+  const t = netTurnGet();
+  if(t) ice.push(t);
+  return {config:{iceServers:ice, sdpSemantics:"unified-plan", iceCandidatePoolSize:4}};
+}
+function netTurnSetup(){
+  const cur = netTurnGet()||{};
+  const curUrl = Array.isArray(cur.urls)?cur.urls[0]:(cur.urls||"");
+  const urls = prompt("Adresse du relais TURN\nex : turn:relay1.expressturn.com:3478\n\n(compte gratuit en 2 min sur expressturn.com — laisse vide pour supprimer le relais)", curUrl);
+  if(urls===null) return;
+  if(!urls.trim()){ localStorage.removeItem("netTurn"); alert("Relais TURN supprimé."); return; }
+  const username = prompt("Identifiant (username) fourni par le relais :", cur.username||"")||"";
+  const credential = prompt("Mot de passe (credential) du relais :", cur.credential||"")||"";
+  localStorage.setItem("netTurn", JSON.stringify({urls:urls.trim(), username, credential}));
+  alert("Relais enregistré ✅\nRecharge la page, puis refais « Héberger » ou « Rejoindre ».");
+}
+function netStatusHelp(id, msg){
+  const e = el(id); if(!e) return;
+  e.textContent = msg+" ";
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = "⚙️ Ajouter un relais TURN";
+  b.style.cssText = "margin-left:4px;padding:3px 8px;font-size:11px;border-radius:6px;border:1px solid #999;background:#eee;color:#222;cursor:pointer;";
+  b.onclick = netTurnSetup;
+  e.appendChild(b);
+}
+function netLibMissing(id){
+  if(typeof Peer!=="undefined") return false;
+  netStatus(id, "❌ Le module de connexion (PeerJS) n'a pas pu être chargé : un bloqueur de publicités ou une extension bloque cdn.jsdelivr.net. Désactivez-le pour ce site, puis rechargez la page.");
+  return true;
+}
+const NET_ERR_SIGNAL = "❌ Impossible de joindre le serveur de mise en relation (0.peerjs.com). Sur Opera : désactivez le VPN intégré et le bloqueur de publicités pour ce site, puis rechargez la page. Sinon : pare-feu, antivirus ou réseau d'entreprise.";
+const NET_ERR_P2P = "❌ Le serveur répond mais la liaison directe entre les deux appareils ne s'établit pas (VPN, pare-feu ou réseau très fermé). Sur Opera : désactivez le VPN intégré puis réessayez. Autres pistes : un autre navigateur, le partage de connexion du téléphone, ou un relais TURN.";
+function netGenCode(){
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  let c = ""; for(let i=0;i<5;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+function netSend(o){ if(NET.conn && NET.conn.open){ try{ NET.conn.send(o); }catch(e){} } }
+function netSendTo(e, o){ if(e && e.c && e.c.open){ try{ e.c.send(o); }catch(err){} } }
+function netBroadcast(o){ NET.conns.forEach(e=>netSendTo(e,o)); }
+function netShowCodeBadge(){
+  if(!NET.code) return;
+  const b = el("netCodeBadge");
+  b.style.display = "block";
+  b.textContent = "🔑 "+NET.code;
+  b.title = "Code de la partie — un joueur déconnecté peut revenir en entrant ce code dans « Rejoindre une partie »";
+}
+function netShowBanner(html){ showBanner(html); }
+function netHideBanner(){ hideBanner(); }
+
+/* ---------------- hôte ---------------- */
+function netHost(attempt){
+  NET.mode = "host"; NET.mySide = "host";
+  if(netLibMissing("hostStatus")) return;
+  const code = netGenCode();
+  netStatus("hostStatus","Création de la partie…");
+  const peer = new Peer("jga-"+code, netPeerOpts());
+  NET.peer = peer;
+  let opened = false;
+  const to = setTimeout(()=>{ if(!opened) netStatus("hostStatus", NET_ERR_SIGNAL); }, 12000);
+  peer.on("open", ()=>{
+    opened = true; clearTimeout(to);
+    NET.code = code;
+    el("hostCode").textContent = code;
+    netShowCodeBadge();
+    netStatus("hostStatus", `En attente des joueurs (jusqu'à ${NET_MAX_GUESTS})… Envoyez-leur ce code !`);
+    renderHostPlayers();
+  });
+  peer.on("error", e=>{
+    if(e.type==="unavailable-id" && attempt<4){ try{ peer.destroy(); }catch(x){} netHost(attempt+1); }
+    else if(e.type!=="peer-unavailable") netStatus("hostStatus","Erreur de connexion ("+e.type+"). Rechargez la page pour réessayer.");
+  });
+  peer.on("connection", c=>{
+    c.on("data", m=>netHostOnData(c,m));
+    c.on("close", ()=>netHostConnLost(c));
+    c.on("error", ()=>netHostConnLost(c));
+  });
+}
+function netFreeSlot(){
+  for(let s=0;s<NET_MAX_GUESTS;s++) if(!NET.conns.some(e=>e.slot===s)) return s;
+  return -1;
+}
+function myName(){
+  const r = document.querySelector("#playerRows .prow .pn");
+  return ((r && r.value.trim()) || "Hôte").slice(0,14);
+}
+function myColor(){
+  const r = document.querySelector("#playerRows .prow .pc");
+  return (r && r.value) || PCOLORS[0];
+}
+function renderHostPlayers(){
+  const list = [`<div><span class="dot" style="background:${myColor()}"></span> ${esc(myName())} — vous (hôte)</div>`];
+  NET.conns.forEach(e=>list.push(`<div><span class="dot" style="background:${e.color||"#4fb3e8"}"></span> ${esc(e.name)} — connecté</div>`));
+  for(let i=NET.conns.length;i<NET_MAX_GUESTS;i++) list.push(`<div style="opacity:.45"><span class="dot" style="background:#4a3626"></span> place libre</div>`);
+  el("hostPlayers").innerHTML = list.join("");
+}
+function netBroadcastLobby(){
+  if(NET.mode!=="host" || NET.started) return;
+  netBroadcast({t:"lobby", code:NET.code,
+    players:[{n:myName(), c:myColor()}].concat(NET.conns.map(e=>({n:e.name, c:e.color||"#4fb3e8"})))});
+}
+function netHostOnData(c, msg){
+  if(!msg || typeof msg!=="object") return;
+  let entry = NET.conns.find(e=>e.c===c);
+  if(msg.t==="hello"){
+    const name = esc(msg.name).slice(0,14) || "Joueur";
+    if(entry){ entry.name = name; return; }
+    if(NET.started){ netHostHandleRejoin(c, name); return; }
+    const slot = netFreeSlot();
+    if(slot<0){ try{ c.send({t:"full"}); }catch(e){} setTimeout(()=>{ try{ c.close(); }catch(e){} },300); return; }
+    entry = {c, slot, side:"g"+slot, name, color:msg.color||"#4fb3e8"};
+    NET.conns.push(entry);
+    netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+    renderHostPlayers();
+    netStatus("hostStatus", `${name} a rejoint la partie (${NET.conns.length}/${NET_MAX_GUESTS}).`);
+    /* on agrandit la table si besoin */
+    const need = NET.conns.length+1;
+    if(parseInt(el("inpCount").value,10) < need){ el("inpCount").value = String(Math.min(4,need)); buildPlayerRows(); }
+    netBroadcastLobby();
+    return;
+  }
+  if(!entry) return;
+  const p = G.players[G.cur];
+  if(!p || p.side!==entry.side) return;         /* ce n'est pas son tour : on ignore */
+  if(msg.t==="grab" && G.phase==="idle" && G.mode==="tour"){
+    if(grabbableSet().has(msg.i)) hostStartGrab(msg.i, msg.d);
+  } else if(msg.t==="hand" && G.phase==="hold"){
+    setHand(new THREE.Vector3(msg.p[0], msg.p[1], msg.p[2]));
+  } else if(msg.t==="rot" && G.phase==="hold"){
+    HOLD.yawT += Math.PI/2;
+  } else if(msg.t==="cancel" && G.phase==="hold"){
+    hostCancelPull();
+  } else if(msg.t==="drop" && G.phase==="hold"){
+    hostDrop();
+  } else if(msg.t==="throw" && G.phase==="aim"){
+    const tp = new THREE.Vector3(msg.p[0],msg.p[1],msg.p[2]);
+    const cp = msg.o ? new THREE.Vector3(msg.o[0],msg.o[1],msg.o[2]) : null;
+    hostThrow(tp, clamp(msg.w,0,1), cp);
+  }
+}
+function netHostHandleRejoin(c, name){
+  const taken = new Set(NET.conns.map(e=>e.side));
+  const cands = G.players.filter(p=>!p.bot && p.side!=="host" && p.side!=="local" && !taken.has(p.side));
+  let k = cands.find(x=>x.name.trim().toLowerCase()===String(name).trim().toLowerCase());
+  if(!k && cands.length===1) k = cands[0];
+  if(!k){
+    try{ c.send({t:"noSeat", names:cands.map(x=>x.name)}); }catch(e){}
+    setTimeout(()=>{ try{ c.close(); }catch(e){} },300);
+    return;
+  }
+  const entry = {c, slot:parseInt(k.side.slice(1),10), side:k.side, name:k.name, color:k.color};
+  NET.conns.push(entry);
+  k.conn = true;
+  showToast("🔌 "+k.name+" est de retour");
+  netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+  netSendTo(entry, netStartMsg());
+  netSendTo(entry, phaseMsg());
+  netFullSync();
+}
+function netHostConnLost(c){
+  const i = NET.conns.findIndex(e=>e.c===c);
+  if(i<0) return;
+  const e = NET.conns[i];
+  NET.conns.splice(i,1);
+  const p = G.players.find(x=>x.side===e.side);
+  if(p){
+    p.conn = false;
+    showToast("🔌 "+p.name+" s'est déconnecté");
+    addLog(`🔌 ${esc(p.name)} déconnecté — il peut revenir avec le code ${NET.code}`);
+    /* pour ne pas bloquer la partie, un robot prend la main pendant son absence */
+    if(G.started && G.players[G.cur]===p){ p.tempBot = true; p.bot = 2; aiStart(); }
+  }
+  renderHostPlayers();
+  netBroadcastLobby();
+}
+function netStartMsg(){
+  return {t:"start", mode:G.mode, lvl:G.level, worn:G.worn?1:0, timer:G.timer?1:0, code:NET.code,
+    players:G.players.map(p=>({side:p.side, name:p.name, color:p.color, bot:p.bot, balls:p.balls||0})),
+    blocks:G.descs||[]};
+}
+function netStart(list){
+  if(NET.mode!=="host" || !NET.conns.length) return;
+  NET.started = true;
+  netBroadcast(netStartMsg());
+}
+function phaseMsg(){
+  return {t:"ph", ph:G.phase, cur:G.cur, mv:G.moved?G.moved.id:0,
+    cl:HOLD.clear?1:0, hd:R3(HOLD.dist), yw:R3(HOLD.yawT), sm:G.smash?1:0, st:G.started?1:0,
+    P:G.players.map(p=>[p.score||0, p.moves||0, p.balls||0, p.out?1:0, p.crashed?1:0, p.conn===false?0:1])};
+}
+function netPhase(full){
+  if(NET.mode!=="host" || !NET.conns.length) return;
+  netBroadcast(phaseMsg());
+  if(full) netFullSync();
+}
+let snapDirty = 0;
+function netFullSync(){
+  if(NET.mode!=="host" || !NET.conns.length || !HAS_PHYS()) return;
+  const B = [];
+  for(const b of G.blocks){
+    if(!b.alive || !b.body) continue;
+    const t = b.body.translation(), r = b.body.rotation();
+    B.push([b.id, R3(t.x),R3(t.y),R3(t.z), R3(r.x),R3(r.y),R3(r.z),R3(r.w)]);
+  }
+  netBroadcast({t:"snap", B, L:ballSnap(), f:1});
+}
+function ballSnap(){
+  return G.balls.map(o=>[R3(o.mesh.position.x),R3(o.mesh.position.y),R3(o.mesh.position.z)]);
+}
+function netSendSnap(){
+  if(NET.mode!=="host" || !NET.conns.length || !HAS_PHYS()) return;
+  const B = [];
+  for(const b of G.blocks){
+    if(!b.alive || !b.body || b.body.isSleeping()) continue;
+    const t = b.body.translation(), r = b.body.rotation();
+    B.push([b.id, R3(t.x),R3(t.y),R3(t.z), R3(r.x),R3(r.y),R3(r.z),R3(r.w)]);
+  }
+  const L = ballSnap();
+  if(!B.length && !L.length){
+    if(!snapDirty) return;
+    snapDirty = 0;
+  } else snapDirty = 1;
+  netBroadcast({t:"snap", B, L});
+}
+let handT = 0;
+function netSendHand(){
+  const now = performance.now();
+  if(now - handT < 33) return;
+  handT = now;
+  netSend({t:"hand", p:[R3(HOLD.target.x), R3(HOLD.target.y), R3(HOLD.target.z)]});
+}
+function netLog(html){ if(NET.mode==="host" && NET.conns.length) netBroadcast({t:"log", s:html}); }
+function netFx(o){ if(NET.mode==="host" && NET.conns.length) netBroadcast({t:"fx", o}); }
+function netThrowFx(from, vel){
+  if(NET.mode==="host" && NET.conns.length)
+    netBroadcast({t:"fx", o:{k:"th", p:[R3(from.x),R3(from.y),R3(from.z)]}});
+}
+function netOver(){
+  if(NET.mode==="host" && NET.conns.length)
+    netBroadcast({t:"over", ti:el("endTitle").innerHTML, su:el("endSub").innerHTML, rs:el("endRes").innerHTML});
+}
+
+/* ---------------- invité ---------------- */
+el("btnConnect").onclick = ()=>{
+  const code = (el("joinCode").value||"").trim().toUpperCase();
+  const name = esc((el("joinName").value||"").trim()).slice(0,14) || "Joueur";
+  if(code.length<4){ netStatus("joinStatus","Entrez le code de la partie (5 lettres)."); return; }
+  audio();
+  readOptions();
+  NET.rejected = false;
+  el("btnConnect").disabled = true;
+  NET.mode = "guest"; NET.mySide = null;
+  NET.joinCode = code; NET.guestName = name;
+  netConnectAsGuest(false);
+};
+function netConnectAsGuest(isReconnect){
+  if(!isReconnect){
+    if(netLibMissing("joinStatus")){ el("btnConnect").disabled = false; return; }
+    netStatus("joinStatus","Connexion…");
+  }
+  const peer = new Peer(undefined, netPeerOpts());
+  NET.peer = peer;
+  let settled = false, openTo = null, to = null;
+  const fail = (msg, isP2P)=>{
+    if(settled) return; settled = true;
+    clearTimeout(openTo); clearTimeout(to);
+    try{ peer.destroy(); }catch(e){}
+    if(isReconnect) netScheduleGuestRetry();
+    else {
+      if(isP2P) netStatusHelp("joinStatus", msg); else netStatus("joinStatus", msg);
+      el("btnConnect").disabled = false;
+    }
+  };
+  peer.on("error", e=>{
+    if(e.type==="peer-unavailable") fail("Partie introuvable. Vérifiez le code, et que l'hôte a bien laissé son onglet ouvert.");
+    else if(e.type==="network"||e.type==="server-error"||e.type==="socket-error") fail(NET_ERR_SIGNAL);
+    else fail("Erreur de connexion ("+e.type+"). Réessayez.");
+  });
+  openTo = setTimeout(()=>fail(NET_ERR_SIGNAL), 12000);
+  peer.on("open", ()=>{
+    clearTimeout(openTo);
+    if(!isReconnect) netStatus("joinStatus","Serveur trouvé — établissement de la liaison directe…");
+    const c = peer.connect("jga-"+NET.joinCode, {reliable:true});
+    NET.conn = c;
+    to = setTimeout(()=>fail(NET_ERR_P2P, true), 25000);
+    c.on("open", ()=>{
+      clearTimeout(to); settled = true; NET.reconnecting = false;
+      netHideBanner();
+      c.send({t:"hello", name:NET.guestName, color:el("joinColor").value});
+      if(!isReconnect) netStatus("joinStatus","✅ Connecté !");
+      c.on("data", netGuestOnData);
+      c.on("close", netOnConnLost);
+      c.on("error", netOnConnLost);
+    });
+    c.on("error", ()=>{ clearTimeout(to); fail(NET_ERR_P2P, true); });
+  });
+}
+function netOnConnLost(){
+  if(NET.mode!=="guest" || NET.rejected || NET.ended) return;
+  netScheduleGuestRetry();
+}
+function netScheduleGuestRetry(){
+  if(NET.ended) return;
+  NET.reconnecting = true;
+  NET.reconnectAttempts++;
+  netShowBanner("🔌 Connexion perdue — tentative de reconnexion…<br><span style='font-size:12px;color:#c3ad95'>Essai "+NET.reconnectAttempts+"</span>");
+  if(NET.reconnectAttempts>30){
+    netShowBanner("❌ Impossible de retrouver la partie.<br><button class='btn small' onclick='location.reload()'>Recharger</button>");
+    return;
+  }
+  setTimeout(()=>{ if(NET.reconnecting) netConnectAsGuest(true); }, 3000);
+}
+function netGuestOnData(msg){
+  if(!msg || typeof msg!=="object") return;
+  if(msg.t==="welcome"){
+    NET.mySide = msg.side; NET.code = msg.code||NET.joinCode;
+    netShowCodeBadge();
+    if(!NET.started) showScreen("scrLobby");
+  } else if(msg.t==="lobby"){
+    el("lobbyPlayers").innerHTML = msg.players.map(o=>`<div><span class="dot" style="background:${o.c}"></span> ${esc(o.n)}</div>`).join("");
+  } else if(msg.t==="full"){
+    NET.rejected = true; NET.reconnecting = false;
+    netStatus("joinStatus","❌ La partie est complète (4 joueurs maximum).");
+    el("btnConnect").disabled = false;
+  } else if(msg.t==="noSeat"){
+    NET.rejected = true; NET.reconnecting = false;
+    const names = Array.isArray(msg.names)?msg.names.filter(Boolean):[];
+    const txt = names.length
+      ? "❌ Partie en cours. Pour reprendre votre place, utilisez exactement le prénom d'un joueur déconnecté : "+names.join(", ")+"."
+      : "❌ Partie déjà en cours et aucune place libre.";
+    if(NET.started){
+      netShowBanner(esc(txt)+"<br><button class='btn small' onclick='location.reload()'>Revenir à l'accueil</button>");
+    } else { netStatus("joinStatus", txt); el("btnConnect").disabled = false; }
+  } else if(msg.t==="start"){
+    NET.started = true;
+    G.mode = msg.mode; G.level = msg.lvl||0;
+    G.worn = !!msg.worn; G.timer = !!msg.timer;
+    G.players = msg.players.map(p=>({name:p.name, color:p.color, bot:p.bot, side:p.side,
+      score:0, moves:0, balls:p.balls||0, out:false, crashed:false, conn:true}));
+    readOptions();
+    startGame(msg.blocks, true);
+  } else if(msg.t==="ph"){
+    netApplyPhase(msg);
+  } else if(msg.t==="snap"){
+    netApplySnap(msg);
+  } else if(msg.t==="log"){
+    G.log.unshift(msg.s); if(G.log.length>6) G.log.pop(); renderLog();
+  } else if(msg.t==="fx"){
+    netApplyFx(msg.o);
+  } else if(msg.t==="over"){
+    NET.ended = false;
+    el("endTitle").innerHTML = msg.ti; el("endSub").innerHTML = msg.su; el("endRes").innerHTML = msg.rs;
+    el("btnAgain").style.display = "none"; el("btnSmash").style.display = "none";
+    el("endStatus").textContent = "En attente de l'hôte pour la prochaine partie…";
+    G.started = false; G.phase = "over";
+    setTimeout(()=>{ if(G.phase==="over") showScreen("scrEnd"); }, 2000);
+  }
+}
+function netApplyPhase(m){
+  const wasPhase = G.phase;
+  const mine = G.players[m.cur] && G.players[m.cur].side===NET.mySide;
+  G.cur = m.cur;
+  G.started = !!m.st; G.smash = !!m.sm;
+  G.phase = m.ph;
+  G.moved = m.mv ? (G.byId.get(m.mv)||null) : null;
+  HOLD.clear = !!m.cl;
+  HOLD.yawT = m.yw||0;
+  /* la distance de saisie reste locale à celui qui manipule */
+  if(!mine || G.phase!=="hold") HOLD.dist = m.hd||HOLD.dist;
+  (m.P||[]).forEach((a,i)=>{
+    const p = G.players[i]; if(!p) return;
+    p.score = a[0]; p.moves = a[1]; p.balls = a[2]; p.out = !!a[3]; p.crashed = !!a[4]; p.conn = !!a[5];
+  });
+  if(G.phase==="idle" && wasPhase!=="idle"){
+    G.moved = null; HOLD.clear = false;
+    camLookAtHeight(G.mode==="tour" ? Math.max(1.0, towerHeight()*0.55) : PODIUM_TOP+1.1);
+  }
+  if(G.smash && wasPhase!=="aim" && G.phase==="aim") hideScreens();
+  updateHud();
+}
+function netApplySnap(m){
+  for(const a of m.B){
+    const b = G.byId.get(a[0]);
+    if(!b || !b.alive) continue;
+    if(!b.tp){ b.tp = new THREE.Vector3(); b.tq = new THREE.Quaternion(); }
+    b.tp.set(a[1],a[2],a[3]); b.tq.set(a[4],a[5],a[6],a[7]);
+    if(m.f){ b.mesh.position.copy(b.tp); b.mesh.quaternion.copy(b.tq); }
+  }
+  const L = m.L||[];
+  while(G.balls.length > L.length){ const o = G.balls.pop(); scene.remove(o.mesh); }
+  while(G.balls.length < L.length){
+    const mesh = new THREE.Mesh(ballGeo, ballMat);
+    mesh.castShadow = true; scene.add(mesh);
+    G.balls.push({mesh, body:null, t:0, tp:new THREE.Vector3(mesh.position.x,mesh.position.y,mesh.position.z)});
+  }
+  L.forEach((p,i)=>{
+    const o = G.balls[i];
+    if(!o.tp) o.tp = new THREE.Vector3();
+    o.tp.set(p[0],p[1],p[2]);
+    if(o.mesh.position.lengthSq()===0) o.mesh.position.copy(o.tp);
+  });
+}
+function netApplyFx(o){
+  if(!o) return;
+  if(o.k==="sh"){
+    const b = G.byId.get(o.i);
+    if(b && b.alive){ spawnPuff(b.mesh.position, "#bfeaff", 14, 2.2, 0.6); sfx("glass",0.8); removeBlock(b, true); }
+  } else if(o.k==="ex"){
+    const b = G.byId.get(o.i);
+    const p = new THREE.Vector3(o.p[0],o.p[1],o.p[2]);
+    if(b && b.alive) removeBlock(b, true);
+    spawnFlash(p, 2.6); spawnPuff(p, "#ffb347", 26, 3.4, 1.0);
+    sfx("boom",1); CAM.shake = 0.16;
+  } else if(o.k==="th"){
+    sfx("whoosh", 0.8);
+  }
+}
+
+/* ---------------- boutons réseau ---------------- */
+el("btnHostGo").onclick = async ()=>{
+  readOptions();
+  if(!await loadPhysics()) return;
+  showScreen("scrHost");
+  netHost(0);
+};
+el("btnJoinGo").onclick = ()=>{ showScreen("scrJoin"); };
+el("btnHostBack").onclick = ()=>{ location.reload(); };
+el("btnJoinBack").onclick = ()=>{ showScreen("scrHome"); };
+el("btnHostStart").onclick = ()=>{
+  readOptions();
+  const need = NET.conns.length+1;
+  if(parseInt(el("inpCount").value,10) < need){ el("inpCount").value = String(Math.min(4,need)); buildPlayerRows(); }
+  G.players = collectPlayers();
+  G.players[0].side = "host"; G.players[0].bot = 0;
+  NET.conns.forEach((e,i)=>{
+    const p = G.players[i+1];
+    if(p){ p.side = e.side; p.name = e.name; p.color = e.color; p.bot = 0; }
+  });
+  /* les places sans invité sont tenues par des robots */
+  for(let i=NET.conns.length+1; i<G.players.length; i++){
+    if(!G.players[i].bot) G.players[i].bot = 2;
+    G.players[i].side = "bot"+i;
+  }
+  startGame();
+};
+setInterval(()=>{ if(NET.mode==="host" && NET.started && G.started) netFullSync(); }, 2500);
+
+/* ---------- PARTIE 23 : démarrage ---------- */
+function init(){
+  buildTextures();
+  buildScene();
+  resize();
+  buildPlayerRows();
+  buildLevelList();
+  try{ G.soloBest = parseInt(localStorage.getItem("jengaSoloBest")||"0",10)||0; }catch(e){}
+  el("optTraj").parentElement.style.display = "none";
+  el("levelPick").style.display = "none";
+  /* petite tour de démonstration en fond du menu */
+  towerDescriptors().forEach(makeBlock);
+  camPreset("tour");
+  CAM.tTh = 0.85;
+  requestAnimationFrame(frame);
+  /* la caméra tourne doucement tant qu'on est au menu */
+  setInterval(()=>{ if(!G.started && !G.smash && G.phase==="menu") CAM.tTh += 0.16; }, 900);
+}
+init();
+</script>
+</body>
+</html>
