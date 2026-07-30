@@ -299,19 +299,33 @@
     <p class="sub">Une vraie tour de 54 blocs, vraie physique, vrais effondrements.
       Retirez un bloc, reposez-le au sommet… et priez.
       Ou passez en <b>Démolition</b> et envoyez tout valser à coups de boulets.
-      <br><span style="color:#8f7d69">Souris ou doigt : glissez pour tourner la caméra, touchez un bloc pour le tirer.</span></p>
+      <br><span style="color:#8f7d69">Le bloc suit vraiment votre souris (ou votre doigt) en 3D : on le tire de biais,
+      on le dandine, on le soulève — mais si on force sur un bloc porteur, tout s'écroule.</span></p>
 
     <h2>Mode de jeu</h2>
     <div class="modes">
       <div class="mcard sel" data-mode="tour">
         <span class="mico">🗼</span>
         <div class="mname">Tour infernale</div>
-        <div class="mdesc">Le Jenga classique. 18 étages, 54 blocs. Retirez un bloc sous l'étage le plus haut et reposez-le au sommet. Celui qui fait tomber la tour a perdu.</div>
+        <div class="mdesc">18 étages, 54 blocs. Attrapez un bloc, sentez s'il coince (jauge à droite), sortez-le… puis jetez-le, ou reposez-le au sommet selon la règle choisie. Celui qui fait tomber la tour a perdu.</div>
       </div>
       <div class="mcard" data-mode="demo">
         <span class="mico">💣</span>
         <div class="mname">Démolition</div>
         <div class="mdesc">À la manière de Boom Blox : 10 constructions à pulvériser à coups de boulets. Bois, pierre, verre, TNT, joyaux… et blocs interdits à ne surtout pas faire tomber.</div>
+      </div>
+    </div>
+
+    <div id="reglePick">
+      <h2>Règle du jeu</h2>
+      <div class="row">
+        <div style="flex:1 1 320px">
+          <select id="inpRegle" style="width:100%">
+            <option value="jeter" selected>🗑️ Simplifiée — le bloc retiré est jeté et disparaît</option>
+            <option value="sommet">🏗️ Classique — il faut reposer le bloc au sommet</option>
+          </select>
+          <div id="regleHint" style="margin-top:7px;font-size:12.5px;color:#bda88f;line-height:1.45"></div>
+        </div>
       </div>
     </div>
 
@@ -509,6 +523,7 @@ const G = {
   goalDone:false,
   quality:"mid",
   help:true, traj:true, worn:false, timer:false,
+  discard:true,             /* règle simplifiée : le bloc retiré disparaît */
   turnEnd:0,
   moved:null,               /* bloc en cours de manipulation */
   settleT:0,
@@ -1506,7 +1521,26 @@ const HOLD_W = 34, HOLD_FMAX = 9;     /* pulsation (rad/s) ; plafond en « poids
 const HOLD_LEAD = 0.28;               /* avance max de la main sur le bloc */
 
 function startGrab(id, dist){
-  if(NET.mode==="guest"){ netSend({t:"grab", i:id, d:R3(dist)}); return; }
+  if(NET.mode==="guest"){
+    /* l'invité pilote sa main avec SA caméra : sans cette distance de saisie
+       le rayon retombe sur la position de la caméra et le bloc ne suit plus
+       le curseur du tout (il ne se dégage jamais, donc pas de bouton
+       « Lâcher »). L'hôte reçoit la même valeur dans le message. */
+    const b = G.byId.get(id);
+    HOLD.dist = dist || camera.position.distanceTo(b ? b.mesh.position : CAM.tgt);
+    /* on prend le bloc en main TOUT DE SUITE, sans attendre l'aller-retour
+       réseau : sinon le début du geste (souvent tout le geste) est perdu.
+       Si l'hôte refuse, il renvoie l'état et tout se remet en place. */
+    if(b){
+      G.moved = b; G.turnBlock = b; G.phase = "hold"; HOLD.clear = false;
+      HOLD.home.copy(b.mesh.position);
+      HOLD.target.copy(b.mesh.position);
+      HOLD.yaw = HOLD.yawT = new THREE.Euler().setFromQuaternion(b.mesh.quaternion, "YXZ").y;
+      updateHud();
+    }
+    netSend({t:"grab", i:id, d:R3(HOLD.dist)});
+    return;
+  }
   hostStartGrab(id, dist);
 }
 function hostStartGrab(id, dist){
@@ -1635,7 +1669,7 @@ function hostDrop(){
   if(!b || G.phase!=="hold") return;
   /* garde-fou : lâcher le bloc à côté de la tour, c'est le perdre. On
      prévient plutôt que de sanctionner un geste imprécis. */
-  if(G.mode==="tour" && !G.smash){
+  if(G.mode==="tour" && !G.smash && !G.discard){
     const p = b.mesh.position;
     if(Math.abs(p.x) > BL*0.8 || Math.abs(p.z) > BL*0.8 || p.y < towerTopY() - BH*0.3){
       showToast("⚠️ Amenez d'abord le bloc au-dessus de la tour", 1800);
@@ -1961,9 +1995,27 @@ function resolveTour(){
     endGame("crash");
     return;
   }
+  const tb = G.turnBlock;
+  /* règle simplifiée : le bloc retiré est jeté, il disparaît du jeu */
+  if(G.discard && tb && tb.alive){
+    spawnPuff(tb.mesh.position, "#e6c48a", 14, 2.0, 0.7);
+    removeBlock(tb, true);
+    netFx({k:"sh", i:tb.id});
+    G.turnBlock = null;
+    sfx("clack", 0.55);
+    p.moves = (p.moves||0)+1;
+    p.score = p.moves;
+    addLog(`🗑️ ${esc(p.name)} jette son bloc (${p.moves})`);
+    if(grabbableSet().size===0){
+      addLog("🏆 Plus aucun bloc jouable — la tour a tenu !");
+      endGame("perfect");
+      return;
+    }
+    nextPlayer();
+    return;
+  }
   /* le bloc a glissé de la tour et fini sur la table : coup perdu,
      mais on ne fait pas perdre la partie pour autant */
-  const tb = G.turnBlock;
   if(tb && tb.alive && tb.mesh.position.y < BH*1.5){
     addLog(`🙈 ${esc(p.name)} laisse tomber son bloc — coup perdu`);
     sfx("tap", 0.6);
@@ -2248,6 +2300,12 @@ function aiBuildPath(lvl){
   AI.yaw = levelYaw(l);
   AI.hand = b.mesh.position.clone();
   AI.wp = 0; AI.rotDone = false;
+  if(G.discard){
+    /* on dégage le bloc puis on le laisse tomber sur la table, c'est tout */
+    AI.rotDone = true;
+    AI.path = [sortie, sortie.clone().addScaledVector(ax, 0.55).setY(sortie.y + 0.25)];
+    return;
+  }
   AI.path = [
     sortie,
     new THREE.Vector3(sortie.x, cruise, sortie.z),
@@ -2287,7 +2345,7 @@ function buildActionBar(){
       h = `<button class="btn ghost" data-a="cancel">↩️ Remettre</button>`+
           `<button class="btn ghost" data-a="rot">⟳ Tourner</button>`;
       if(IS_TOUCH) h += `<button class="btn ghost" data-a="near">⤡</button><button class="btn ghost" data-a="far">⤢</button>`;
-      if(HOLD.clear) h += `<button class="btn" data-a="drop">✅ Lâcher le bloc</button>`;
+      if(HOLD.clear) h += `<button class="btn" data-a="drop">${G.discard?"🗑️ Jeter le bloc":"✅ Lâcher le bloc"}</button>`;
     }
   } else if(G.mode==="demo" && mine && G.phase==="aim"){
     h = `<div style="display:flex;align-items:center;gap:9px;background:rgba(20,13,9,.74);border:1px solid rgba(255,220,180,.16);border-radius:12px;padding:7px 13px;pointer-events:auto">
@@ -2364,10 +2422,13 @@ function updateHud(){
   else if(!G.started) msg = "";
   else if(!mine) msg = p ? `⏳ Au tour de ${p.name}…` : "";
   else if(G.mode==="tour"){
-    if(G.phase==="idle") msg = IS_TOUCH ? "Touchez un bloc vert et tirez-le vers vous" : "Cliquez-glissez un bloc vert pour l'extraire";
+    if(G.phase==="idle") msg = IS_TOUCH
+      ? "Touchez un bloc et tirez-le vers vous (les rouges sont interdits)"
+      : "Cliquez-glissez un bloc pour le sortir — les rouges sont interdits";
     else if(G.phase==="hold") msg = HOLD.clear
-      ? "Amenez le bloc au sommet, puis « Lâcher »"
-      : (IS_TOUCH ? "Dégagez le bloc de la tour… doucement" : "Dégagez le bloc (molette : rapprocher / éloigner)");
+      ? (G.discard ? "Jetez le bloc où vous voulez, il disparaîtra" : "Amenez le bloc au sommet, puis « Lâcher »")
+      : (IS_TOUCH ? "Dégagez le bloc… doucement (2 doigts = caméra)"
+                  : "Dégagez le bloc — molette : rapprocher/éloigner, clic droit : caméra");
     else if(G.phase==="settle") msg = "😬 La tour vacille…";
   } else {
     if(G.phase==="aim") msg = IS_TOUCH ? "Visez et touchez la cible (maintenez pour charger)" : "Cliquez la cible (maintenez pour charger) · glissez pour tourner";
@@ -2398,6 +2459,7 @@ function readOptions(){
   G.traj = el("optTraj").checked;
   G.worn = el("optWorn").checked;
   G.timer = el("optTimer").checked;
+  G.discard = el("inpRegle").value === "jeter";
   applyQuality();
 }
 function collectPlayers(){
@@ -2468,12 +2530,17 @@ function startGame(descs, fromNet){
   G.players.forEach(p=>{ p.moves = 0; p.crashed = false; p.out = false; if(G.mode==="tour") p.score = 0; });
 
   camPreset(G.mode);
-  G.cur = 0; G.round = 0; G.started = true;
+  /* le premier joueur est tiré au sort (l'invité, lui, reçoit le tirage
+     de l'hôte dans le message de phase) */
+  G.cur = fromNet ? 0 : Math.floor(Math.random()*G.players.length);
+  G.round = 0; G.started = true;
   G.power = 0.6;
   hideScreens(); hideBanner();
   snapshotRefs();
   if(!fromNet) netStart(list);
   startTurn();
+  if(!fromNet && G.players.length>1)
+    addLog(`🎲 <b>${esc(G.players[G.cur].name)}</b> commence`);
 }
 async function startLocal(){
   readOptions();
@@ -2634,8 +2701,28 @@ function tick(dt){
   snapT += dt;
   if(snapT > 0.05){ snapT = 0; netSendSnap(); }
 
-  renderer.render(scene, camera);
+  if(!document.hidden) renderer.render(scene, camera);
 }
+
+/* Un onglet en arrière-plan ne reçoit plus requestAnimationFrame : si l'hôte
+   change d'onglet, la partie se fige pour TOUT LE MONDE puisque c'est lui qui
+   simule. On prend donc le relais avec un timer — tant qu'une liaison WebRTC
+   est ouverte, le navigateur ne l'étrangle pas. */
+let bgTimer = null, bgLast = 0;
+function bgTick(){
+  if(!document.hidden) return;
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - bgLast)/1000);
+  bgLast = now; last = now;
+  tick(dt);
+}
+function majRelaisFond(){
+  const besoin = document.hidden && NET.mode==="host" && NET.conns.length>0;
+  if(besoin && !bgTimer){ bgLast = performance.now(); bgTimer = setInterval(bgTick, 20); }
+  else if(!besoin && bgTimer){ clearInterval(bgTimer); bgTimer = null; }
+  if(!document.hidden) last = performance.now();
+}
+addEventListener("visibilitychange", majRelaisFond);
 /* Presque tous les blocs sont jouables : les surligner tous reviendrait à
    repeindre la tour. On marque donc l'inverse — les 2 ou 3 blocs interdits
    (l'étage complet du sommet et au-dessus) passent en rouge sourd. */
@@ -2666,7 +2753,7 @@ function updateAids(){
   updateHighlight();
   if(G.phase!=="idle") selRing.visible = false;
   /* une fois le bloc dégagé, on montre où il peut se poser */
-  if(G.phase==="hold" && HOLD.clear && G.moved){
+  if(G.phase==="hold" && HOLD.clear && G.moved && !G.discard){
     const tm = towerMap();
     let l = tm.top;
     if((tm.levels.get(l)||[]).length>=3) l = tm.top+1;
@@ -2694,12 +2781,20 @@ document.querySelectorAll(".mcard").forEach(c=>{
     G.mode = c.dataset.mode;
     document.querySelectorAll(".mcard").forEach(x=>x.classList.toggle("sel", x===c));
     el("levelPick").style.display = (G.mode==="demo") ? "" : "none";
+    el("reglePick").style.display = (G.mode==="tour") ? "" : "none";
     el("optWorn").parentElement.style.display = (G.mode==="tour") ? "" : "none";
     el("optTraj").parentElement.style.display = (G.mode==="demo") ? "" : "none";
     el("optHelp").parentElement.style.display = (G.mode==="tour") ? "" : "none";
   };
 });
 el("inpCount").onchange = buildPlayerRows;
+function majRegle(){
+  const jeter = el("inpRegle").value === "jeter";
+  el("regleHint").textContent = jeter
+    ? "Le bloc retiré se jette par terre et disparaît : la tour ne monte pas, elle se creuse. Parties plus courtes, idéal avec des enfants."
+    : "Chaque bloc retiré doit être reposé au sommet : la tour monte, s'affine et devient de plus en plus instable. La vraie règle.";
+}
+el("inpRegle").onchange = majRegle;
 el("btnLocal").onclick = ()=>{ NET.mode = null; startLocal(); };
 el("btnAgain").onclick = ()=>{ hideScreens(); restart(); };
 el("btnHome").onclick = backHome;
@@ -2883,6 +2978,7 @@ function netHostOnData(c, msg){
     entry = {c, slot, side:"g"+slot, name, color:msg.color||"#4fb3e8"};
     NET.conns.push(entry);
     netSendTo(entry, {t:"welcome", side:entry.side, code:NET.code});
+    majRelaisFond();
     renderHostPlayers();
     netStatus("hostStatus", `${name} a rejoint la partie (${NET.conns.length}/${NET_MAX_GUESTS}).`);
     /* on agrandit la table si besoin */
@@ -2894,8 +2990,9 @@ function netHostOnData(c, msg){
   if(!entry) return;
   const p = G.players[G.cur];
   if(!p || p.side!==entry.side) return;         /* ce n'est pas son tour : on ignore */
-  if(msg.t==="grab" && G.phase==="idle" && G.mode==="tour"){
-    if(grabbableSet().has(msg.i)) hostStartGrab(msg.i, msg.d);
+  if(msg.t==="grab"){
+    if(G.phase==="idle" && G.mode==="tour" && grabbableSet().has(msg.i)) hostStartGrab(msg.i, msg.d);
+    else netSendTo(entry, phaseMsg());     /* refusé : on resynchronise l'invité */
   } else if(msg.t==="hand" && G.phase==="hold"){
     setHand(new THREE.Vector3(msg.p[0], msg.p[1], msg.p[2]));
   } else if(msg.t==="rot" && G.phase==="hold"){
@@ -2928,6 +3025,7 @@ function netHostHandleRejoin(c, name){
   netSendTo(entry, netStartMsg());
   netSendTo(entry, phaseMsg());
   netFullSync();
+  majRelaisFond();
 }
 function netHostConnLost(c){
   const i = NET.conns.findIndex(e=>e.c===c);
@@ -2944,9 +3042,11 @@ function netHostConnLost(c){
   }
   renderHostPlayers();
   netBroadcastLobby();
+  majRelaisFond();
 }
 function netStartMsg(){
-  return {t:"start", mode:G.mode, lvl:G.level, worn:G.worn?1:0, timer:G.timer?1:0, code:NET.code,
+  return {t:"start", mode:G.mode, lvl:G.level, worn:G.worn?1:0, timer:G.timer?1:0,
+    disc:G.discard?1:0, code:NET.code,
     players:G.players.map(p=>({side:p.side, name:p.name, color:p.color, bot:p.bot, balls:p.balls||0})),
     blocks:G.descs||[]};
 }
@@ -3110,6 +3210,7 @@ function netGuestOnData(msg){
     G.players = msg.players.map(p=>({name:p.name, color:p.color, bot:p.bot, side:p.side,
       score:0, moves:0, balls:p.balls||0, out:false, crashed:false, conn:true}));
     readOptions();
+    G.discard = !!msg.disc;      /* la règle est celle de l'hôte */
     startGame(msg.blocks, true);
   } else if(msg.t==="ph"){
     netApplyPhase(msg);
@@ -3227,6 +3328,7 @@ function init(){
   try{ G.soloBest = parseInt(localStorage.getItem("jengaSoloBest")||"0",10)||0; }catch(e){}
   el("optTraj").parentElement.style.display = "none";
   el("levelPick").style.display = "none";
+  majRegle();
   /* petite tour de démonstration en fond du menu */
   towerDescriptors().forEach(makeBlock);
   camPreset("tour");
