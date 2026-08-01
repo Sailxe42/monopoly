@@ -1128,7 +1128,14 @@ function boutonSuite(txt){
 /* ============================================================
    1) LE PRÉSIDENT
    ============================================================ */
-function ordreP(r){ return r===2 ? 15 : r; }   /* le 2 est la plus forte carte */
+/* Force d'un rang : le 2 est la plus forte carte (3 → 15).
+   Pendant une RÉVOLUTION, tout l'ordre est inversé : le 2 devient la plus
+   faible et le 3 la plus forte. Toutes les comparaisons du Président passent
+   par ici, donc l'inversion s'applique partout (jeu, tri de la main, IA). */
+function ordreP(r){
+  const o = r===2 ? 15 : r;
+  return G.revolution ? 18-o : o;
+}
 
 defJeu({
   id:"president", nom:"Le Président", icone:"👑", min:3, max:6, defaut:4,
@@ -1138,13 +1145,16 @@ defJeu({
     <p><b>Force des cartes :</b> 3 &lt; 4 &lt; 5 &lt; 6 &lt; 7 &lt; 8 &lt; 9 &lt; 10 &lt; V &lt; D &lt; R &lt; A &lt; <b>2</b> (le 2 est la plus forte).</p>
     <p><b>Le tour :</b> celui qui ouvre pose une carte, une paire, un brelan ou un carré. Chacun à son tour doit poser <b>le même nombre de cartes</b>, d'un rang <b>supérieur ou égal</b>, ou <b>passer</b>. Quand tout le monde a passé, le pli est ramassé et le dernier à avoir posé ouvre le pli suivant.</p>
     <p><b>Égaliser 🔒 :</b> si vous posez <b>la même valeur</b> que le joueur précédent (il pose un 4, vous posez un 4), la valeur est <b>bloquée</b> : le joueur suivant n'a plus le choix, il pose un 4 lui aussi… ou il passe. Le blocage saute dès que le pli est ramassé.</p>
-    <p><b>Le 2 :</b> avec l'option activée, poser un 2 (ou une paire de 2…) clôture immédiatement le pli et vous permet de repartir.</p>
+    <p><b>Le carré 💣 :</b> dès que <b>4 cartes du même rang</b> se suivent dans le pli — posées d'un seul coup, ou complétées carte après carte par plusieurs joueurs — le pli est <b>immédiatement remporté</b> par celui qui a posé la dernière : il ramasse et rouvre. (Un rang différent posé entre-temps remet le compteur à zéro.)</p>
+    <p><b>La révolution 🔄 :</b> avec l'option activée (par défaut), un joueur qui pose <b>les 4 cartes d'un même rang en une seule fois</b> déclenche une révolution : personne ne peut renchérir (le carré emporte le pli) et, pour le reste de la manche, <b>l'ordre des cartes s'inverse</b> — le 2 devient la plus faible et le 3 la plus forte. Une 2<sup>e</sup> révolution dans la même manche est une <b>contre-révolution</b> et rétablit l'ordre normal : un nombre <b>pair</b> de révolutions = ordre normal, <b>impair</b> = ordre inversé. Tout revient à la normale à la manche suivante.</p>
+    <p><b>Le 2 :</b> avec l'option activée, poser un 2 (ou une paire de 2…) clôture immédiatement le pli et vous permet de repartir. Pendant une révolution le 2 est la carte la plus faible : il ne coupe plus.</p>
     <p><b>Passer :</b> avec l'option activée (par défaut), vous avez toujours le droit de passer, même si vous pouviez poser — quitte à garder vos grosses cartes pour plus tard. Désactivez-la pour obliger tout le monde à poser dès que c'est possible.</p>
     <p><b>Échange :</b> à partir de la 2<sup>e</sup> manche, le Trouduc donne ses <b>2 meilleures</b> cartes au Président qui lui rend 2 cartes dont il ne veut pas ; même chose (1 carte) entre Vice-Trouduc et Vice-Président.</p>
     <p><b>Points :</b> à chaque manche, le 1<sup>er</sup> marque (nombre de joueurs − 1) points, le suivant un de moins… le dernier 0. Le meilleur total gagne la partie.</p>`,
   options:[
     {id:"manches", label:"Nombre de manches", type:"select", choix:[[1,"1 manche"],[3,"3 manches"],[5,"5 manches"],[7,"7 manches"]], defaut:3},
     {id:"deuxCoupe", label:"Poser un 2 clôture le pli", type:"check", defaut:true},
+    {id:"revolution", label:"Révolution (4 cartes d'un coup inversent la force des cartes)", type:"check", defaut:true},
     {id:"passeLibre", label:"Passer même si on peut jouer", type:"check", defaut:true}
   ],
   tri:(a,b)=>ordreP(a.r)-ordreP(b.r) || ORDRE_COULEURS.indexOf(a.s)-ORDRE_COULEURS.indexOf(b.s),
@@ -1162,16 +1172,22 @@ defJeu({
     const t = !G.taille ? "<b>table libre</b>"
       : (G.bloque ? `<b>${n}</b> de rang <b>exactement ${G.rangLbl}</b> 🔒`
                   : `<b>${n}</b> de rang <b>${G.rangLbl}</b> ou plus`);
-    return `<span>Manche <b>${G.manche}/${G.opts.manches}</b></span><span>Il faut : ${t}</span>`;
+    const rev = G.revolution ? `<span>🔄 <b>Révolution</b> : le 2 est la plus faible, le 3 la plus forte</span>` : "";
+    return `<span>Manche <b>${G.manche}/${G.opts.manches}</b></span><span>Il faut : ${t}</span>${rev}`;
   },
   aide(){
     if(G.phase==="fin-manche") return "Manche terminée — regardez les scores !";
     if(!jeMeControle(G.tour)) return "";
-    if(G.taille===0) return "À vous d'ouvrir : posez 1, 2, 3 ou 4 cartes du même rang.";
+    const rev = G.revolution ? "🔄 Révolution en cours : l'ordre est inversé (le 3 est la plus forte, le 2 la plus faible). " : "";
+    if(G.taille===0) return rev+"À vous d'ouvrir : posez 1, 2, 3 ou 4 cartes du même rang."+
+      (G.opts.revolution!==false ? " Les 4 d'un coup = 💣 carré (vous remportez le pli) + 🔄 révolution." : " Les 4 d'un coup = 💣 carré : vous remportez le pli.");
     const fin = pPasseAutorisee(G.tour) ? " — ou passez" : " (vous devez poser si vous pouvez)";
     const n = G.taille===1 ? "1 carte" : G.taille+" cartes";
-    if(G.bloque) return `🔒 Valeur bloquée : posez ${n} de rang ${G.rangLbl} exactement${fin}.`;
-    return `Posez ${n} de même rang, ${G.rangLbl} ou plus fort${fin}.`;
+    const m = G.mains[G.tour]||[];
+    const carre = (G.serieN>0 && G.serieN+G.taille>=4 && m.filter(c=>c.r===G.serieR).length>=G.taille)
+      ? ` 💣 Poser ${G.rangLbl} complète le carré : vous remportez le pli !` : "";
+    if(G.bloque) return `${rev}🔒 Valeur bloquée : posez ${n} de rang ${G.rangLbl} exactement${fin}.${carre}`;
+    return `${rev}Posez ${n} de même rang, ${G.rangLbl} ou plus fort${fin}.${carre}`;
   },
   mat(i){
     const t = G.titres.length ? pLibTitre(G.titres.indexOf(i), players.length) : "";
@@ -1194,10 +1210,12 @@ defJeu({
     } else if(G.tapis.length){
       h += `<div class="centre-titre">Posé par ${esc(nom(G.dernier))}</div>`;
       h += `<div class="pli-zone">`+G.tapis.map(c=>carteHtml(c,{tapis:true})).join("")+`</div>`;
+      if(G.serieN>=2) h += `<div class="tapis-info">💣 <b>${G.serieN}/4</b> ${G.rangLbl} posés d'affilée${G.serieN<4?` — le 4<sup>e</sup> emporte le pli`:``}.</div>`;
       if(G.bloque) h += `<div class="tapis-info">🔒 Valeur bloquée : <b>${G.rangLbl}</b> exactement, ou passer.</div>`;
     } else {
       h += `<div class="tapis-info">🧹 Table vide — <b>${esc(nom(G.tour))}</b> ouvre le pli.</div>`;
     }
+    if(G.revolution) h += `<div class="tapis-info">🔄 <b>Révolution</b> — l'ordre est inversé : le 3 est la plus forte, le 2 la plus faible.</div>`;
     h += `</div>`;
     document.getElementById("table").innerHTML = h;
 
@@ -1249,6 +1267,10 @@ defJeu({
       if(!pCoupValide(cartes)) return;
       /* même valeur que le coup précédent : la valeur se bloque pour le suivant */
       const egale = G.taille>0 && ordreP(cartes[0].r)===G.rang;
+      /* série de cartes du même rang posées d'affilée dans CE pli : à 4 c'est
+         un carré, il emporte le pli. Un autre rang remet le compteur à zéro. */
+      G.serieN = (G.serieN>0 && G.serieR===cartes[0].r) ? G.serieN+cartes.length : cartes.length;
+      G.serieR = cartes[0].r;
       cartes.forEach(c=>retire(main, c));
       G.tapis = cartes.slice();
       G.taille = cartes.length;
@@ -1257,14 +1279,30 @@ defJeu({
       G.bloque = egale;
       G.dernier = seat;
       log(`${players[seat].symbol} ${nom(seat)} pose ${cartes.map(libCourt).join(" ")}.`);
-      if(egale) log(`🔒 Même valeur — il faudra poser ${G.rangLbl} exactement, ou passer.`);
+      if(egale && G.serieN<4) log(`🔒 Même valeur — il faudra poser ${G.rangLbl} exactement, ou passer.`);
       if(main.length===0){
         G.finis.push(seat);
         const k = G.finis.length-1;
         log(`🎉 ${nom(seat)} n'a plus de cartes — ${pLibTitre(k, players.length)} !`);
       }
-      const deux = G.opts.deuxCoupe && cartes[0].r===2;
+      /* les 4 d'un coup : personne n'a pu renchérir → révolution (une 2e dans
+         la manche est une contre-révolution et rétablit l'ordre normal) */
+      const revo = G.opts.revolution!==false && cartes.length===4;
+      const carre = G.serieN>=4;
+      if(revo){
+        G.revolution = !G.revolution;
+        G.mains = G.mains.map(m=>trierMain(m));   /* l'ordre a changé : on retrie les mains */
+        log(G.revolution
+          ? `🔄 RÉVOLUTION ! Carré de ${G.rangLbl} posé d'un coup — l'ordre des cartes s'inverse : le 3 devient la plus forte, le 2 la plus faible.`
+          : `🔄 CONTRE-RÉVOLUTION ! Carré de ${G.rangLbl} posé d'un coup — l'ordre normal revient (le 2 est de nouveau la plus forte).`);
+      }
+      const deux = G.opts.deuxCoupe && cartes[0].r===2 && !G.revolution;
       if(pActifs().length<=1){ pause(700, pFinManche); return; }
+      if(carre){
+        log(`💣 Carré de ${G.rangLbl} — ${nom(seat)} remporte le pli et repart.`);
+        pause(revo?1400:1100, pNouveauPli);
+        return;
+      }
       if(deux){
         log(`💥 Le 2 clôture le pli — ${nom(seat)} repart.`);
         pause(900, pNouveauPli);
@@ -1284,7 +1322,16 @@ defJeu({
       let r = rangs[0];
       /* on garde les 2 pour la fin s'il reste autre chose */
       if(ordreP(r)>=15 && rangs.length>1) r = rangs[1];
-      return {k:"pose", cartes: groupes[r].map(cid)};
+      let coup = groupes[r];
+      /* poser les 4 d'un coup déclenche une révolution : on ne la provoque que
+         si l'inversion nous arrange, c.-à-d. si le reste de la main est faible
+         dans l'ordre courant (il deviendra fort). Sinon on n'en pose que 3. */
+      if(coup.length===4 && G.opts.revolution!==false && niv!=="easy"){
+        const reste = main.filter(c=>c.r!==r);
+        const moy = reste.length ? reste.reduce((s,c)=>s+ordreP(c.r),0)/reste.length : 9;
+        if(moy>9) coup = coup.slice(0,3);
+      }
+      return {k:"pose", cartes: coup.map(cid)};
     }
     /* réponse : le plus petit coup valide, en évitant de casser un gros groupe.
        Égaliser (même rang) est le coup le moins cher et il bloque les suivants :
@@ -1294,15 +1341,17 @@ defJeu({
       const g = groupes[r], o = ordreP(r);
       if(g.length<G.taille) return;
       if(G.bloque ? o!==G.rang : o<G.rang) return;
-      cands.push({cartes:g.slice(0,G.taille), casse:g.length-G.taille, o});
+      /* compléter le carré emporte le pli : c'est toujours le meilleur coup */
+      cands.push({cartes:g.slice(0,G.taille), casse:g.length-G.taille, o,
+                  carre: G.serieN>0 && G.serieR===r && G.serieN+G.taille>=4});
     });
     if(!cands.length) return {k:"passe"};
-    cands.sort((a,b)=> (niv==="hard" ? a.casse-b.casse : 0) || a.o-b.o);
+    cands.sort((a,b)=> (niv==="easy" ? 0 : (b.carre?1:0)-(a.carre?1:0)) || (niv==="hard" ? a.casse-b.casse : 0) || a.o-b.o);
     const co = cands[0];
     const restants = pActifs().length;
     /* on ne garde ses grosses cartes que si la règle autorise vraiment la passe :
        sinon l'IA reproposerait une passe refusée et la partie tournerait en rond */
-    if(pPasseAutorisee(seat)){
+    if(!co.carre && pPasseAutorisee(seat)){
       if(niv!=="easy" && co.o>=14 && main.length>3 && restants>2 && Math.random()<0.65) return {k:"passe"};
       if(niv==="easy" && Math.random()<0.12) return {k:"passe"};
     }
@@ -1313,12 +1362,14 @@ defJeu({
 });
 
 function pDonne(){
+  G.revolution = false;   /* l'inversion ne dure que le temps d'une manche — à remettre AVANT de trier */
   const d = melanger(jeu52());
   G.mains = players.map(()=>[]);
   let i = 0;
   while(d.length) G.mains[(i++)%players.length].push(d.pop());
   G.mains = G.mains.map(m=>trierMain(m));
   G.tapis = []; G.taille = 0; G.rang = 0; G.rangLbl = ""; G.bloque = false;
+  G.serieR = 0; G.serieN = 0;
   G.dernier = -1; G.passes = players.map(()=>false);
   G.finis = []; G.phase = "jeu";
   selVide();
@@ -1387,6 +1438,7 @@ function pSuite(seat){
 function pNouveauPli(){
   const dernier = G.dernier;
   G.tapis = []; G.taille = 0; G.rang = 0; G.rangLbl = ""; G.bloque = false;
+  G.serieR = 0; G.serieN = 0;
   G.passes = players.map(()=>false);
   let s = dernier;
   if(s<0 || G.mains[s].length===0) s = siegeSuivant(s<0?players.length-1:s, i=>G.mains[i].length>0);
@@ -3271,8 +3323,9 @@ function bContrat(){ return B_CONTRATS[G.contratIdx % 6]; }
 
 defJeu({
   id:"bombu", nom:"Le Bombu", icone:"🤴", min:3, max:6, defaut:4,
-  desc:"Le barbu : six contrats à négocier dans l'ordre — le pli, le cœur, la dame, le bombu (le roi de cœur), la marmelade qui cumule tout, puis la réussite où l'on se débarrasse de ses cartes en partant des 7.",
+  desc:"Le barbu, au jeu de 32 cartes : six contrats à négocier dans l'ordre — le pli, le cœur, la dame, le bombu (le roi de cœur), la marmelade qui cumule tout, puis la réussite où l'on se débarrasse de ses cartes en partant des 7.",
   regles:`
+    <p>On joue avec un <b>jeu de 32 cartes</b> (du 7 à l'as), soit 8 cartes chacun à 4 joueurs. Aux autres effectifs, deux cartes hautes sont écartées pour que la donne tombe juste.</p>
     <p>Six donnes s'enchaînent, toujours dans le même ordre. Dans les cinq premières on joue des <b>plis</b> classiques : on fournit la couleur demandée, il n'y a pas d'atout, la plus forte carte de la couleur d'entame ramasse — et on cherche surtout à <b>ne rien ramasser</b>.</p>
     <p><b>1. Le pli</b> — −2 points par pli ramassé.<br>
        <b>2. Le cœur</b> — −2 points par carte de cœur ramassée.<br>
@@ -3437,9 +3490,13 @@ defJeu({
 
 function bDonne(){
   const n = players.length;
-  let d = jeu52();
-  /* on retire les cartes les moins gênantes pour que la donne tombe juste */
-  const aRetirer = [{s:"T",r:2},{s:"P",r:2},{s:"T",r:3},{s:"P",r:3},{s:"T",r:4}];
+  let d = jeu32();
+  /* Le barbu se joue à 32 cartes (du 7 à l'as) : ça tombe juste à 4 joueurs.
+     Aux autres effectifs il reste 2 cartes en trop, qu'on retire par le HAUT.
+     La réussite se construit à partir des 7 vers les deux extrémités : une
+     carte manquante au sommet arrête simplement la série, alors qu'un 7 ou une
+     carte du milieu la couperait en deux et bloquerait son détenteur. */
+  const aRetirer = [{s:"P",r:14},{s:"T",r:14},{s:"P",r:13},{s:"T",r:13},{s:"K",r:14},{s:"K",r:13}];
   let k = d.length % n, i = 0;
   while(k>0 && i<aRetirer.length){ retire(d, aRetirer[i]); i++; k--; }
   melanger(d);
@@ -4120,36 +4177,69 @@ function pkIa(seat){
    9) LE MENTEUR
    ============================================================ */
 function mRangSuivant(r){ return r===14 ? 2 : (r===13 ? 14 : r+1); }
-function mLibRang(r){ return libRang({s:"P", r}); }
+/* on annonce à voix haute : « trois rois » se lit mieux que « 3 × R » */
+const M_NOMS = {11:"valets", 12:"dames", 13:"rois", 14:"as"};
+function mLibRang(r){ return M_NOMS[r] || String(r); }
+/* mode d'annonce : "choisi" = l'ouvreur fixe le rang, "couleur" = il fixe la
+   couleur, "montant" = le rang monte tout seul à chaque tour */
+function mModeCoul(){ return G.opts.annonce==="couleur"; }
+function mModeFixe(){ return G.opts.annonce!=="montant"; }
+/* le tas est vide : celui qui pose ouvre et choisit lui-même l'annonce */
+function mChoixLibre(){ return mModeFixe() && !G.tas.length; }
+function mAnnDefinie(){ return mModeCoul() ? !!G.coul : G.rang>0; }
+function mLibAnn(rang, coul){
+  if(mModeCoul()) return coul ? `${COULEURS[coul].sym} ${COULEURS[coul].nom}` : "au choix";
+  return rang ? mLibRang(rang) : "au choix";
+}
+function mAnnCourante(){ return mLibAnn(G.rang, G.coul); }
+function mCarteConforme(c, rang, coul){ return mModeCoul() ? c.s===coul : c.r===rang; }
+/* combien d'exemplaires de l'annonce existent dans le paquet */
+function mTotalPossible(){ return mModeCoul() ? 13 : 4; }
+let mChoix = null;   /* annonce en cours de sélection — hors de G : un re-rendu ne doit pas l'effacer */
 
 defJeu({
   id:"menteur", nom:"Le Menteur", icone:"🤥", min:3, max:6, defaut:4,
-  desc:"On pose ses cartes face cachée en annonçant leur rang… en disant la vérité, ou pas. Si quelqu'un crie « Menteur ! », on retourne les cartes : le perdant ramasse tout le tas.",
+  desc:"On pose ses cartes face cachée en annonçant leur rang… en disant la vérité, ou pas. Tout le monde peut crier « Menteur ! » à tout moment : on retourne les cartes, et le perdant ramasse tout le tas.",
   regles:`
     <p><b>But :</b> se débarrasser de toutes ses cartes.</p>
-    <p><b>Le tour :</b> le rang annoncé monte à chaque tour (as, 2, 3, …, roi, puis on repart aux as). À votre tour, posez <b>1 à 4 cartes face cachée</b> en annonçant ce rang — vous avez parfaitement le droit de mentir.</p>
-    <p><b>Le défi :</b> après la pose, ${""}un adversaire peut crier <b>« Menteur ! »</b>. On retourne alors les cartes posées : si elles ne correspondent pas toutes à l'annonce, le menteur <b>ramasse tout le tas</b> ; sinon c'est celui qui a contesté qui le ramasse. Dans les deux cas, celui qui ramasse repart pour un nouveau tour.</p>
-    <p><b>Fin :</b> le premier joueur qui n'a plus de cartes (et qui n'est pas confondu dans la foulée) gagne la manche. Les autres sont classés selon le nombre de cartes qui leur restent.</p>`,
+    <p><b>Le tour :</b> à votre tour, posez <b>1 à 4 cartes face cachée</b> en annonçant l'annonce en cours — vous avez parfaitement le droit de mentir.</p>
+    <p><b>L'annonce</b> (option) :<br>
+       • <b>l'ouvreur choisit le rang</b> (par défaut) — celui qui pose sur un tas vide annonce le rang de son choix, et <b>tout le monde reste sur ce rang</b> jusqu'à ce que le tas soit ramassé. Comme il n'existe que 4 cartes de ce rang, il faut vite se mettre à mentir…<br>
+       • <b>l'ouvreur choisit la couleur</b> — même chose, mais on annonce une couleur (♠ ♥ ♦ ♣) au lieu d'un rang.<br>
+       • <b>le rang monte</b> — l'annonce grimpe toute seule à chaque tour : as, 2, 3, …, roi, puis on repart aux as.</p>
+    <p><b>« Menteur ! » :</b> <b>n'importe qui</b> peut crier « Menteur ! » à <b>n'importe quel moment</b>, sans attendre son tour — le bouton reste affiché en permanence. Seule limite : on ne se conteste pas soi-même. On retourne alors les cartes de la dernière pose : si elles ne correspondent pas toutes à l'annonce, le menteur <b>ramasse tout le tas</b> ; sinon c'est celui qui a contesté qui le ramasse. Celui qui ramasse repart avec un tas vide (et choisit donc la nouvelle annonce).</p>
+    <p><b>Fin :</b> quand un joueur pose sa dernière carte, il n'a pas encore gagné : le joueur suivant doit <b>valider sa sortie</b>… ou crier « Menteur ! ». Le premier sorti gagne la manche, les autres sont classés selon le nombre de cartes qui leur restent.</p>`,
   options:[
     {id:"manches", label:"Nombre de manches", type:"select", choix:[[1,"1 manche"],[3,"3 manches"],[5,"5 manches"]], defaut:3},
-    {id:"defi", label:"Qui peut crier « Menteur ! »", type:"select", choix:[["suivant","le joueur suivant (rapide)"],["tous","tout le monde"]], defaut:"suivant"},
+    {id:"annonce", label:"Annonce", type:"select", choix:[["choisi","l'ouvreur choisit le rang (fixe)"],["couleur","l'ouvreur choisit la couleur (fixe)"],["montant","le rang monte à chaque tour"]], defaut:"choisi"},
     {id:"maxi", label:"Cartes posées par tour", type:"select", choix:[[3,"1 à 3"],[4,"1 à 4"]], defaut:4}
   ],
 
   demarrer(){ G.donneur = players.length-1; mDonne(); },
   titre(){
     if(G.phase==="fin-manche") return "Manche terminée";
-    if(G.phase==="defi") return `${nom(G.tour)} : « Menteur ! » ?`;
+    if(G.phase==="reveal") return "On retourne les cartes…";
+    if(G.sortant>=0) return `${nom(G.sortant)} a posé sa dernière carte !`;
     return G.tour>=0 ? `À ${nom(G.tour)} de poser` : "…";
   },
   info(){
     return `<span>Manche <b>${G.manche}/${G.opts.manches}</b></span>`+
-      `<span>Rang annoncé : <b>${mLibRang(G.rang)}</b></span><span>Tas : <b>${G.tas.length}</b> carte(s)</span>`;
+      `<span>Annonce : <b>${mAnnCourante()}</b>${mModeFixe()&&mAnnDefinie()?" 🔒":""}</span>`+
+      `<span>Tas : <b>${G.tas.length}</b> carte(s)</span>`;
   },
   aide(){
-    if(!jeMeControle(G.tour)) return "";
-    if(G.phase==="defi") return "Vous pensez qu'il ment ? C'est le moment de le dire.";
-    return `Posez 1 à ${G.opts.maxi} cartes en annonçant « ${mLibRang(G.rang)} » — vrai ou faux, à vous de voir.`;
+    if(G.phase==="fin-manche") return "Manche terminée — regardez le classement !";
+    if(G.phase==="reveal") return "";
+    const jeConteste = players.some((p,i)=>jeMeControle(i) && mPeutCrier(i));
+    const rappel = jeConteste ? " Vous pouvez crier « Menteur ! » à tout moment." : "";
+    if(G.sortant>=0){
+      return jeMeControle(G.tour)
+        ? `${nom(G.sortant)} vient de poser sa dernière carte : criez « Menteur ! » ou validez sa sortie.`
+        : `Dernier moment pour crier « Menteur ! » avant que ${nom(G.sortant)} ne gagne la manche.`;
+    }
+    if(!jeMeControle(G.tour)) return rappel.trim();
+    if(mChoixLibre()) return `Le tas est vide : choisissez l'annonce, puis posez 1 à ${G.opts.maxi} cartes.${rappel}`;
+    return `Posez 1 à ${G.opts.maxi} cartes en annonçant « ${mAnnCourante()} » — vrai ou faux, à vous de voir.${rappel}`;
   },
   mat(i){
     return `<span>Cartes : <b>${G.mains[i]?G.mains[i].length:0}</b></span><span>Score : <b>${G.scores[i]}</b></span>`+
@@ -4162,7 +4252,9 @@ defJeu({
     let h = rangeeAdversaires(i=>({
       cartes:G.mains[i].length,
       hs:G.finis.indexOf(i)>=0,
-      sous:(G.derniere&&G.derniere.seat===i&&G.phase==="defi")?`annonce ${G.derniere.n} × ${mLibRang(G.rang)}`:(G.finis.indexOf(i)>=0?"✅ sorti":"")
+      sous: G.finis.indexOf(i)>=0 ? "✅ sorti"
+          : (G.sortant===i ? "🏁 dernière carte posée !"
+          : ((G.derniere && G.derniere.seat===i && G.derniere.n) ? `annonce ${G.derniere.n} × ${mLibAnn(G.rangAnnonce, G.coulAnnonce)}` : ""))
     }));
     h += `<div class="centre">`;
     if(G.phase==="fin-manche"){
@@ -4171,14 +4263,16 @@ defJeu({
     } else {
       h += `<div class="centre-titre">Le tas</div><div class="pli-zone">`+
         (G.revele && G.revele.length
-          ? G.revele.map(c=>carteHtml(c,{tapis:true, cls:(c.r===G.rangRevele?"gagne":"")})).join("")
+          ? G.revele.map(c=>carteHtml(c,{tapis:true, cls:(mCarteConforme(c, G.rangRevele, G.coulRevele)?"gagne":"")})).join("")
           : (G.tas.length ? Array(Math.min(6,G.tas.length)).fill(carteHtml(null,{tapis:true,dos:true})).join("") : `<span class="tapis-info">Tas vide.</span>`))+
         `</div>`;
       h += `<div class="tapis-info">`+
         (G.derniere && G.derniere.n
-          ? `<b>${esc(nom(G.derniere.seat))}</b> a posé <b>${G.derniere.n}</b> carte(s) en annonçant <b>${mLibRang(G.rangAnnonce!=null?G.rangAnnonce:G.rang)}</b>.`
-          : `Nouveau tour : on annonce des <b>${mLibRang(G.rang)}</b>.`)+
-        (G.tas.length?`<br>${G.tas.length} carte(s) dans le tas.`:"")+`</div>`;
+          ? `<b>${esc(nom(G.derniere.seat))}</b> a posé <b>${G.derniere.n}</b> carte(s) en annonçant <b>${mLibAnn(G.rangAnnonce, G.coulAnnonce)}</b>.`
+          : (mChoixLibre() ? `Tas vide : <b>${esc(nom(G.tour))}</b> ouvre et choisit l'annonce.`
+                           : `Nouveau tour : on annonce <b>${mAnnCourante()}</b>.`))+
+        (G.tas.length?`<br>${G.tas.length} carte(s) dans le tas${mModeFixe()&&G.tas.length>mTotalPossible()?` — il n'en existe que ${mTotalPossible()} de vraies 👀`:""}.`:"")+`</div>`;
+      if(G.sortant>=0) h += `<div class="tapis-info">🏁 <b>${esc(nom(G.sortant))}</b> n'a plus de cartes : dernier moment pour crier « Menteur ! ».</div>`;
     }
     h += `</div>`;
     document.getElementById("table").innerHTML = h;
@@ -4186,25 +4280,47 @@ defJeu({
     const main = G.mains[moi]||[];
     const sel = selCartes(main);
     if(G.phase==="fin-manche"){ boutons(boutonSuite(G.manche>=G.opts.manches?"🏁 Voir le classement":"▶️ Manche suivante")); }
-    else if(!jeMeControle(G.tour)) boutons([{html:`<span class="lbl">${G.tour>=0?"En attente de "+esc(nom(G.tour))+"…":"…"}</span>`}]);
-    else if(G.phase==="defi"){
-      boutons([
-        {txt:"😠 Menteur !", cls:"danger", on:()=>envoyer(moi,{k:"conteste"})},
-        {txt:"😶 Je passe", cls:"secondary", on:()=>envoyer(moi,{k:"passeDefi"})}
-      ]);
-    } else {
-      boutons([
-        {txt:`🃏 Annoncer ${sel.length||""} × ${mLibRang(G.rang)}`, dis:!(sel.length>=1 && sel.length<=Math.min(G.opts.maxi, main.length)),
-         on:()=>{ envoyer(moi,{k:"pose", cartes:SEL.slice()}); selVide(); }},
-        {html:`<span class="lbl">Sélectionnez 1 à ${Math.min(G.opts.maxi, main.length)} cartes (personne ne les verra).</span>`}
-      ]);
+    else {
+      const l = [];
+      const libre = mChoixLibre() && jeMeControle(G.tour) && G.sortant<0 && G.phase==="annonce";
+      const choix = mModeCoul() ? ["P","C","K","T"] : [14,2,3,4,5,6,7,8,9,10,11,12,13];
+      if(libre){
+        if(mChoix===null || choix.map(String).indexOf(String(mChoix))<0) mChoix = choix[0];
+      } else mChoix = null;
+      if(G.phase==="reveal") l.push({html:`<span class="lbl">On retourne les cartes…</span>`});
+      else if(G.sortant>=0 && jeMeControle(G.tour)){
+        l.push({txt:`✅ Je ne conteste pas — ${esc(nom(G.sortant))} gagne`, cls:"secondary", on:()=>envoyer(G.tour,{k:"valide"})});
+      }
+      else if(!jeMeControle(G.tour)) l.push({html:`<span class="lbl">${G.tour>=0?"En attente de "+esc(nom(G.tour))+"…":"…"}</span>`});
+      else {
+        if(libre) l.push({html:`<span class="lbl">Annonce :</span><select id="mAnn">`+
+            choix.map(v=>`<option value="${v}">${mModeCoul()?`${COULEURS[v].sym} ${COULEURS[v].nom}`:mLibRang(v)}</option>`).join("")+`</select>`,
+          apres:(box)=>{
+            const s = box.querySelector("#mAnn");
+            s.value = mChoix;
+            s.onchange = ()=>{ mChoix = s.value; render(); };
+          }});
+        l.push({txt:`🃏 Annoncer ${sel.length||""} × ${libre?mLibAnn(parseInt(mChoix,10), mChoix):mAnnCourante()}`,
+          dis:!(sel.length>=1 && sel.length<=Math.min(G.opts.maxi, main.length)),
+          on:()=>{ envoyer(moi,{k:"pose", cartes:SEL.slice(), ann:mChoix}); selVide(); }});
+        l.push({html:`<span class="lbl">Sélectionnez 1 à ${Math.min(G.opts.maxi, main.length)} cartes (personne ne les verra).</span>`});
+      }
+      /* « Menteur ! » : disponible en permanence, pour chaque siège que je pilote,
+         sans attendre son tour — mais jamais contre sa propre pose */
+      players.forEach((p,i)=>{
+        if(!jeMeControle(i) || !mPeutCrier(i)) return;
+        const plusieurs = players.filter((q,j)=>jeMeControle(j)).length > 1;
+        l.push({txt:`😠 Menteur !${plusieurs?" ("+esc(p.name)+")":""}`, cls:"danger", on:()=>{ selVide(); envoyer(i,{k:"conteste"}); }});
+      });
+      boutons(l);
     }
 
+    const conformes = mAnnDefinie() ? main.filter(c=>mCarteConforme(c, G.rang, G.coul)).length : 0;
     rendreMain({
       titre:`Votre main — ${main.length} carte(s)`,
-      droite: main.filter(c=>c.r===G.rang).length ? `Vous avez ${main.filter(c=>c.r===G.rang).length} ${mLibRang(G.rang)}` : `Aucun ${mLibRang(G.rang)} en main…`,
+      droite: !mAnnDefinie() ? "" : (conformes ? `Vous avez ${conformes} × ${mAnnCourante()}` : `Aucun ${mAnnCourante()} en main…`),
       cartes:main, sel:SEL,
-      jouable:()=>jeMeControle(G.tour) && G.phase==="annonce",
+      jouable:()=>jeMeControle(G.tour) && G.phase==="annonce" && G.sortant<0,
       onClic:(c)=>{
         if(!selA(c) && SEL.length>=Math.min(G.opts.maxi, main.length)) return;
         selBascule(c); render();
@@ -4218,57 +4334,97 @@ defJeu({
       G.manche++; G.donneur = (G.donneur+1)%players.length; mDonne();
       return;
     }
-    if(seat!==G.tour || G.phase==="fin-manche") return;
-    if(G.phase==="annonce" && msg.k==="pose"){
+    /* « Menteur ! » — accepté de n'importe quel siège, à n'importe quel moment :
+       c'est volontairement le seul message qui ne vérifie pas G.tour */
+    if(msg.k==="conteste"){
+      if(!mPeutCrier(seat)) return;
+      mResoudre(seat);
+      return;
+    }
+    if(seat!==G.tour || G.phase!=="annonce") return;
+    if(msg.k==="valide"){
+      if(G.sortant<0) return;
+      const s = G.sortant; G.sortant = -1;
+      log(`🤝 ${nom(seat)} ne conteste pas : la sortie de ${nom(s)} est validée.`);
+      mSortie(s);
+      return;
+    }
+    if(msg.k==="pose"){
+      if(G.sortant>=0) return;                 /* il faut d'abord trancher la sortie en cours */
       const main = G.mains[seat];
       const cartes = (msg.cartes||[]).map(k=>main.find(c=>cid(c)===k)).filter(Boolean);
       if(!cartes.length || cartes.length>Math.min(G.opts.maxi, main.length)) return;
+      /* tas vide : celui qui ouvre fixe l'annonce pour tout le tas */
+      if(mChoixLibre()){
+        if(mModeCoul()){
+          if(["P","C","K","T"].indexOf(msg.ann)<0) return;
+          G.coul = msg.ann; G.rang = 0;
+        } else {
+          const r = parseInt(msg.ann, 10);
+          if(!(r>=2 && r<=14)) return;
+          G.rang = r; G.coul = null;
+        }
+        log(`📣 ${nom(seat)} ouvre le tas et annonce : ${mAnnCourante()}.`);
+      }
       cartes.forEach(c=>retire(main, c));
       cartes.forEach(c=>G.tas.push(c));
       G.derniere = {seat, n:cartes.length, cartes:cartes.slice()};
-      G.rangAnnonce = G.rang;
+      G.rangAnnonce = G.rang; G.coulAnnonce = G.coul;
       G.revele = [];
-      log(`🃏 ${nom(seat)} pose ${cartes.length} carte(s) en annonçant des ${mLibRang(G.rang)}.`);
-      mLancerDefi();
-      return;
-    }
-    if(G.phase==="defi"){
-      if(msg.k==="conteste"){ mResoudre(seat); return; }
-      if(msg.k==="passeDefi"){
-        G.defiIdx++;
-        if(G.defiIdx >= G.defiOrdre.length) mPersonneNeConteste();
-        else G.tour = G.defiOrdre[G.defiIdx];
+      log(`🃏 ${nom(seat)} pose ${cartes.length} carte(s) en annonçant ${cartes.length} × ${mAnnCourante()}.`);
+      if(!main.length){
+        G.sortant = seat;
+        log(`🏁 ${nom(seat)} vient de poser sa dernière carte — dernier moment pour crier « Menteur ! ».`);
+      }
+      /* les IA décident tout de suite si elles contestent (aucune pause imposée
+         aux humains : leur bouton « Menteur ! » reste actif jusqu'à la pose suivante) */
+      const crieur = mIaDefis(seat);
+      if(crieur>=0){ mResoudre(crieur); return; }
+      if(G.opts.annonce==="montant") G.rang = mRangSuivant(G.rang);
+      /* une sortie en attente : on donne la main à un humain s'il y en a un,
+         sinon l'IA suivante validera aussitôt */
+      if(G.sortant>=0){
+        const h = mSuivant(seat, i=>!players[i].ai);
+        if(h>=0){ G.tour = h; return; }
+      }
+      const suiv = mSuivant(seat, null);
+      if(suiv<0){
+        if(G.sortant>=0){ const s = G.sortant; G.sortant = -1; mSortie(s); return; }
+        G.tour = seat;
         return;
       }
+      G.tour = suiv;
+      return;
     }
   },
 
   ia(seat){
     const main = G.mains[seat];
-    if(G.phase==="defi"){
-      const n = G.derniere.n;
-      const enMain = main.filter(c=>c.r===G.rangAnnonce).length;
-      const niv = players[seat].ai||"medium";
-      if(enMain + n > 4) return {k:"conteste"};                     /* mensonge certain */
-      let p = 0.04 + 0.06*n + 0.14*enMain;
-      if(G.derniere.seat>=0 && G.mains[G.derniere.seat].length===0) p += 0.5;  /* il va gagner : on vérifie ! */
-      if(G.tas.length>10) p -= 0.08;                                /* gros tas : on hésite */
-      if(niv==="easy") p *= 0.6;
-      if(niv==="hard") p *= 1.25;
-      return Math.random()<p ? {k:"conteste"} : {k:"passeDefi"};
-    }
-    const vraies = main.filter(c=>c.r===G.rang);
+    if(G.sortant>=0) return {k:"valide"};      /* son occasion de crier est déjà passée */
+    const coulM = mModeCoul();
+    const libre = mChoixLibre();
+    let ann = null, cible;
+    if(libre){
+      /* on ouvre : on annonce ce dont on a le plus d'exemplaires */
+      const cpt = {};
+      main.forEach(c=>{ const k = coulM ? c.s : c.r; cpt[k] = (cpt[k]||0)+1; });
+      const cles = Object.keys(cpt).sort((a,b)=>cpt[b]-cpt[a]);
+      ann = coulM ? cles[0] : parseInt(cles[0],10);
+      cible = ann;
+    } else cible = coulM ? G.coul : G.rang;
+    const vraies = main.filter(c=> coulM ? c.s===cible : c.r===cible);
     const maxi = Math.min(G.opts.maxi, main.length);
     if(vraies.length){
       const n = Math.min(vraies.length, maxi);
-      return {k:"pose", cartes: vraies.slice(0,n).map(cid)};
+      return {k:"pose", cartes: vraies.slice(0,n).map(cid), ann};
     }
     /* il faut mentir : on se débarrasse des cartes dont on a le moins besoin */
     const cpt = {};
-    main.forEach(c=>{ cpt[c.r] = (cpt[c.r]||0)+1; });
-    const tri = main.slice().sort((a,b)=> (cpt[a.r]-cpt[b.r]) || (b.r-a.r));
+    main.forEach(c=>{ const k = coulM ? c.s : c.r; cpt[k] = (cpt[k]||0)+1; });
+    const cle = c=>coulM ? c.s : c.r;
+    const tri = main.slice().sort((a,b)=> (cpt[cle(a)]-cpt[cle(b)]) || (b.r-a.r));
     const n = (players[seat].ai==="hard" && main.length>4) ? 1 : Math.min(main.length, 1+(Math.random()<0.35?1:0));
-    return {k:"pose", cartes: tri.slice(0, Math.min(n, maxi)).map(cid)};
+    return {k:"pose", cartes: tri.slice(0, Math.min(n, maxi)).map(cid), ann};
   },
 
   masque(g, seat){
@@ -4284,57 +4440,92 @@ function mDonne(){
   let i = 0;
   while(d.length) G.mains[(i++)%players.length].push(d.pop());
   G.mains = G.mains.map(m=>m.slice().sort(triDefaut));
-  G.tas = []; G.derniere = null; G.revele = []; G.rangRevele = -1;
-  G.finis = [];
-  G.rang = 14; G.rangAnnonce = null;
-  G.defiOrdre = []; G.defiIdx = 0;
+  G.tas = []; G.derniere = null; G.revele = []; G.rangRevele = -1; G.coulRevele = null;
+  G.finis = []; G.sortant = -1;
+  G.rangAnnonce = null; G.coulAnnonce = null;
+  G.rang = mModeFixe() ? 0 : 14;   /* en annonce fixe c'est l'ouvreur qui choisit */
+  G.coul = null;
   G.phase = "annonce";
   G.tour = (G.donneur+1)%players.length;
+  mChoix = null;
   selVide();
-  log(`🃏 Manche ${G.manche} — ${nom(G.tour)} commence par annoncer des as.`);
+  log(mModeFixe()
+    ? `🃏 Manche ${G.manche} — ${nom(G.tour)} ouvre le tas et choisit l'annonce.`
+    : `🃏 Manche ${G.manche} — ${nom(G.tour)} commence par annoncer des as.`);
 }
-function mLancerDefi(){
-  const poseur = G.derniere.seat, n = players.length;
-  let ordre = [];
-  for(let k=1;k<n;k++){
+/* siège actif suivant (celui qui vient de poser sa dernière carte est sauté) */
+function mSuivant(from, ok){
+  return siegeSuivant(from, i=>i!==from && G.finis.indexOf(i)<0 && G.mains[i].length>0 && (!ok || ok(i)));
+}
+/* a-t-on le droit de crier « Menteur ! » ? à tout moment, sauf sur sa propre pose */
+function mPeutCrier(seat){
+  if(!G || G.phase!=="annonce" || !G.derniere || !G.derniere.n) return false;
+  if(!players[seat] || G.finis.indexOf(seat)>=0) return false;
+  return seat !== G.derniere.seat;
+}
+/* chance donnée aux IA de contester juste après une pose (sans faire attendre
+   les humains : c'est instantané, leur bouton reste actif après) */
+function mIaDefis(poseur){
+  const n = players.length;
+  const nbCand = players.filter((p,i)=>p.ai && mPeutCrier(i)).length;
+  for(let k=1;k<=n;k++){
     const i = (poseur+k)%n;
-    if(G.finis.indexOf(i)>=0) continue;
-    ordre.push(i);
+    if(!players[i].ai || !mPeutCrier(i)) continue;
+    if(mIaConteste(i, nbCand)) return i;
   }
-  if(G.opts.defi==="suivant") ordre = ordre.slice(0,1);
-  G.defiOrdre = ordre;
-  G.defiIdx = 0;
-  if(!ordre.length){ mPersonneNeConteste(); return; }
-  G.phase = "defi";
-  G.tour = ordre[0];
+  return -1;
 }
-function mPersonneNeConteste(){
-  const poseur = G.derniere.seat;
-  G.phase = "annonce";
-  G.revele = [];
-  if(!G.mains[poseur].length){ mSortie(poseur); return; }
-  G.rang = mRangSuivant(G.rang);
-  const suiv = siegeSuivant(poseur, i=>G.finis.indexOf(i)<0);
-  G.tour = suiv<0 ? poseur : suiv;
+function mIaConteste(seat, nbCand){
+  const main = G.mains[seat] || [];
+  const n = G.derniere.n;
+  const total = mTotalPossible();
+  const enMain = main.filter(c=>mCarteConforme(c, G.rangAnnonce, G.coulAnnonce)).length;
+  const niv = players[seat].ai || "medium";
+  /* mensonge certain (il annonce plus d'exemplaires qu'il n'en reste) : reste à
+     savoir si ça vaut le coup — confondre quelqu'un sur un tas de 2 cartes ne
+     lui coûte presque rien, et si tout le monde crie au moindre soupçon le tas
+     ne grossit jamais et la partie n'avance plus */
+  if(enMain + n > total){
+    if(G.sortant===G.derniere.seat) return true;          /* il allait gagner : toujours */
+    return Math.random() < Math.min(0.92, 0.15 + 0.06*G.tas.length);
+  }
+  let p = 0.02 + 0.035*n + (mModeCoul() ? 0.04 : 0.10)*enMain;
+  /* en annonce fixe, le tas ne peut pas contenir plus de `total` cartes vraies :
+     au-delà quelqu'un a menti, et plus la pose est grosse plus c'est louche */
+  if(mModeFixe() && G.tas.length + enMain > total) p += 0.25 * (n/Math.max(1,G.tas.length));
+  if(G.tas.length>10) p -= 0.05;                          /* gros tas : on hésite */
+  if(niv==="easy") p *= 0.6;
+  if(niv==="hard") p *= 1.3;
+  /* tout le monde peut crier à chaque pose : on partage la suspicion, sinon
+     avec 5 adversaires il y aurait un défi à presque chaque tour */
+  p /= Math.max(1, nbCand);
+  /* sauf quand l'adversaire pose sa dernière carte : là on vérifie vraiment */
+  if(G.sortant===G.derniere.seat) p += 0.22 + 0.10*enMain;
+  return Math.random()<p;
 }
 function mResoudre(contestant){
   const cartes = G.derniere.cartes;
-  const rang = G.rangAnnonce;
-  const menteur = cartes.some(c=>c.r!==rang);
-  const perdant = menteur ? G.derniere.seat : contestant;
+  const rang = G.rangAnnonce, coul = G.coulAnnonce;
+  const poseur = G.derniere.seat;
+  const menteur = cartes.some(c=>!mCarteConforme(c, rang, coul));
+  const perdant = menteur ? poseur : contestant;
   G.revele = cartes.slice();
-  G.rangRevele = rang;
+  G.rangRevele = rang; G.coulRevele = coul;
+  G.phase = "reveal";                 /* on fige : plus personne ne crie pendant qu'on retourne */
   G.tour = -1;
-  log(`😠 ${nom(contestant)} crie « Menteur ! » — ${cartes.map(libCourt).join(" ")} : ${menteur?`c'était faux, ${nom(G.derniere.seat)} ramasse le tas (${G.tas.length}).`:`c'était vrai ! ${nom(contestant)} ramasse le tas (${G.tas.length}).`}`);
+  log(`😠 ${nom(contestant)} crie « Menteur ! » — ${cartes.map(libCourt).join(" ")} : ${menteur?`c'était faux, ${nom(poseur)} ramasse le tas (${G.tas.length}).`:`c'était vrai ! ${nom(contestant)} ramasse le tas (${G.tas.length}).`}`);
   pause(2200, ()=>{
     G.mains[perdant] = G.mains[perdant].concat(G.tas).slice().sort(triDefaut);
     G.tas = [];
     G.revele = [];
-    const poseur = G.derniere.seat;
+    G.derniere = null;                /* nouveau tas : plus rien à contester */
     G.phase = "annonce";
-    /* celui qui n'a plus de cartes après un défi raté sort */
-    if(!menteur && !G.mains[poseur].length){ mSortie(poseur); return; }
-    G.rang = mRangSuivant(G.rang);
+    const sortant = G.sortant; G.sortant = -1;
+    /* il avait posé sa dernière carte : il sort quand même si son annonce était vraie */
+    if(!menteur && sortant===poseur && !G.mains[poseur].length){ mSortie(poseur); return; }
+    if(G.opts.annonce==="montant") G.rang = mRangSuivant(G.rang);
+    else { G.rang = 0; G.coul = null; }   /* celui qui ramasse choisira sa propre annonce */
+    mChoix = null;
     G.tour = perdant;
   });
 }
