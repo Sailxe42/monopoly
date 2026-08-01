@@ -312,7 +312,12 @@
       <div class="mcard" data-mode="demo">
         <span class="mico">💣</span>
         <div class="mname">Démolition</div>
-        <div class="mdesc">À la manière de Boom Blox : 10 constructions à pulvériser à coups de boulets. Bois, pierre, verre, TNT, joyaux… et blocs interdits à ne surtout pas faire tomber.</div>
+        <div class="mdesc">À la manière de Boom Blox : 15 constructions à pulvériser à coups de boulets, jusqu'à 100 blocs. Bois, pierre, verre, TNT, joyaux… et blocs interdits à ne surtout pas faire tomber.</div>
+      </div>
+      <div class="mcard" data-mode="chateau">
+        <span class="mico">🏰</span>
+        <div class="mname">Château fort</div>
+        <div class="mdesc">Chacun son château d'une cinquantaine de blocs. À votre tour, choisissez qui vous visez et tirez : chaque bloc arraché vous rapporte ses points… et les fait perdre à son propriétaire. Le dernier château debout gagne.</div>
       </div>
     </div>
 
@@ -332,6 +337,30 @@
     <div id="levelPick" style="display:none">
       <h2>Construction</h2>
       <div class="levels" id="levelList"></div>
+    </div>
+
+    <div id="castlePick" style="display:none">
+      <h2>Les châteaux</h2>
+      <div class="row">
+        <div>
+          <label>Taille du château</label>
+          <select id="inpCastle">
+            <option value="0" selected>🏯 Donjon — 57 blocs</option>
+            <option value="1">🏰 Forteresse — 73 blocs</option>
+            <option value="2">🏛️ Citadelle — 93 blocs</option>
+          </select>
+        </div>
+        <div>
+          <label>Boulets par joueur</label>
+          <select id="inpMuns">
+            <option value="6">6 boulets</option>
+            <option value="10" selected>10 boulets</option>
+            <option value="15">15 boulets</option>
+            <option value="25">25 boulets</option>
+          </select>
+        </div>
+      </div>
+      <div id="castleHint" style="margin-top:-4px;font-size:12.5px;color:#bda88f;line-height:1.45"></div>
     </div>
 
     <h2>Joueurs</h2>
@@ -513,12 +542,15 @@ const SIZES = {
 
 /* ---------- PARTIE 2 : état global ---------- */
 const G = {
-  mode:"tour",              /* "tour" | "demo" */
+  mode:"tour",              /* "tour" | "demo" | "chateau" */
   phase:"menu",             /* menu | idle | pull | place | settle | aim | fly | over */
   players:[], cur:0, round:0,
   blocks:[], byId:new Map(), nextId:1,
   balls:[],
   level:0,                  /* construction choisie en démolition */
+  castles:[], baseMeshes:[], /* mode château fort */
+  target:1,                 /* joueur visé ce tour-ci */
+  castleSize:0, muns:10,
   ballsLeft:0,
   goalDone:false,
   quality:"mid",
@@ -892,6 +924,34 @@ async function loadPhysics(){
 let physPodium = null;
 const HAS_PHYS = ()=> !!world;
 
+/* Les réglages ci-dessus sont taillés pour la tour de Jenga : 18 étages
+   empilés au millimètre. Une construction de 100 blocs n'a pas besoin de
+   cette précision — et la payer coûterait la moitié des images par seconde.
+   On assouplit donc le solveur dès qu'on quitte le mode Tour. */
+function tunePhysics(){
+  if(!world) return;
+  const ip = world.integrationParameters;
+  if(G.mode==="tour"){
+    world.timestep = 1/120;
+    ip.contact_natural_frequency = 240;
+    ip.normalizedAllowedLinearError = 0.0002;
+    ip.numSolverIterations = 12;
+    ip.numAdditionalFrictionIterations = 8;
+  } else if(G.blocks.length > 60){
+    world.timestep = 1/90;
+    ip.contact_natural_frequency = 90;
+    ip.normalizedAllowedLinearError = 0.001;
+    ip.numSolverIterations = 6;
+    ip.numAdditionalFrictionIterations = 3;
+  } else {
+    world.timestep = 1/120;
+    ip.contact_natural_frequency = 140;
+    ip.normalizedAllowedLinearError = 0.0006;
+    ip.numSolverIterations = 8;
+    ip.numAdditionalFrictionIterations = 4;
+  }
+}
+
 /* ---------- PARTIE 6 : blocs ---------- */
 /* Un bloc = un descripteur (partagé sur le réseau) + un mesh + éventuellement un corps physique. */
 function makeBlock(desc){
@@ -908,6 +968,8 @@ function makeBlock(desc){
     id: desc.i, type, dim:[w,h,d], mesh, body:null, coll:null,
     def, alive:true, fallen:false, scored:false, tower:!!desc.tw,
     variant:desc.v||0, ref:new THREE.Vector3(), refQ:new THREE.Quaternion(),
+    own: (desc.ow==null ? null : desc.ow),      /* propriétaire (mode Château fort) */
+    start: mesh.position.clone(),               /* position de départ : sert à mesurer les dégâts */
     lastImpact:0, fuse:0
   };
 
@@ -932,7 +994,9 @@ function removeBlock(b, silent){
   b.alive = false;
   if(!silent && b.mesh) spawnPuff(b.mesh.position, b.def.col);
   if(b.mesh) scene.remove(b.mesh);
-  if(b.body && HAS_PHYS()){ try{ world.removeRigidBody(b.body); }catch(e){} b.body = null; }
+  /* le collisionneur part avec le corps : garder la référence ferait planter
+     le WASM au prochain setFriction (cf. la « main glissante ») */
+  if(b.body && HAS_PHYS()){ try{ world.removeRigidBody(b.body); }catch(e){} b.body = null; b.coll = null; }
 }
 function clearBlocks(){
   G.blocks.forEach(b=>{
@@ -944,6 +1008,7 @@ function clearBlocks(){
     if(b.body && HAS_PHYS()){ try{ world.removeRigidBody(b.body); }catch(e){} }
   });
   G.blocks = []; G.balls = []; G.byId.clear(); G.nextId = 1;
+  clearCastleBases();
   /* important : sinon un relancement en pleine manipulation ferait appeler
      une méthode sur un corps Rapier déjà libéré -> plantage du WASM */
   G.moved = null; G.turnBlock = null; G.pushBack = 0; G.retry = false;
@@ -1070,6 +1135,71 @@ function arch(out, type, x, z, y0, hgt){
     y += dl[1]+0.004;
   }
   return y;
+}
+
+/* ------------------------------------------------------------------
+   UN CHÂTEAU FORT : quatre courtines, quatre tours d'angle, un donjon
+   et son trésor. Sert au mode « Château fort » ET aux grandes
+   constructions du mode Démolition.
+   Toutes les cotes sont calculées pour que RIEN ne se chevauche au
+   démarrage : deux collisionneurs qui s'interpénètrent à la première
+   image se repoussent violemment et font exploser la scène.
+     - courtines avant/arrière : briques posées selon X, en z = ±mz
+     - courtines latérales     : briques tournées, en x = ±mx, plus
+                                 courtes pour se glisser entre les deux
+                                 premières (d'où le petit décrochement
+                                 aux angles, comblé par les tours)
+     - tours d'angle : hors de l'emprise des courtines (offset `T`)
+   ------------------------------------------------------------------ */
+const CASTLE_CFG = [
+  {nom:"Donjon",     cols:2, len:1, rows:4, mz:0.74, mx:0.75, tour:4, dj:3, dS:"petit", dOff:0.22, mer:2, tnt:0, n:57},
+  {nom:"Forteresse", cols:3, len:2, rows:4, mz:1.21, mx:1.15, tour:5, dj:2, dS:"cube",  dOff:0.36, mer:2, tnt:1, n:73},
+  {nom:"Citadelle",  cols:3, len:2, rows:5, mz:1.21, mx:1.15, tour:6, dj:3, dS:"cube",  dOff:0.36, mer:3, tnt:1, n:93}
+];
+function castleShape(out, size, cx, cz, mur, bois){
+  const cfg = CASTLE_CFG[size] || CASTLE_CFG[0];
+  const B = SIZES.brique, P = SIZES.petit, DS = SIZES[cfg.dS];
+  mur = mur || "pierre"; bois = bois || "bois";
+  const pas = B[0] + 0.02;
+  const xs = [], zs = [];
+  for(let i=0;i<cfg.cols;i++) xs.push(cx + (i-(cfg.cols-1)/2)*pas);
+  for(let i=0;i<cfg.len;i++)  zs.push(cz + (i-(cfg.len-1)/2)*pas);
+
+  /* les quatre courtines */
+  for(let r=0;r<cfg.rows;r++){
+    const y = PODIUM_TOP + B[1]/2 + r*(B[1]+0.004);
+    for(const s of [-1,1]){
+      for(const x of xs) out.push(D(mur,"brique", x, y, cz + s*cfg.mz, 0));
+      for(const z of zs) out.push(D(mur,"brique", cx + s*cfg.mx, y, z, Math.PI/2));
+    }
+  }
+  const hautMur = PODIUM_TOP + cfg.rows*(B[1]+0.004);
+
+  /* créneaux sur les courtines avant/arrière */
+  const mer = xs.length===cfg.mer ? xs : [xs[0], xs[xs.length-1]];
+  for(const s of [-1,1])
+    for(const x of mer) out.push(D(bois,"petit", x, hautMur + P[1]/2, cz + s*cfg.mz, 0));
+
+  /* tours d'angle — l'une d'elles sert de poudrière */
+  const T = (cfg.cols-1)*pas/2 + B[0]/2 + P[0]/2 + 0.03;
+  let coin = 0;
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    for(let i=0;i<cfg.tour;i++){
+      const poudre = cfg.tnt && coin===0 && i===1;
+      out.push(D(poudre?"tnt":mur, "petit", cx + sx*T, PODIUM_TOP + P[1]/2 + i*(P[1]+0.004), cz + sz*T, 0));
+    }
+    coin++;
+  }
+
+  /* le donjon, au centre, et le trésor à son sommet */
+  let y = PODIUM_TOP;
+  for(let i=0;i<cfg.dj;i++){
+    for(const sx of [-1,1]) for(const sz of [-1,1])
+      out.push(D(bois, cfg.dS, cx + sx*cfg.dOff, y + DS[1]/2, cz + sz*cfg.dOff, 0));
+    y += DS[1]+0.004;
+  }
+  out.push(D("joyau","petit", cx, y + P[1]/2, cz, 0.4));
+  return out;
 }
 
 const STRUCTS = [
@@ -1221,6 +1351,72 @@ const STRUCTS = [
       o.push(D("tnt","petit",0,y+SIZES.petit[1]/2,0));
       return o;
     }
+  },
+
+  /* ---- les grandes constructions : 60 à 100 blocs ----
+     Le solveur est assoupli pour elles (voir tunePhysics) : sur un tas de
+     100 blocs, deux millimètres de tassement ne se voient pas, alors que la
+     précision exigée par la tour de Jenga coûterait la moitié des images. */
+  {
+    name:"La grande muraille", desc:"⚑ 60 blocs. Trois murailles à raser. Prends ton élan.",
+    balls:9, goal:{type:"score", n:520}, par:[6,8],
+    build(){
+      const o=[];
+      wall(o,"pierre",4,5,-1.35);
+      wall(o,"bois",  4,5, 0);
+      wall(o,"pierre",4,5, 1.35);
+      return o;                                    /* 60 */
+    }
+  },
+  {
+    name:"Le fort de bois", desc:"⚑ 57 blocs. Un vrai petit château : décroche le trésor du donjon.",
+    balls:8, goal:{type:"joyaux"}, par:[5,7],
+    build(){ return castleShape([], 0, 0, 0, "bois", "bois"); }
+  },
+  {
+    name:"La ziggourat", desc:"⚑ 79 blocs. Quatre terrasses, quatre joyaux au sommet.",
+    balls:9, goal:{type:"joyaux"}, par:[6,8],
+    build(){
+      const o=[], d=SIZES.petit, pas=d[0]+0.01;
+      let y = PODIUM_TOP;
+      [5,5,4,3].forEach((n,r)=>{
+        for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+          const bord = (i===0||j===0||i===n-1||j===n-1);
+          o.push(D(r===0?"pierre":(bord?"bois":"verre"), "petit",
+            (i-(n-1)/2)*pas, y+d[1]/2, (j-(n-1)/2)*pas));
+        }
+        y += d[1]+0.004;
+      });
+      for(const [x,z] of [[-0.22,-0.22],[0.22,-0.22],[-0.22,0.22],[0.22,0.22]])
+        o.push(D("joyau","petit", x, y+d[1]/2, z, 0.3));
+      return o;                                    /* 25+25+16+9 + 4 = 79 */
+    }
+  },
+  {
+    name:"La citadelle", desc:"⚑ 93 blocs de pierre, une poudrière dans une tour. Le gros morceau.",
+    balls:12, goal:{type:"joyaux"}, par:[8,10],
+    build(){ return castleShape([], 2, 0, 0, "pierre", "bois"); }
+  },
+  {
+    name:"Cent blocs", desc:"⚑ 100 blocs, une caisse de TNT au cœur et un joyau au sommet. Bon courage.",
+    balls:14, goal:{type:"score", n:1150}, par:[8,11],
+    build(){
+      const o=[], d=SIZES.petit, pas=d[0]+0.01;
+      let y = PODIUM_TOP;
+      [[5,"pierre"],[5,"pierre"],[4,"bois"],[4,"bois"],[3,"metal"],[3,"bois"]].forEach(([n,t],r)=>{
+        for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+          /* une seule caisse de TNT, bien enfouie : deux suffiraient à
+             pulvériser la tour d'un seul boulet et le niveau n'aurait plus
+             aucun intérêt */
+          const coeur = (r===2 && i===1 && j===1);
+          o.push(D(coeur ? "tnt" : t, "petit",
+            (i-(n-1)/2)*pas, y+d[1]/2, (j-(n-1)/2)*pas));
+        }
+        y += d[1]+0.004;
+      });
+      o.push(D("joyau","petit", 0, y+d[1]/2, 0, 0.5));
+      return o;                                    /* 25+25+16+16+9+9 = 100 */
+    }
   }
 ];
 
@@ -1232,6 +1428,105 @@ function structDescriptors(idx){
     i:id++, t:r.t, v:(id*3)%WOOD_TINTS.length, d:r.d.map(R3),
     p:r.p.map(R3), q:r.q, tw:0
   }));
+}
+
+/* ============================================================
+   PARTIE 8bis — MODE CHÂTEAU FORT
+   ------------------------------------------------------------
+   Chaque joueur possède un château posé sur son propre socle,
+   disposés en cercle autour de la table. À son tour, on choisit
+   la cible puis on tire : chaque bloc arraché rapporte ses points
+   à l'attaquant et les fait perdre au propriétaire. Le trésor du
+   donjon fait tomber tout le château avec lui.
+   ============================================================ */
+const CASTLE_BASE = 2.0;     /* demi-côté du socle d'un château */
+const CASTLE_BONUS = 150;    /* prime pour avoir rasé un château */
+const CASTLE_KO = 0.72;      /* part de blocs détruits qui fait tomber le château */
+const CASTLE_HIT = 0.6;      /* déplacement (m) à partir duquel un bloc est « détruit » */
+
+function castlePositions(n){
+  const R = n<=2 ? 3.9 : (n===3 ? 4.6 : 4.8);
+  const out = [];
+  for(let k=0;k<n;k++){
+    const a = -Math.PI/2 + k*2*Math.PI/n;
+    out.push(new THREE.Vector3(R3(R*Math.cos(a)), 0, R3(R*Math.sin(a))));
+  }
+  return out;
+}
+function clearCastleBases(){
+  /* la géométrie vient du cache partagé, mais chaque socle a SON matériau
+     (teinté à la couleur du joueur) : il faut le libérer à la main */
+  (G.baseMeshes||[]).forEach(m=>{ scene.remove(m); if(m.material) m.material.dispose(); });
+  G.baseMeshes = [];
+  (G.castles||[]).forEach(c=>{
+    if(c.coll && HAS_PHYS()){ try{ world.removeCollider(c.coll, false); }catch(e){} }
+    c.coll = null;
+  });
+  G.castles = [];
+}
+/* un socle par joueur, teinté à sa couleur pour qu'on sache à qui l'on tire */
+function setupCastles(){
+  clearCastleBases();
+  const pos = castlePositions(G.players.length);
+  const pierre = new THREE.Color(0xb9b2a6);
+  G.castles = pos.map((p,k)=>{
+    const mat = new THREE.MeshStandardMaterial({map:stoneTex, roughness:0.9});
+    mat.color.set(G.players[k] ? G.players[k].color : "#b9b2a6").lerp(pierre, 0.5);
+    const mesh = new THREE.Mesh(roundedBox(CASTLE_BASE*2, PODIUM_TOP, CASTLE_BASE*2, 0.06, 2), mat);
+    mesh.position.set(p.x, PODIUM_TOP/2, p.z);
+    mesh.receiveShadow = true; mesh.castShadow = true;
+    scene.add(mesh);
+    G.baseMeshes.push(mesh);
+    const c = {owner:k, pos:p, mesh, coll:null, blocks:[], gem:null, hp:1};
+    if(HAS_PHYS()){
+      c.coll = world.createCollider(
+        RAPIER.ColliderDesc.cuboid(CASTLE_BASE, PODIUM_TOP/2, CASTLE_BASE)
+          .setTranslation(p.x, PODIUM_TOP/2, p.z).setFriction(0.8));
+    }
+    return c;
+  });
+}
+function castleDescriptors(){
+  const list = [];
+  let id = 1;
+  G.castles.forEach((c,k)=>{
+    castleShape([], G.castleSize, c.pos.x, c.pos.z).forEach(r=>{
+      list.push({i:id++, t:r.t, v:(id*3)%WOOD_TINTS.length, d:r.d.map(R3),
+        p:r.p.map(R3), q:r.q, tw:0, ow:k});
+    });
+  });
+  return list;
+}
+/* rattache les blocs fraîchement créés à leur château */
+function linkCastles(){
+  G.castles.forEach(c=>{ c.blocks = []; c.gem = null; c.hp = 1; });
+  for(const b of G.blocks){
+    const c = G.castles[b.own];
+    if(!c) continue;
+    c.blocks.push(b);
+    if(b.def.gem) c.gem = b;
+  }
+}
+const castleAlive = k => !!G.castles[k] && !!G.players[k] && !G.players[k].out;
+function pickDefaultTarget(){
+  const n = G.players.length;
+  for(let i=1;i<=n;i++){
+    const k = (G.cur+i)%n;
+    if(k!==G.cur && castleAlive(k)){ G.target = k; return; }
+  }
+  G.target = (G.cur+1)%Math.max(1,n);
+}
+function setTarget(k){
+  if(G.mode!=="chateau" || k===G.cur || !castleAlive(k)) return;
+  if(NET.mode==="guest"){
+    G.target = k; camToCastle(k); updateHud();     /* on suit tout de suite, l'hôte confirmera */
+    netSend({t:"tgt", k});
+    return;
+  }
+  G.target = k;
+  camToCastle(k);
+  netPhase();
+  updateHud();
 }
 
 /* ---------- PARTIE 9 : effets visuels ---------- */
@@ -1280,12 +1575,31 @@ const CAM = {
   minD:1.8, maxD:18, shake:0
 };
 function camPreset(mode){
-  if(mode==="demo"){
+  if(mode==="chateau" && G.castles.length){
+    camToCastle(G.target);
+  } else if(mode==="chateau"){
+    CAM.tTgt.set(0, PODIUM_TOP+1.4, 0); CAM.tDist = 13; CAM.tPhi = 1.18; CAM.tTh = 0.6;
+  } else if(mode==="demo"){
     CAM.tTgt.set(0, PODIUM_TOP+1.1, 0); CAM.tDist = 10.5; CAM.tPhi = 1.22; CAM.tTh = 0.62;
   } else {
     CAM.tTgt.set(0, TOWER_H*0.46, 0); CAM.tDist = 4.9; CAM.tPhi = 1.14; CAM.tTh = 0.85;
   }
   CAM.tgt.copy(CAM.tTgt); CAM.dist = CAM.tDist; CAM.phi = CAM.tPhi; CAM.th = CAM.tTh;
+}
+/* la caméra se pose derrière NOTRE château et regarde celui qu'on vise :
+   les boulets passent ainsi par-dessus nos propres murs */
+function camToCastle(k){
+  const c = G.castles[k];
+  if(!c) return;
+  const me = G.castles[G.cur];
+  CAM.tTgt.set(c.pos.x, PODIUM_TOP+1.1, c.pos.z);
+  if(me && me!==c){
+    /* assez haut et assez loin pour que nos propres tours ne mangent pas
+       le bas de l'écran : on tire par-dessus nos créneaux */
+    CAM.tDist = clamp(me.pos.distanceTo(c.pos) + 3.2, CAM.minD, CAM.maxD);
+    CAM.tTh = Math.atan2(me.pos.x-c.pos.x, me.pos.z-c.pos.z);
+  } else CAM.tDist = clamp(CAM.tDist, 7, CAM.maxD);
+  CAM.tPhi = 1.02;
 }
 function camStep(dt){
   const k = 1 - Math.exp(-dt*11);
@@ -1338,7 +1652,7 @@ function pickBlock(cx,cy){
 }
 function pickAim(cx,cy){
   setRay(cx,cy);
-  const meshes = [podiumMesh, tableMesh];
+  const meshes = [podiumMesh, tableMesh].concat(G.baseMeshes||[]);
   for(const b of G.blocks) if(b.alive && b.mesh) meshes.push(b.mesh);
   const hits = raycaster.intersectObjects(meshes, false);
   if(!hits.length) return null;
@@ -1520,6 +1834,26 @@ const PULL = HOLD;              /* ancien nom, utilisé par la jauge et l'IA */
 const HOLD_W = 34, HOLD_FMAX = 9;     /* pulsation (rad/s) ; plafond en « poids de bloc » */
 const HOLD_LEAD = 0.28;               /* avance max de la main sur le bloc */
 
+/* Le bloc qu'on tient devient TRÈS glissant. C'est le frottement de ses deux
+   voisins qui « colle » un bloc de Jenga en place ; en le supprimant sur le
+   seul bloc tenu, la main arrive à le faire coulisser sans avoir à forcer —
+   donc sans emmener la tour. Le plafond de force (HOLD_FMAX) reste, lui,
+   inchangé : un bloc réellement porteur ne vient toujours pas.
+   Règle de combinaison « Min » indispensable : par défaut Rapier fait la
+   MOYENNE des deux coefficients, on n'y gagnerait que la moitié. */
+const HOLD_FRIC = 0.015;
+function setHeldFriction(b, glissant){
+  if(!b || !b.alive || !b.body || !b.coll || !HAS_PHYS()) return;
+  try{
+    b.coll.setFriction(glissant ? HOLD_FRIC : b.def.fric);
+    if(RAPIER.CoefficientCombineRule){
+      b.coll.setFrictionCombineRule(glissant
+        ? RAPIER.CoefficientCombineRule.Min
+        : RAPIER.CoefficientCombineRule.Average);
+    }
+  }catch(e){}
+}
+
 function startGrab(id, dist){
   if(NET.mode==="guest"){
     /* l'invité pilote sa main avec SA caméra : sans cette distance de saisie
@@ -1559,6 +1893,7 @@ function hostStartGrab(id, dist){
     b.body.setLinearDamping(1.6);
     b.body.setAngularDamping(6);
     b.body.wakeUp();
+    setHeldFriction(b, true);
   }
   sfx("tap", 0.5);
   netPhase();
@@ -1692,6 +2027,7 @@ function releaseMoved(){
       b.body.setLinearDamping(0.12);
       b.body.setAngularDamping(0.22);
     }catch(e){}
+    setHeldFriction(b, false);    /* il redevient un bloc normal, qui accroche */
   }
   G.moved = null;
 }
@@ -1884,7 +2220,9 @@ function watchSpecials(dt){
 function scoreBlock(b){
   if(b.scored) return;
   b.scored = true;
-  if(G.mode!=="demo" || G.smash) return;
+  if(G.smash) return;
+  if(G.mode==="chateau"){ scoreCastleBlock(b); return; }
+  if(G.mode!=="demo") return;
   const p = G.players[G.cur]; if(!p) return;
   p.score = (p.score||0) + b.def.pts;
   if(b.def.bad){
@@ -1895,19 +2233,69 @@ function scoreBlock(b){
     sfx("ding", 0.9);
   }
 }
-/* un bloc a-t-il quitté le socle ? */
+/* Château fort : le propriétaire perd toujours la valeur du bloc, et
+   l'attaquant l'empoche — sauf s'il vient de démolir son propre château,
+   auquel cas il ne perd qu'une fois. */
+function scoreCastleBlock(b){
+  const own = G.players[b.own];
+  const att = G.players[G.cur];
+  const pts = Math.abs(b.def.pts);
+  if(own) own.score = (own.score||0) - pts;
+  if(att && att!==own) att.score = (att.score||0) + pts;
+  if(b.def.gem){
+    sfx("ding", 0.9);
+    if(att && att!==own) addLog(`💎 ${esc(att.name)} emporte le trésor de ${esc(own?own.name:"?")} !`);
+    else addLog(`💎 ${esc(own?own.name:"?")} fait tomber son propre trésor…`);
+  }
+}
+/* un bloc a-t-il quitté le socle ? (château : ou simplement été arraché) */
 function checkFallen(){
   let any = false;
   for(const b of G.blocks){
     if(!b.alive || b.fallen) continue;
-    const y = b.mesh.position.y;
-    const off = Math.abs(b.mesh.position.x)>2.25 || Math.abs(b.mesh.position.z)>2.25;
-    if(y < PODIUM_TOP-0.16 || off){
+    const p = b.mesh.position;
+    let ko;
+    if(G.mode==="chateau"){
+      const c = G.castles[b.own];
+      if(!c) continue;
+      ko = p.y < PODIUM_TOP-0.16
+        || Math.abs(p.x-c.pos.x) > CASTLE_BASE+0.2
+        || Math.abs(p.z-c.pos.z) > CASTLE_BASE+0.2
+        || p.distanceToSquared(b.start) > CASTLE_HIT*CASTLE_HIT;
+    } else {
+      ko = p.y < PODIUM_TOP-0.16 || Math.abs(p.x)>2.25 || Math.abs(p.z)>2.25;
+    }
+    if(ko){
       b.fallen = true; any = true;
       scoreBlock(b);
     }
   }
   return any;
+}
+/* un château tombe quand son trésor part ou qu'il est aux trois quarts détruit */
+function checkCastles(){
+  const att = G.players[G.cur];
+  for(const c of G.castles){
+    const own = G.players[c.owner];
+    if(!own || own.out) continue;
+    const tot = c.blocks.length || 1;
+    let down = 0;
+    for(const b of c.blocks) if(!b.alive || b.fallen) down++;
+    c.hp = Math.max(0, 1 - down/tot);
+    /* attention : un château SANS trésor ne doit pas tomber tout seul */
+    const tresor = !!c.gem && (!c.gem.alive || c.gem.fallen);
+    if(!tresor && down < tot*CASTLE_KO) continue;
+    own.out = true;
+    c.hp = 0;
+    sfx("crash", 1); CAM.shake = Math.max(CAM.shake, 0.2);
+    if(att && att!==own){
+      att.score = (att.score||0) + CASTLE_BONUS;
+      addLog(`🏰💥 <b>${esc(att.name)}</b> rase le château de ${esc(own.name)} ! +${CASTLE_BONUS}`);
+      showToast(`🏰💥 Château de ${esc(own.name)} détruit ! +${CASTLE_BONUS}`, 2200);
+    } else {
+      addLog(`🏰💥 ${esc(own.name)} a détruit son propre château…`);
+    }
+  }
 }
 
 /* ---------- PARTIE 16 : déroulé d'une partie ---------- */
@@ -1971,8 +2359,11 @@ function startTurn(){
   snapshotRefs();
   if(G.timer) G.turnEnd = performance.now() + 30000;
   const p = G.players[G.cur];
-  if(G.mode==="demo") G.ballsLeft = p ? (p.balls||0) : 0;
-  camLookAtHeight(G.mode==="tour" ? Math.max(1.0, towerHeight()*0.55) : PODIUM_TOP+1.1);
+  if(G.mode!=="tour") G.ballsLeft = p ? (p.balls||0) : 0;
+  if(G.mode==="chateau"){
+    if(G.target===G.cur || !castleAlive(G.target)) pickDefaultTarget();
+    camToCastle(G.target);
+  } else camLookAtHeight(G.mode==="tour" ? Math.max(1.0, towerHeight()*0.55) : PODIUM_TOP+1.1);
   netPhase(true);
   updateHud();
   if(p && p.bot) aiStart();
@@ -2057,6 +2448,24 @@ function resolveDemo(){
   G.round++;
   startTurn();
 }
+/* fin de tour en mode Château fort */
+function resolveChateau(){
+  checkFallen();
+  checkCastles();
+  const p = G.players[G.cur];
+  const debout = G.castles.filter(c=>castleAlive(c.owner));
+  if(debout.length<=1){ endGame("lastCastle"); return; }
+  const reste = G.players.reduce((s,x)=>s + (x.out?0:(x.balls||0)), 0);
+  if(reste<=0){ endGame("noballs"); return; }
+  if(p) addLog(`🎯 ${esc(p.name)} : ${p.score||0} pts (${p.balls||0} boulet${(p.balls||0)>1?"s":""})`);
+  /* on saute les éliminés et ceux qui n'ont plus de munitions */
+  let n = 0;
+  do{ G.cur = (G.cur+1)%G.players.length; n++; }
+  while((G.players[G.cur].out || (G.players[G.cur].balls||0)<=0) && n<=G.players.length);
+  G.round++;
+  pickDefaultTarget();
+  startTurn();
+}
 function goalReached(g){
   if(g.type==="tout") return G.blocks.every(b=>!b.alive || b.fallen);
   if(g.type==="joyaux") return G.blocks.every(b=>b.type!=="joyau" || !b.alive || b.fallen);
@@ -2073,6 +2482,8 @@ function endGame(reason){
       if(a.crashed!==b.crashed) return a.crashed?1:-1;
       return (b.moves||0)-(a.moves||0);
     }
+    /* château fort : un château rasé passe derrière, quel que soit le score */
+    if(G.mode==="chateau" && !!a.out !== !!b.out) return a.out?1:-1;
     return (b.score||0)-(a.score||0);
   });
   let title = "Partie terminée", sub = "";
@@ -2090,6 +2501,16 @@ function endGame(reason){
       const best = Math.max(G.soloBest, G.players[0].moves||0);
       if(best>G.soloBest){ G.soloBest = best; try{ localStorage.setItem("jengaSoloBest", String(best)); }catch(e){} }
       sub += ` Record personnel : <b>${G.soloBest}</b> blocs.`;
+    }
+  } else if(G.mode==="chateau"){
+    const survivant = G.players.filter(p=>!p.out);
+    if(reason==="lastCastle" && survivant.length===1){
+      title = "🏰 Dernier château debout !";
+      sub = `<b>${esc(survivant[0].name)}</b> est le seul à avoir encore des murs — ` +
+            `${rank[0].score||0} points pour ${esc(rank[0].name)}.`;
+    } else {
+      title = "🎯 Plus de munitions";
+      sub = `<b>${esc(rank[0].name)}</b> l'emporte avec ${rank[0].score||0} points.`;
     }
   } else {
     const st = STRUCTS[G.level];
@@ -2117,8 +2538,10 @@ function endGame(reason){
     const v = G.mode==="tour" ? `${p.moves||0} bloc${(p.moves||0)>1?"s":""}` : `${p.score||0} pts`;
     return `<div class="${i===0?"win":""}"><span class="rk">${i===0?"🥇":(i===1?"🥈":(i===2?"🥉":i+1))}</span>`+
       `<span class="dot" style="background:${p.color}"></span>${esc(p.name)}${p.bot?" 🤖":""}`+
-      `${p.crashed?' <span style="color:#ff7a6e">💥</span>':""}<span class="rp">${v}</span></div>`;
+      `${(p.crashed||(G.mode==="chateau"&&p.out))?' <span style="color:#ff7a6e">💥</span>':""}<span class="rp">${v}</span></div>`;
   }).join("");
+  el("btnSmash").textContent = G.mode==="tour" ? "💥 Faire exploser la tour"
+    : (G.mode==="chateau" ? "💥 Raser les châteaux" : "💥 Tout faire sauter");
   el("btnSmash").style.display = (NET.mode==="guest") ? "none" : "";
   el("btnAgain").style.display = (NET.mode==="guest") ? "none" : "";
   netOver();
@@ -2211,6 +2634,36 @@ function aiAimPoint(lvl){
   const noise = lvl>=3 ? 0.12 : (lvl===2 ? 0.34 : 0.75);
   return target.mesh.position.clone().add(new THREE.Vector3(rnd(-noise,noise), rnd(-noise,noise)*0.6, rnd(-noise,noise)));
 }
+/* --- Château fort : quel château, et où taper dedans ? --- */
+function aiCastleAim(lvl){
+  const cibles = G.castles.filter(c=>castleAlive(c.owner) && c.owner!==G.cur);
+  if(!cibles.length) return null;
+  /* un bon robot achève le château le plus abîmé ; un débutant tire au hasard */
+  cibles.sort((a,b)=>(a.hp==null?1:a.hp)-(b.hp==null?1:b.hp));
+  const c = lvl>=2 ? cibles[0] : pick(cibles);
+  if(c.owner!==G.target){ G.target = c.owner; camToCastle(G.target); netPhase(); }
+  const alive = c.blocks.filter(b=>b.alive && !b.fallen);
+  if(!alive.length) return null;
+  let t = null;
+  if(lvl>=2){
+    const tnt = alive.filter(b=>b.def.tnt);       /* la poudrière : le meilleur coup */
+    if(tnt.length) t = tnt[0];
+  }
+  if(!t && lvl>=3 && c.gem && c.gem.alive && !c.gem.fallen){
+    /* on tape le donjon juste sous le trésor pour le faire basculer */
+    t = alive.filter(b=>b!==c.gem && b.mesh.position.y < c.gem.mesh.position.y-0.1)
+             .sort((a,b)=>b.mesh.position.y-a.mesh.position.y)[0] || c.gem;
+  }
+  if(!t){
+    /* sinon : les fondations, du côté d'où l'on tire */
+    const vers = camera.position;
+    t = alive.slice().sort((a,b)=>
+      (a.mesh.position.y - b.mesh.position.y) ||
+      (a.mesh.position.distanceToSquared(vers) - b.mesh.position.distanceToSquared(vers)))[0];
+  }
+  const noise = lvl>=3 ? 0.18 : (lvl===2 ? 0.45 : 0.95);
+  return t.mesh.position.clone().add(new THREE.Vector3(rnd(-noise,noise), rnd(-noise,noise)*0.6, rnd(-noise,noise)));
+}
 function aiStep(dt){
   if(!AI.on || NET.mode==="guest") return;
   const p = G.players[G.cur];
@@ -2218,20 +2671,22 @@ function aiStep(dt){
   AI.t += dt;
   const lvl = p.bot;
 
-  if(G.mode==="demo"){
+  if(G.mode!=="tour"){
     if(G.phase!=="aim"){ if(G.phase!=="fly") AI.on = false; return; }
     if(AI.step===0){
       if(AI.t < 0.7) return;
-      AI.tgt = aiAimPoint(lvl);
+      AI.tgt = G.mode==="chateau" ? aiCastleAim(lvl) : aiAimPoint(lvl);
       AI.pw = lvl>=3 ? rnd(0.75,1) : (lvl===2 ? rnd(0.55,0.9) : rnd(0.3,0.85));
       if(!AI.tgt){ AI.on = false; return; }
-      /* on tourne un peu la caméra vers la cible pour que ce soit lisible */
-      CAM.tTh = Math.atan2(AI.tgt.x - CAM.tgt.x, AI.tgt.z - CAM.tgt.z) + Math.PI + rnd(-0.5,0.5);
+      /* on tourne un peu la caméra vers la cible pour que ce soit lisible
+         (en château fort elle est déjà cadrée sur le château visé) */
+      if(G.mode==="demo")
+        CAM.tTh = Math.atan2(AI.tgt.x - CAM.tgt.x, AI.tgt.z - CAM.tgt.z) + Math.PI + rnd(-0.5,0.5);
       AI.step = 1; AI.t = 0;
       if(G.traj) drawTraj(AI.tgt, AI.pw);
       return;
     }
-    if(AI.step===1 && AI.t > 1.1){
+    if(AI.step===1 && AI.t > (G.mode==="chateau" ? 1.5 : 1.1)){
       trajLine.visible = false; aimDot.visible = false;
       hostThrow(AI.tgt, AI.pw, camera.position.clone());
       AI.on = false;
@@ -2347,8 +2802,18 @@ function buildActionBar(){
       if(IS_TOUCH) h += `<button class="btn ghost" data-a="near">⤡</button><button class="btn ghost" data-a="far">⤢</button>`;
       if(HOLD.clear) h += `<button class="btn" data-a="drop">${G.discard?"🗑️ Jeter le bloc":"✅ Lâcher le bloc"}</button>`;
     }
-  } else if(G.mode==="demo" && mine && G.phase==="aim"){
-    h = `<div style="display:flex;align-items:center;gap:9px;background:rgba(20,13,9,.74);border:1px solid rgba(255,220,180,.16);border-radius:12px;padding:7px 13px;pointer-events:auto">
+  } else if(G.mode!=="tour" && mine && G.phase==="aim"){
+    /* choix de la cible : dès qu'il y a plus d'un adversaire encore debout */
+    if(G.mode==="chateau"){
+      const cibles = G.players.map((p,k)=>k).filter(k=>k!==G.cur && castleAlive(k));
+      if(cibles.length>1){
+        h += `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;width:100%;margin-bottom:2px">`+
+          cibles.map(k=>`<button class="btn small ${k===G.target?"":"ghost"}" data-tg="${k}">`+
+            `<span class="dot" style="background:${G.players[k].color};margin-right:5px"></span>`+
+            `${k===G.target?"🎯 ":""}${esc(G.players[k].name)}</button>`).join("")+`</div>`;
+      }
+    }
+    h += `<div style="display:flex;align-items:center;gap:9px;background:rgba(20,13,9,.74);border:1px solid rgba(255,220,180,.16);border-radius:12px;padding:7px 13px;pointer-events:auto">
            <span style="font-size:12px;color:#c3ad95">Puissance</span>
            <input type="range" id="inpPower" min="10" max="100" step="1" value="${Math.round(powerValue()*100)}" style="width:110px;accent-color:#e8913c">
            <b id="pwLbl" style="font-size:12.5px;color:#ffc46b;width:36px;text-align:right">${Math.round(powerValue()*100)}%</b>
@@ -2359,6 +2824,7 @@ function buildActionBar(){
     b.classList.add("clickable");
     b.onclick = ()=>{
       const a = b.dataset.a;
+      if(b.dataset.tg!=null){ setTarget(parseInt(b.dataset.tg,10)); return; }
       if(a==="cancel") cancelPull();
       else if(a==="rot") rotateHeld();
       else if(a==="near") holdDepth(0.9);
@@ -2371,9 +2837,14 @@ function buildActionBar(){
   if(rng){
     rng.oninput = ()=>{ G.power = rng.value/100; el("pwLbl").textContent = rng.value+"%"; };
   }
+  /* la barre d'action peut faire deux lignes (choix de la cible, boutons qui
+     passent à la ligne sur téléphone) : on remonte le bandeau d'aide d'autant,
+     sinon il passe dessous. */
+  const hh = bar.offsetHeight || 0;
+  el("msgBar").style.bottom = `calc(${Math.max(56, hh+26)}px + env(safe-area-inset-bottom))`;
 }
 function updateHud(){
-  const key = [G.phase, G.mode, localTurn(), G.smash, G.started, HOLD.clear].join("|");
+  const key = [G.phase, G.mode, localTurn(), G.smash, G.started, HOLD.clear, G.target, G.cur].join("|");
   if(key!==hudKey){ hudKey = key; buildActionBar(); }
 
   const p = G.players[G.cur];
@@ -2400,7 +2871,19 @@ function updateHud(){
   }).join("");
 
   const gb = el("goalBox");
-  if(G.mode==="demo" && !G.smash && STRUCTS[G.level]){
+  if(G.mode==="chateau" && !G.smash && G.castles.length){
+    gb.innerHTML = `<div style="color:#ffdfae;font-weight:800;margin-bottom:3px">🏰 Les châteaux</div>`+
+      G.castles.map((c,k)=>{
+        const x = G.players[k]; if(!x) return "";
+        const pc = Math.round(clamp(c.hp==null?1:c.hp,0,1)*100);
+        const col = pc>60 ? "#7ed957" : (pc>30 ? "#ffc46b" : "#ff7a6e");
+        return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;${x.out?"opacity:.45":""}">`+
+          `<span class="dot" style="background:${x.color}"></span>`+
+          `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}${k===G.target&&!x.out?" 🎯":""}</span>`+
+          `<b style="color:${x.out?"#ff7a6e":col}">${x.out?"💥":pc+"%"}</b></div>`;
+      }).join("");
+    gb.style.display = "block";
+  } else if(G.mode==="demo" && !G.smash && STRUCTS[G.level]){
     const st = STRUCTS[G.level], g = st.goal;
     let txt;
     if(g.type==="tout"){
@@ -2420,7 +2903,7 @@ function updateHud(){
   let msg = "";
   if(G.smash) msg = "💥 Tapez n'importe où pour tirer — maintenez pour taper plus fort";
   else if(!G.started) msg = "";
-  else if(!mine) msg = p ? `⏳ Au tour de ${p.name}…` : "";
+  else if(!mine) msg = p ? `⏳ Au tour de ${esc(p.name)}…` : "";
   else if(G.mode==="tour"){
     if(G.phase==="idle") msg = IS_TOUCH
       ? "Touchez un bloc et tirez-le vers vous (les rouges sont interdits)"
@@ -2430,12 +2913,17 @@ function updateHud(){
       : (IS_TOUCH ? "Dégagez le bloc… doucement (2 doigts = caméra)"
                   : "Dégagez le bloc — molette : rapprocher/éloigner, clic droit : caméra");
     else if(G.phase==="settle") msg = "😬 La tour vacille…";
+  } else if(G.mode==="chateau"){
+    const cible = G.players[G.target];
+    if(G.phase==="aim") msg = `🏰 Château de <b>${esc(cible?cible.name:"?")}</b> — ` +
+      (IS_TOUCH ? "touchez où tirer (maintenez pour charger)" : "cliquez où tirer, maintenez pour charger");
+    else if(G.phase==="fly") msg = "💨 …";
   } else {
     if(G.phase==="aim") msg = IS_TOUCH ? "Visez et touchez la cible (maintenez pour charger)" : "Cliquez la cible (maintenez pour charger) · glissez pour tourner";
     else if(G.phase==="fly") msg = "💨 …";
   }
   const mb = el("msgBar");
-  mb.textContent = msg; mb.style.display = msg ? "" : "none";
+  mb.innerHTML = msg; mb.style.display = msg ? "" : "none";
 
   /* jauge : résistance du bloc pendant la traction, puissance pendant la charge */
   const g = el("gauge"), gl = el("gaugeLbl");
@@ -2460,6 +2948,8 @@ function readOptions(){
   G.worn = el("optWorn").checked;
   G.timer = el("optTimer").checked;
   G.discard = el("inpRegle").value === "jeter";
+  G.castleSize = parseInt(el("inpCastle").value,10) || 0;
+  G.muns = parseInt(el("inpMuns").value,10) || 10;
   applyQuality();
 }
 function collectPlayers(){
@@ -2516,23 +3006,31 @@ function startGame(descs, fromNet){
   G.log = []; renderLog();
   podiumMesh.visible = (G.mode==="demo");
   if(physPodium) physPodium.setEnabled(G.mode==="demo");
-  scene.fog.near = G.mode==="demo" ? 18 : 14;
+  scene.fog.near = G.mode==="chateau" ? 26 : (G.mode==="demo" ? 18 : 14);
 
-  const list = descs || (G.mode==="tour" ? towerDescriptors() : structDescriptors(G.level));
+  G.players.forEach(p=>{ p.moves = 0; p.crashed = false; p.out = false; if(G.mode==="tour") p.score = 0; });
+  if(G.mode==="chateau") setupCastles();     /* les socles avant les blocs */
+
+  const list = descs || (G.mode==="tour" ? towerDescriptors()
+                        : (G.mode==="chateau" ? castleDescriptors() : structDescriptors(G.level)));
   G.descs = list;
   list.forEach(makeBlock);
   G.nextId = list.length+1;
+  if(G.mode==="chateau") linkCastles();
+  tunePhysics();
 
   if(G.mode==="demo"){
     const st = STRUCTS[G.level];
     G.players.forEach(p=>{ p.balls = st.balls; p.score = 0; });
+  } else if(G.mode==="chateau"){
+    G.players.forEach(p=>{ p.balls = G.muns; p.score = 0; });
   }
-  G.players.forEach(p=>{ p.moves = 0; p.crashed = false; p.out = false; if(G.mode==="tour") p.score = 0; });
 
-  camPreset(G.mode);
   /* le premier joueur est tiré au sort (l'invité, lui, reçoit le tirage
      de l'hôte dans le message de phase) */
   G.cur = fromNet ? 0 : Math.floor(Math.random()*G.players.length);
+  if(G.mode==="chateau") pickDefaultTarget();
+  camPreset(G.mode);
   G.round = 0; G.started = true;
   G.power = 0.6;
   hideScreens(); hideBanner();
@@ -2544,6 +3042,12 @@ function startGame(descs, fromNet){
 }
 async function startLocal(){
   readOptions();
+  /* il faut au moins un adversaire à assiéger */
+  if(G.mode==="chateau" && parseInt(el("inpCount").value,10) < 2){
+    el("inpCount").value = "2"; buildPlayerRows(); majChateau();
+    showToast("🏰 Le mode Château fort demande au moins 2 joueurs", 2000);
+    return;
+  }
   if(!await loadPhysics()) return;
   G.players = collectPlayers();
   if(!G.players.length) return;
@@ -2569,8 +3073,14 @@ function startSmash(){
   G.smash = true; G.started = false; G.phase = "aim";
   G.power = 0.85;
   hideScreens(); hideBanner();
-  camPreset(G.mode==="tour" ? "tour" : "demo");
-  CAM.tDist = Math.max(CAM.tDist, 7.5);
+  if(G.mode==="chateau"){
+    /* on recule pour avoir tous les châteaux dans le viseur */
+    CAM.tTgt.set(0, PODIUM_TOP+1.2, 0); CAM.tDist = 15; CAM.tPhi = 1.15; CAM.tTh = 0.6;
+    CAM.tgt.copy(CAM.tTgt); CAM.dist = CAM.tDist; CAM.phi = CAM.tPhi; CAM.th = CAM.tTh;
+  } else {
+    camPreset(G.mode==="tour" ? "tour" : "demo");
+    CAM.tDist = Math.max(CAM.tDist, 7.5);
+  }
   addLog("💥 Démolition libre !");
   netPhase(true);
   updateHud();
@@ -2663,7 +3173,9 @@ function updateGame(dt){
   } else if(G.phase==="fly"){
     G.settleT += dt;
     checkFallen();
-    if((G.settleT>1.3 && allAsleep() && !G.balls.length) || G.settleT>7.5) resolveDemo();
+    if((G.settleT>1.3 && allAsleep() && !G.balls.length) || G.settleT>7.5){
+      if(G.mode==="chateau") resolveChateau(); else resolveDemo();
+    }
   }
 
   if(G.timer && G.started && !G.smash && G.players[G.cur] && !G.players[G.cur].bot && performance.now()>G.turnEnd){
@@ -2699,7 +3211,9 @@ function tick(dt){
   hudT += dt;
   if(hudT > 0.12){ hudT = 0; if(G.started||G.smash) updateHud(); }
   snapT += dt;
-  if(snapT > 0.05){ snapT = 0; netSendSnap(); }
+  /* un effondrement de château réveille 100 blocs d'un coup : à 20 Hz le
+     canal WebRTC sature. On espace les instantanés sur les grosses scènes. */
+  if(snapT > (G.blocks.length>120 ? 0.09 : 0.05)){ snapT = 0; netSendSnap(); }
 
   if(!document.hidden) renderer.render(scene, camera);
 }
@@ -2782,12 +3296,32 @@ document.querySelectorAll(".mcard").forEach(c=>{
     document.querySelectorAll(".mcard").forEach(x=>x.classList.toggle("sel", x===c));
     el("levelPick").style.display = (G.mode==="demo") ? "" : "none";
     el("reglePick").style.display = (G.mode==="tour") ? "" : "none";
+    el("castlePick").style.display = (G.mode==="chateau") ? "" : "none";
     el("optWorn").parentElement.style.display = (G.mode==="tour") ? "" : "none";
-    el("optTraj").parentElement.style.display = (G.mode==="demo") ? "" : "none";
+    el("optTraj").parentElement.style.display = (G.mode!=="tour") ? "" : "none";
     el("optHelp").parentElement.style.display = (G.mode==="tour") ? "" : "none";
+    /* un château fort tout seul, ça n'a pas de sens : il faut un adversaire */
+    if(G.mode==="chateau" && parseInt(el("inpCount").value,10) < 2){
+      el("inpCount").value = "2"; buildPlayerRows();
+    }
+    majChateau();
   };
 });
-el("inpCount").onchange = buildPlayerRows;
+el("inpCount").onchange = ()=>{ buildPlayerRows(); majChateau(); };
+/* rappelle combien de blocs la partie va faire tourner : au-delà de 250,
+   une machine modeste rame — autant le dire avant de lancer. */
+function majChateau(){
+  const cfg = CASTLE_CFG[parseInt(el("inpCastle").value,10)||0];
+  const n = Math.max(2, parseInt(el("inpCount").value,10)||2);
+  const tot = cfg.n*n;
+  el("castleHint").innerHTML =
+    `${n} joueurs × ${cfg.n} blocs = <b style="color:${tot>260?"#ffb36b":"#ffc46b"}">${tot} blocs</b> à simuler` +
+    (tot>260 ? " — costaud pour un téléphone, passez la qualité en « Basse »." : ".") +
+    `<br>Un bloc arraché = ses points pour l'attaquant, autant en moins pour le propriétaire. ` +
+    `Le trésor 💎 du donjon ou les ¾ du château détruits, et c'est fini pour lui (+${CASTLE_BONUS} à l'assaillant).` +
+    (cfg.tnt ? "<br>⚠️ Une des tours d'angle sert de poudrière…" : "");
+}
+el("inpCastle").onchange = majChateau;
 function majRegle(){
   const jeter = el("inpRegle").value === "jeter";
   el("regleHint").textContent = jeter
@@ -3005,6 +3539,8 @@ function netHostOnData(c, msg){
     const tp = new THREE.Vector3(msg.p[0],msg.p[1],msg.p[2]);
     const cp = msg.o ? new THREE.Vector3(msg.o[0],msg.o[1],msg.o[2]) : null;
     hostThrow(tp, clamp(msg.w,0,1), cp);
+  } else if(msg.t==="tgt" && G.mode==="chateau" && G.phase==="aim"){
+    setTarget(msg.k|0);
   }
 }
 function netHostHandleRejoin(c, name){
@@ -3046,7 +3582,7 @@ function netHostConnLost(c){
 }
 function netStartMsg(){
   return {t:"start", mode:G.mode, lvl:G.level, worn:G.worn?1:0, timer:G.timer?1:0,
-    disc:G.discard?1:0, code:NET.code,
+    disc:G.discard?1:0, code:NET.code, cs:G.castleSize||0, mn:G.muns||10,
     players:G.players.map(p=>({side:p.side, name:p.name, color:p.color, bot:p.bot, balls:p.balls||0})),
     blocks:G.descs||[]};
 }
@@ -3058,6 +3594,7 @@ function netStart(list){
 function phaseMsg(){
   return {t:"ph", ph:G.phase, cur:G.cur, mv:G.moved?G.moved.id:0,
     cl:HOLD.clear?1:0, hd:R3(HOLD.dist), yw:R3(HOLD.yawT), sm:G.smash?1:0, st:G.started?1:0,
+    tg:G.target|0, hp:G.castles.map(c=>Math.round(clamp(c.hp==null?1:c.hp,0,1)*100)),
     P:G.players.map(p=>[p.score||0, p.moves||0, p.balls||0, p.out?1:0, p.crashed?1:0, p.conn===false?0:1])};
 }
 function netPhase(full){
@@ -3210,7 +3747,8 @@ function netGuestOnData(msg){
     G.players = msg.players.map(p=>({name:p.name, color:p.color, bot:p.bot, side:p.side,
       score:0, moves:0, balls:p.balls||0, out:false, crashed:false, conn:true}));
     readOptions();
-    G.discard = !!msg.disc;      /* la règle est celle de l'hôte */
+    G.discard = !!msg.disc;      /* les règles sont celles de l'hôte */
+    G.castleSize = msg.cs||0; G.muns = msg.mn||10;
     startGame(msg.blocks, true);
   } else if(msg.t==="ph"){
     netApplyPhase(msg);
@@ -3230,7 +3768,7 @@ function netGuestOnData(msg){
   }
 }
 function netApplyPhase(m){
-  const wasPhase = G.phase;
+  const wasPhase = G.phase, wasCur = G.cur;
   const mine = G.players[m.cur] && G.players[m.cur].side===NET.mySide;
   G.cur = m.cur;
   G.started = !!m.st; G.smash = !!m.sm;
@@ -3244,6 +3782,14 @@ function netApplyPhase(m){
     const p = G.players[i]; if(!p) return;
     p.score = a[0]; p.moves = a[1]; p.balls = a[2]; p.out = !!a[3]; p.crashed = !!a[4]; p.conn = !!a[5];
   });
+  (m.hp||[]).forEach((v,i)=>{ if(G.castles[i]) G.castles[i].hp = v/100; });
+  if(G.mode==="chateau"){
+    /* la caméra se recadre quand la cible change… mais aussi quand c'est un
+       autre joueur qui prend la main : elle se pose derrière SON château */
+    const bouge = (m.tg!=null && m.tg!==G.target) || m.cur!==wasCur;
+    if(m.tg!=null) G.target = m.tg;
+    if(bouge) camToCastle(G.target);
+  }
   if(G.phase==="idle" && wasPhase!=="idle"){
     G.moved = null; HOLD.clear = false;
     camLookAtHeight(G.mode==="tour" ? Math.max(1.0, towerHeight()*0.55) : PODIUM_TOP+1.1);
@@ -3328,7 +3874,9 @@ function init(){
   try{ G.soloBest = parseInt(localStorage.getItem("jengaSoloBest")||"0",10)||0; }catch(e){}
   el("optTraj").parentElement.style.display = "none";
   el("levelPick").style.display = "none";
+  el("castlePick").style.display = "none";
   majRegle();
+  majChateau();
   /* petite tour de démonstration en fond du menu */
   towerDescriptors().forEach(makeBlock);
   camPreset("tour");

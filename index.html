@@ -123,6 +123,25 @@
   #zombiesCard:hover{border-color:#8ee34a;}
   #kartCard{background:linear-gradient(160deg, rgba(226,87,28,.45), rgba(65,217,255,.2));}
   #kartCard:hover{border-color:#ffb03a;}
+  #cartesCard{background:linear-gradient(160deg, rgba(15,92,60,.5), rgba(212,160,23,.18));}
+  #cartesCard:hover{border-color:#4fc98a;}
+
+  /* la carte « jeux de cartes » embarque son propre sélecteur */
+  .card-pick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .card-pick select{
+    flex:1 1 170px;min-width:0;
+    background:rgba(0,0,0,.35);color:#fff;
+    border:1px solid rgba(255,255,255,.28);border-radius:8px;
+    padding:9px 10px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+  }
+  .card-pick select option{background:#162331;color:#fff;}
+  .card-pick .go{
+    background:#4fc98a;color:#06301f;border-radius:8px;padding:9px 16px;
+    font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap;
+    transition:filter .15s ease, transform .1s ease;
+  }
+  .card-pick .go:hover{filter:brightness(1.1);}
+  .card-pick .go:active{transform:scale(.96);}
 
   .section-title{
     width:100%;
@@ -281,6 +300,31 @@
     </div>
     <span class="play-btn">Jouer</span>
   </a>
+
+  <div class="game-card" id="cartesCard">
+    <span class="icon">🃏</span>
+    <h2>Jeux de cartes <span class="badge-new">Nouveau</span></h2>
+    <p>Neuf classiques réunis : le Président, le 8 américain, le Tarot, la Contrée, la Belote (belote et rebelote, dix de der, annonces en option), le Rami, le Bombu (le barbu, avec ses contrats pli · cœur · dame · bombu · marmelade · réussite), le Poker Texas Hold'em et le Menteur. Choisissez votre jeu ci-dessous.</p>
+    <div class="tags">
+      <span class="tag">2-8 joueurs</span>
+      <span class="tag">🌐 En ligne</span>
+      <span class="tag">🤖 IA</span>
+    </div>
+    <div class="card-pick">
+      <select id="cartesSel" aria-label="Choisir un jeu de cartes">
+        <option value="president">👑 Le Président</option>
+        <option value="huit">8️⃣ Le 8 américain</option>
+        <option value="tarot">🔮 Le Tarot</option>
+        <option value="contree">🂡 La Contrée</option>
+        <option value="belote">💛 La Belote</option>
+        <option value="rami">🧩 Le Rami</option>
+        <option value="bombu">🤴 Le Bombu</option>
+        <option value="poker">♠️ Poker Texas Hold'em</option>
+        <option value="menteur">🤥 Le Menteur</option>
+      </select>
+      <a class="go" id="cartesGo" href="cartes.html?jeu=president">Jouer →</a>
+    </div>
+  </div>
 </div>
 
 <div class="section-title">🎮 Jeux vidéo</div>
@@ -313,6 +357,15 @@
 </div>
 
 <footer>Fait maison, jouable à plusieurs depuis n'importe où 🎮</footer>
+
+<script>
+  /* le sélecteur de la carte « jeux de cartes » pointe directement sur le bon jeu */
+  (function(){
+    var sel = document.getElementById("cartesSel"), go = document.getElementById("cartesGo");
+    if(!sel || !go) return;
+    sel.addEventListener("change", function(){ go.href = "cartes.html?jeu=" + sel.value; });
+  })();
+</script>
 
 </body>
 </html>
