@@ -191,6 +191,84 @@
   #actions select,#actions input[type=number]{padding:6px 8px;border-radius:6px;border:1px solid #ccc;font-size:14px;}
   #actions input[type=range]{width:min(220px,42vw);}
 
+  /* ---------- POKER : mises visibles sur le tapis ---------- */
+  .pk-pile{display:inline-flex;align-items:center;vertical-align:middle;}
+  .pk-pile .pk-j{
+    width:15px;height:15px;border-radius:50%;flex-shrink:0;margin-left:-7px;
+    background:
+      radial-gradient(circle, var(--c) 0 54%, transparent 55%),
+      repeating-conic-gradient(rgba(255,255,255,.92) 0 15deg, var(--c) 15deg 30deg);
+    box-shadow:0 1px 3px rgba(0,0,0,.55);
+  }
+  .pk-pile .pk-j:first-child{margin-left:0;}
+  .pk-pile .pk-v{margin-left:7px;font-weight:800;font-size:12.5px;color:#ffe08a;}
+  .pk-pile.gros .pk-j{width:26px;height:26px;margin-left:-12px;}
+  .pk-pile.gros .pk-v{font-size:21px;margin-left:10px;}
+  .pk-pot{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:rgba(0,0,0,.36);border:1px solid rgba(255,214,106,.4);
+    border-radius:14px;padding:7px 20px;transition:transform .18s ease;
+  }
+  .pk-pot.bump{transform:scale(1.1);}
+  .pk-pot .lbl{font-size:10px;letter-spacing:2px;color:#ffd76a;font-weight:800;text-transform:uppercase;}
+  .pk-pot .vide{font-size:21px;font-weight:800;color:#8fb9a4;}
+  .pk-moi{
+    display:flex;align-items:center;gap:7px;justify-content:center;flex-wrap:wrap;
+    background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.15);
+    border-radius:10px;padding:5px 13px;font-size:11.5px;color:#bfe3d0;
+  }
+  .pk-moi b{color:#ffe08a;font-size:13px;}
+  .pk-mise{display:flex;justify-content:center;margin-top:3px;}
+  .pk-act{
+    display:inline-block;font-size:10px;font-weight:800;border-radius:20px;
+    padding:1px 7px;margin-top:3px;background:rgba(255,255,255,.18);color:#eaf7f0;
+  }
+  .pk-act.s{background:#1e7a4f;color:#fff;}
+  .pk-act.r{background:#b3771a;color:#fff;}
+  .pk-act.t{background:#a83232;color:#fff;}
+  .pk-act.c{background:#5b5b5b;color:#fff;}
+  .pk-act.b{background:#2c5f8a;color:#fff;}
+  /* jetons qui volent vers le pot : dans une couche fixe, pour survivre au re-rendu */
+  #fxLayer{position:fixed;inset:0;pointer-events:none;z-index:90;overflow:hidden;}
+  .pk-vol{
+    position:absolute;width:17px;height:17px;border-radius:50%;
+    background:
+      radial-gradient(circle, var(--c) 0 54%, transparent 55%),
+      repeating-conic-gradient(rgba(255,255,255,.92) 0 15deg, var(--c) 15deg 30deg);
+    box-shadow:0 2px 7px rgba(0,0,0,.5);
+    animation:pkVol .58s cubic-bezier(.35,.02,.3,1) forwards;
+  }
+  @keyframes pkVol{
+    0%{transform:translate(0,0) scale(.5);opacity:0;}
+    12%{opacity:1;}
+    55%{transform:translate(calc(var(--dx)*.55), calc(var(--dy)*.55 - 26px)) scale(1.05);}
+    100%{transform:translate(var(--dx), var(--dy)) scale(.8);opacity:.15;}
+  }
+  /* choix du montant de relance — pensé pour le tactile */
+  #actions .pk-wrap{flex:1 1 250px;max-width:380px;display:flex;justify-content:center;}
+  .pk-ctrl{display:flex;flex-direction:column;gap:7px;align-items:stretch;width:100%;}
+  .pk-ctrl .rowa{display:flex;align-items:center;gap:7px;}
+  #actions .pk-ctrl input[type=range]{
+    -webkit-appearance:none;appearance:none;flex:1;width:auto;min-width:80px;
+    height:28px;background:transparent;padding:0;border:none;margin:0;touch-action:none;
+  }
+  .pk-ctrl input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:6px;background:linear-gradient(90deg,#f0d7a5,#b3771a);}
+  .pk-ctrl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-9px;border-radius:50%;background:#fff;border:3px solid #b3771a;box-shadow:0 2px 6px rgba(0,0,0,.35);}
+  .pk-ctrl input[type=range]::-moz-range-track{height:10px;border-radius:6px;background:linear-gradient(90deg,#f0d7a5,#b3771a);}
+  .pk-ctrl input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid #b3771a;}
+  .pk-ctrl .step{
+    width:38px;height:38px;flex-shrink:0;border-radius:10px;border:1px solid #d9c39a;
+    background:#fff6e2;color:#7a4c07;font-size:21px;font-weight:800;line-height:1;cursor:pointer;
+  }
+  .pk-ctrl .step:active{transform:scale(.94);}
+  .pk-quick{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+  .pk-quick button{
+    border:1px solid #d9c39a;background:#fff6e2;color:#7a4c07;border-radius:20px;
+    padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;
+  }
+  .pk-quick button:active{transform:scale(.95);}
+  .pk-ctrl .go{width:100%;padding:11px 12px;font-size:15px;}
+
   #myHandWrap{
     background:var(--panel-bg);border-radius:10px;padding:10px 12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);
   }
@@ -243,7 +321,7 @@
 
   #victory-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;z-index:100;padding:16px;overflow:hidden;}
   #victory-overlay.active{display:flex;}
-  #victory-box{position:relative;z-index:2;background:#fff;border-radius:18px;padding:28px 34px;text-align:center;max-width:min(94vw,520px);max-height:90vh;overflow-y:auto;box-shadow:0 14px 60px rgba(0,0,0,.5);}
+  #victory-box{position:relative;z-index:2;background:#fff;border-radius:18px;padding:28px 34px;text-align:center;max-width:min(94vw,520px);max-height:90vh;overflow:auto;box-shadow:0 14px 60px rgba(0,0,0,.5);}
   .confetti{position:absolute;top:-24px;z-index:1;border-radius:2px;animation:confettiFall linear infinite;}
   @keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);}}
 
@@ -252,10 +330,13 @@
 
   @media(max-width:960px){
     :root{--cw:56px;--cwt:42px;}
-    #board-area{flex-direction:column;}
-    #sidePanel{width:100%;flex:none;flex-direction:row;flex-wrap:wrap;}
-    #sidePanel>#mats{flex:1 1 260px;display:flex;flex-direction:column;gap:8px;}
-    #sidePanel>#log{flex:1 1 260px;max-height:150px;}
+    /* en colonne, align-items:flex-start laissait le tapis prendre la largeur de
+       son contenu (18 dos de cartes en tarot…) et la page débordait à droite */
+    #board-area{flex-direction:column;align-items:stretch;}
+    #tableWrap{flex:none;width:100%;min-width:0;}
+    #sidePanel{width:100%;flex:none;flex-direction:row;flex-wrap:wrap;min-width:0;}
+    #sidePanel>#mats{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:8px;}
+    #sidePanel>#log{flex:1 1 260px;min-width:0;max-height:150px;}
     #sidePanel>#actionHint{width:100%;order:-1;}
   }
   @media(max-width:560px){
@@ -265,13 +346,31 @@
     .cross-link{top:6px;right:6px;font-size:10.5px;}
     .cross-link a{padding:4px 8px;}
     #table{padding:8px;border-width:5px;}
-    #myHand .fan .card{margin-left:calc(var(--cw)*-.45);}
+    /* NE PAS forcer le chevauchement ici : rendreMain() calcule --ml pour que la
+       main tienne pile dans la largeur, et une règle fixe écrasait ce calcul —
+       c'est ce qui faisait déborder la main de 18 cartes du tarot sur téléphone */
     .player-row{flex-wrap:wrap;row-gap:6px;}
     .player-row input[type=text]{flex:1 1 100%;order:1;}
     .player-row input[type=color]{order:2;}
     .player-row select.psymbol{order:3;}
     .player-row select.ptype{order:4;flex:1;max-width:none;}
     #victory-box{padding:22px 16px;}
+    /* les blocs adversaires doivent pouvoir rétrécir et passer à la ligne */
+    .advs{gap:6px;}
+    .adv{min-width:0;flex:1 1 108px;max-width:100%;padding:5px 7px;}
+    .adv-cartes{gap:0;}
+    .dos{width:10px;height:15px;}
+    .pose{padding:3px 4px;}
+    #actions{padding:8px 8px;gap:6px;}
+    #topBar{padding:8px 10px;}
+    #myHandWrap{padding:8px 8px 12px;}
+    .tbl-score th,.tbl-score td{padding:4px 5px;}
+  }
+  @media(max-width:400px){
+    :root{--cw:44px;--cwt:32px;}
+    .adv{flex:1 1 96px;font-size:11.5px;}
+    .adv-nom{font-size:11.5px;}
+    .btn.small{padding:7px 9px;font-size:12.5px;}
   }
 </style>
 </head>
@@ -660,7 +759,7 @@ function advHtml(i, opts){
   let dos = "";
   for(let k=0;k<Math.min(n,10);k++) dos += `<span class="dos"></span>`;
   if(n>0) dos += `<span class="nb">${n}</span>`;
-  return `<div class="adv${i===G.tour?" actif":""}${opts.hs?" hs":""}">
+  return `<div class="adv${i===G.tour?" actif":""}${opts.hs?" hs":""}" data-seat="${i}">
     <div class="adv-nom"><span class="adv-dot" style="background:${esc(p.color)}"></span>${p.symbol} ${esc(p.name)}</div>
     ${opts.cartes!=null?`<div class="adv-cartes">${dos||`<span class="nb">vide</span>`}</div>`:""}
     ${opts.sous?`<div class="adv-sous">${opts.sous}</div>`:""}
@@ -683,6 +782,7 @@ function boutons(list){
   (list||[]).forEach(b=>{
     if(b.html!==undefined){
       const d = document.createElement("span");
+      if(b.cls) d.className = b.cls;
       d.innerHTML = b.html;
       el.appendChild(d);
       if(b.apres) b.apres(d);
@@ -1036,13 +1136,16 @@ defJeu({
   regles:`
     <p><b>But :</b> se défausser de toutes ses cartes. Le 1<sup>er</sup> à n'avoir plus rien est <b>Président</b>, le dernier est <b>Trouduc</b>.</p>
     <p><b>Force des cartes :</b> 3 &lt; 4 &lt; 5 &lt; 6 &lt; 7 &lt; 8 &lt; 9 &lt; 10 &lt; V &lt; D &lt; R &lt; A &lt; <b>2</b> (le 2 est la plus forte).</p>
-    <p><b>Le tour :</b> celui qui ouvre pose une carte, une paire, un brelan ou un carré. Chacun à son tour doit poser <b>le même nombre de cartes</b>, d'un rang <b>strictement supérieur</b>, ou <b>passer</b>. Quand tout le monde a passé, le pli est ramassé et le dernier à avoir posé ouvre le pli suivant.</p>
+    <p><b>Le tour :</b> celui qui ouvre pose une carte, une paire, un brelan ou un carré. Chacun à son tour doit poser <b>le même nombre de cartes</b>, d'un rang <b>supérieur ou égal</b>, ou <b>passer</b>. Quand tout le monde a passé, le pli est ramassé et le dernier à avoir posé ouvre le pli suivant.</p>
+    <p><b>Égaliser 🔒 :</b> si vous posez <b>la même valeur</b> que le joueur précédent (il pose un 4, vous posez un 4), la valeur est <b>bloquée</b> : le joueur suivant n'a plus le choix, il pose un 4 lui aussi… ou il passe. Le blocage saute dès que le pli est ramassé.</p>
     <p><b>Le 2 :</b> avec l'option activée, poser un 2 (ou une paire de 2…) clôture immédiatement le pli et vous permet de repartir.</p>
+    <p><b>Passer :</b> avec l'option activée (par défaut), vous avez toujours le droit de passer, même si vous pouviez poser — quitte à garder vos grosses cartes pour plus tard. Désactivez-la pour obliger tout le monde à poser dès que c'est possible.</p>
     <p><b>Échange :</b> à partir de la 2<sup>e</sup> manche, le Trouduc donne ses <b>2 meilleures</b> cartes au Président qui lui rend 2 cartes dont il ne veut pas ; même chose (1 carte) entre Vice-Trouduc et Vice-Président.</p>
     <p><b>Points :</b> à chaque manche, le 1<sup>er</sup> marque (nombre de joueurs − 1) points, le suivant un de moins… le dernier 0. Le meilleur total gagne la partie.</p>`,
   options:[
     {id:"manches", label:"Nombre de manches", type:"select", choix:[[1,"1 manche"],[3,"3 manches"],[5,"5 manches"],[7,"7 manches"]], defaut:3},
-    {id:"deuxCoupe", label:"Poser un 2 clôture le pli", type:"check", defaut:true}
+    {id:"deuxCoupe", label:"Poser un 2 clôture le pli", type:"check", defaut:true},
+    {id:"passeLibre", label:"Passer même si on peut jouer", type:"check", defaut:true}
   ],
   tri:(a,b)=>ordreP(a.r)-ordreP(b.r) || ORDRE_COULEURS.indexOf(a.s)-ORDRE_COULEURS.indexOf(b.s),
 
@@ -1055,14 +1158,20 @@ defJeu({
     return G.tour>=0 ? `À ${nom(G.tour)} de jouer` : "…";
   },
   info(){
-    const t = G.taille ? `<b>${G.taille===1?"1 carte":G.taille+" cartes"}</b> de rang supérieur à <b>${G.rangLbl}</b>` : "<b>table libre</b>";
+    const n = G.taille===1 ? "1 carte" : G.taille+" cartes";
+    const t = !G.taille ? "<b>table libre</b>"
+      : (G.bloque ? `<b>${n}</b> de rang <b>exactement ${G.rangLbl}</b> 🔒`
+                  : `<b>${n}</b> de rang <b>${G.rangLbl}</b> ou plus`);
     return `<span>Manche <b>${G.manche}/${G.opts.manches}</b></span><span>Il faut : ${t}</span>`;
   },
   aide(){
     if(G.phase==="fin-manche") return "Manche terminée — regardez les scores !";
     if(!jeMeControle(G.tour)) return "";
     if(G.taille===0) return "À vous d'ouvrir : posez 1, 2, 3 ou 4 cartes du même rang.";
-    return `Posez ${G.taille} carte(s) de même rang, plus fortes — ou passez.`;
+    const fin = pPasseAutorisee(G.tour) ? " — ou passez" : " (vous devez poser si vous pouvez)";
+    const n = G.taille===1 ? "1 carte" : G.taille+" cartes";
+    if(G.bloque) return `🔒 Valeur bloquée : posez ${n} de rang ${G.rangLbl} exactement${fin}.`;
+    return `Posez ${n} de même rang, ${G.rangLbl} ou plus fort${fin}.`;
   },
   mat(i){
     const t = G.titres.length ? pLibTitre(G.titres.indexOf(i), players.length) : "";
@@ -1085,6 +1194,7 @@ defJeu({
     } else if(G.tapis.length){
       h += `<div class="centre-titre">Posé par ${esc(nom(G.dernier))}</div>`;
       h += `<div class="pli-zone">`+G.tapis.map(c=>carteHtml(c,{tapis:true})).join("")+`</div>`;
+      if(G.bloque) h += `<div class="tapis-info">🔒 Valeur bloquée : <b>${G.rangLbl}</b> exactement, ou passer.</div>`;
     } else {
       h += `<div class="tapis-info">🧹 Table vide — <b>${esc(nom(G.tour))}</b> ouvre le pli.</div>`;
     }
@@ -1098,7 +1208,7 @@ defJeu({
       const ok = pCoupValide(sel);
       boutons([
         {txt:`✅ Poser ${sel.length?"("+sel.length+")":""}`, dis:!ok, on:()=>{ envoyer(moi,{k:"pose", cartes:sel.map(cid)}); selVide(); }},
-        {txt:"🙅 Passer", cls:"secondary", dis:G.taille===0, on:()=>{ selVide(); envoyer(moi,{k:"passe"}); }}
+        {txt:"🙅 Passer", cls:"secondary", dis:!pPasseAutorisee(moi), on:()=>{ selVide(); envoyer(moi,{k:"passe"}); }}
       ]);
     } else boutons([{html:`<span class="lbl">${G.tour>=0?"En attente de "+esc(nom(G.tour))+"…":"…"}</span>`}]);
 
@@ -1127,7 +1237,7 @@ defJeu({
     }
     if(seat!==G.tour || G.phase==="fin-manche") return;
     if(msg.k==="passe"){
-      if(G.taille===0) return;
+      if(!pPasseAutorisee(seat)) return;
       G.passes[seat] = true;
       log(`🙅 ${nom(seat)} passe.`);
       pSuite(seat);
@@ -1137,13 +1247,17 @@ defJeu({
       const main = G.mains[seat];
       const cartes = (msg.cartes||[]).map(k=>main.find(c=>cid(c)===k)).filter(Boolean);
       if(!pCoupValide(cartes)) return;
+      /* même valeur que le coup précédent : la valeur se bloque pour le suivant */
+      const egale = G.taille>0 && ordreP(cartes[0].r)===G.rang;
       cartes.forEach(c=>retire(main, c));
       G.tapis = cartes.slice();
       G.taille = cartes.length;
       G.rang = ordreP(cartes[0].r);
       G.rangLbl = libRang(cartes[0]);
+      G.bloque = egale;
       G.dernier = seat;
       log(`${players[seat].symbol} ${nom(seat)} pose ${cartes.map(libCourt).join(" ")}.`);
+      if(egale) log(`🔒 Même valeur — il faudra poser ${G.rangLbl} exactement, ou passer.`);
       if(main.length===0){
         G.finis.push(seat);
         const k = G.finis.length-1;
@@ -1172,18 +1286,26 @@ defJeu({
       if(ordreP(r)>=15 && rangs.length>1) r = rangs[1];
       return {k:"pose", cartes: groupes[r].map(cid)};
     }
-    /* réponse : le plus petit coup valide, en évitant de casser un gros groupe */
+    /* réponse : le plus petit coup valide, en évitant de casser un gros groupe.
+       Égaliser (même rang) est le coup le moins cher et il bloque les suivants :
+       le tri par rang croissant le fait naturellement préférer. */
     const cands = [];
     rangs.forEach(r=>{
-      const g = groupes[r];
-      if(g.length>=G.taille && ordreP(r)>G.rang) cands.push({cartes:g.slice(0,G.taille), casse:g.length-G.taille, o:ordreP(r)});
+      const g = groupes[r], o = ordreP(r);
+      if(g.length<G.taille) return;
+      if(G.bloque ? o!==G.rang : o<G.rang) return;
+      cands.push({cartes:g.slice(0,G.taille), casse:g.length-G.taille, o});
     });
     if(!cands.length) return {k:"passe"};
     cands.sort((a,b)=> (niv==="hard" ? a.casse-b.casse : 0) || a.o-b.o);
     const co = cands[0];
     const restants = pActifs().length;
-    if(niv!=="easy" && co.o>=14 && main.length>3 && restants>2 && Math.random()<0.65) return {k:"passe"};
-    if(niv==="easy" && Math.random()<0.12) return {k:"passe"};
+    /* on ne garde ses grosses cartes que si la règle autorise vraiment la passe :
+       sinon l'IA reproposerait une passe refusée et la partie tournerait en rond */
+    if(pPasseAutorisee(seat)){
+      if(niv!=="easy" && co.o>=14 && main.length>3 && restants>2 && Math.random()<0.65) return {k:"passe"};
+      if(niv==="easy" && Math.random()<0.12) return {k:"passe"};
+    }
     return {k:"pose", cartes: co.cartes.map(cid)};
   },
 
@@ -1196,7 +1318,7 @@ function pDonne(){
   let i = 0;
   while(d.length) G.mains[(i++)%players.length].push(d.pop());
   G.mains = G.mains.map(m=>trierMain(m));
-  G.tapis = []; G.taille = 0; G.rang = 0; G.rangLbl = "";
+  G.tapis = []; G.taille = 0; G.rang = 0; G.rangLbl = ""; G.bloque = false;
   G.dernier = -1; G.passes = players.map(()=>false);
   G.finis = []; G.phase = "jeu";
   selVide();
@@ -1218,17 +1340,35 @@ function pGroupes(main){
   return g;
 }
 function pActifs(){ return players.map((p,i)=>i).filter(i=>G.mains[i].length>0); }
+/* Le rang posé doit être supérieur OU ÉGAL au rang en cours — sauf si le pli
+   est « bloqué » (quelqu'un vient d'égaliser) : là il faut la valeur exacte. */
+function pRangOk(o){
+  if(G.taille===0) return true;
+  return G.bloque ? o===G.rang : o>=G.rang;
+}
 function pCoupValide(cartes){
   if(!cartes || !cartes.length) return false;
   if(cartes.some(c=>c.r!==cartes[0].r)) return false;
   if(G.taille===0) return cartes.length<=4;
-  return cartes.length===G.taille && ordreP(cartes[0].r)>G.rang;
+  return cartes.length===G.taille && pRangOk(ordreP(cartes[0].r));
 }
 /* une carte est cliquable si elle peut faire partie d'un coup légal */
 function pCartePosable(c, main){
   const n = main.filter(x=>x.r===c.r).length;
   if(G.taille===0) return true;
-  return n>=G.taille && ordreP(c.r)>G.rang;
+  return n>=G.taille && pRangOk(ordreP(c.r));
+}
+function pPeutJouer(seat){
+  const main = G.mains[seat] || [];
+  return main.some(c=>pCartePosable(c, main));
+}
+/* On peut toujours passer quand on ne peut rien poser. Avec l'option
+   « passer même si on peut jouer » (par défaut), on peut passer dans tous les
+   cas — sauf quand la table est vide : là il faut bien ouvrir le pli. */
+function pPasseAutorisee(seat){
+  if(G.taille===0) return false;
+  if(G.opts && G.opts.passeLibre===false) return !pPeutJouer(seat);
+  return true;
 }
 function pProchain(from){
   const n = players.length;
@@ -1246,7 +1386,7 @@ function pSuite(seat){
 }
 function pNouveauPli(){
   const dernier = G.dernier;
-  G.tapis = []; G.taille = 0; G.rang = 0; G.rangLbl = "";
+  G.tapis = []; G.taille = 0; G.rang = 0; G.rangLbl = ""; G.bloque = false;
   G.passes = players.map(()=>false);
   let s = dernier;
   if(s<0 || G.mains[s].length===0) s = siegeSuivant(s<0?players.length-1:s, i=>G.mains[i].length>0);
@@ -3524,22 +3664,34 @@ defJeu({
 
   rendu(){
     const moi = monSiege();
+    const pot = pkPot();
     let h = rangeeAdversaires(i=>({
       cartes: G.statut[i]==="out" ? 0 : (G.mains[i]?G.mains[i].length:0),
       hs: G.statut[i]==="couche" || G.statut[i]==="out",
-      sous: `${G.jetons[i]} jetons${G.mises[i]?" — mise "+G.mises[i]:""}`+
-            (G.statut[i]==="couche"?" ❌":(G.statut[i]==="tapis"?" 🔥 tapis":""))+
+      sous: `🪙 <b style="color:#ffe08a">${G.jetons[i]}</b>`+
+            (G.statut[i]==="out"?" 💀":"")+
+            pkBadge(i)+
+            (G.mises[i]?`<div class="pk-mise">${pkPile(G.mises[i])}</div>`:"")+
             (G.montre&&G.montre.indexOf(i)>=0&&G.mains[i]&&G.mains[i][0]?"<br>"+G.mains[i].map(libCourt).join(" "):"")
     }));
     h += `<div class="centre">`;
-    h += `<div class="centre-titre">Pot : ${pkPot()} jetons</div>`;
+    const gagn = (G.phase==="fin-manche" && (G.gagnants||[]).length)
+      ? `Pot → ${G.gagnants.map(i=>esc(nom(i))).join(", ")}` : "Pot";
+    h += `<div class="pk-pot" id="pkPot"><span class="lbl">${gagn}</span>`+
+         (pot ? pkPile(pot, true) : `<span class="vide">0</span>`)+`</div>`;
     h += `<div class="pli-zone">`+
       (G.board.length ? G.board.map(c=>carteHtml(c,{tapis:true})).join("") : `<span class="tapis-info">Cartes communes à venir…</span>`)+
       (G.board.length&&G.board.length<5 ? Array(5-G.board.length).fill(`<div class="card tapis back" style="opacity:.22"></div>`).join("") : "")+
       `</div>`;
+    h += `<div class="pk-moi" data-seat="${moi}">Votre mise `+
+         (G.mises[moi] ? pkPile(G.mises[moi]) : `<b>—</b>`)+
+         ` · tapis <b>${G.jetons[moi]}</b>`+
+         (G.miseMax>G.mises[moi] ? ` · à suivre <b>${Math.min(G.miseMax-G.mises[moi], G.jetons[moi])}</b>` : "")+
+         `</div>`;
     if(G.resultat) h += `<div class="tapis-info">${G.resultat}</div>`;
     h += `</div>`;
     document.getElementById("table").innerHTML = h;
+    pkAnimeJetons();
 
     if(G.phase==="fin-manche"){ boutons(boutonSuite("▶️ Main suivante")); }
     else if(!jeMeControle(G.tour)) boutons([{html:`<span class="lbl">${G.tour>=0?"En attente de "+esc(nom(G.tour))+"…":"…"}</span>`}]);
@@ -3551,17 +3703,47 @@ defJeu({
       if(aSuivre<=0) l.push({txt:"✔️ Checker", on:()=>envoyer(moi,{k:"check"})});
       else l.push({txt:`📞 Suivre ${aSuivre}`, on:()=>envoyer(moi,{k:"suit"})});
       if(maxi > G.miseMax){
-        l.push({html:`<input type="range" id="pkSlider" min="${relMin}" max="${maxi}" step="${Math.max(1,Math.floor(G.gb/2))}" value="${Math.min(maxi, Math.max(relMin, Math.floor(pkPot()*0.6/10)*10))}">
-                      <input type="number" id="pkNb" min="${relMin}" max="${maxi}" value="${Math.min(maxi, Math.max(relMin, Math.floor(pkPot()*0.6/10)*10))}" style="width:88px;">`,
-          apres:(el)=>{
-            const sl = el.querySelector("#pkSlider"), nb = el.querySelector("#pkNb");
-            sl.oninput = ()=>{ nb.value = sl.value; };
-            nb.oninput = ()=>{ sl.value = nb.value; };
+        const pas = Math.max(1, G.gb);
+        const val = pkMontant(relMin, maxi, pot);
+        l.push({cls:"pk-wrap", html:`<div class="pk-ctrl">
+            <div class="rowa">
+              <button type="button" class="step" data-d="-1">−</button>
+              <input type="range" id="pkSlider" min="${relMin}" max="${maxi}" step="1" value="${val}">
+              <button type="button" class="step" data-d="1">+</button>
+            </div>
+            <div class="pk-quick">
+              <button type="button" data-v="min">Min ${relMin}</button>
+              <button type="button" data-v="demi">½ pot</button>
+              <button type="button" data-v="pot">Pot</button>
+              <button type="button" data-v="max">Max ${maxi}</button>
+            </div>
+            <button type="button" class="btn small warn go" id="pkGo">⬆️ Relancer à <span id="pkNbL">${val}</span></button>
+          </div>`,
+          apres:(box)=>{
+            const sl = box.querySelector("#pkSlider"), lbl = box.querySelector("#pkNbL");
+            const borne = v=>Math.max(relMin, Math.min(maxi, Math.round(v)||relMin));
+            /* on arrondit à la grosse blinde, sauf tout en bas et tout en haut */
+            const cran = v=>(v<=relMin||v>=maxi) ? v : Math.round(v/pas)*pas;
+            const maj = (v, ecrire)=>{
+              pkMise = borne(v);
+              lbl.textContent = pkMise;
+              if(ecrire) sl.value = pkMise;
+            };
+            sl.oninput = ()=>maj(cran(+sl.value), false);
+            sl.onchange = ()=>maj(cran(+sl.value), true);
+            box.querySelectorAll(".step").forEach(b=>{
+              b.onclick = ()=>maj(pkMise + (+b.dataset.d)*pas, true);
+            });
+            box.querySelectorAll(".pk-quick button").forEach(b=>{
+              b.onclick = ()=>maj({min:relMin, demi:G.miseMax+Math.round(pot/2),
+                                   pot:G.miseMax+pot, max:maxi}[b.dataset.v], true);
+            });
+            box.querySelector("#pkGo").onclick = ()=>{
+              const v = pkMise; pkMise = null;
+              envoyer(moi,{k:"relance", v});
+            };
+            maj(val, true);
           }});
-        l.push({txt:"⬆️ Relancer", cls:"warn", on:()=>{
-          const v = parseInt(document.getElementById("pkNb").value)||relMin;
-          envoyer(moi,{k:"relance", v});
-        }});
       }
       l.push({txt:`🔥 Tapis (${G.jetons[moi]})`, cls:"danger", on:()=>envoyer(moi,{k:"tapis"})});
       boutons(l);
@@ -3584,13 +3766,16 @@ defJeu({
     const aSuivre = Math.min(G.miseMax - G.mises[seat], G.jetons[seat]);
     if(msg.k==="couche"){
       G.statut[seat] = "couche";
+      pkNote(seat, "❌ Couché", "c");
       log(`❌ ${nom(seat)} se couche.`);
     } else if(msg.k==="check"){
       if(aSuivre>0) return;
+      pkNote(seat, "✔️ Check", "s");
       log(`✔️ ${nom(seat)} checke.`);
     } else if(msg.k==="suit"){
       if(aSuivre<=0) return;
       pkMiser(seat, aSuivre);
+      pkNote(seat, `📞 Suit ${aSuivre}`, "s");
       log(`📞 ${nom(seat)} suit (${aSuivre}).`);
     } else if(msg.k==="relance"){
       let v = parseInt(msg.v)||0;
@@ -3603,6 +3788,7 @@ defJeu({
       pkMiser(seat, delta);
       G.miseMax = v;
       G.aParle = players.map((p,i)=> i===seat);
+      pkNote(seat, `⬆️ Relance ${v}`, "r");
       log(`⬆️ ${nom(seat)} relance à ${v}.`);
     } else if(msg.k==="tapis"){
       const delta = G.jetons[seat];
@@ -3614,6 +3800,7 @@ defJeu({
         G.miseMax = total;
         G.aParle = players.map((p,i)=> i===seat);
       }
+      pkNote(seat, `🔥 Tapis ${total}`, "t");
       log(`🔥 ${nom(seat)} fait tapis (${total}) !`);
     } else return;
     G.aParle[seat] = true;
@@ -3627,6 +3814,93 @@ defJeu({
     g.pioche = (g.pioche||[]).map(()=>null);
   }
 });
+
+/* ---- mises visibles : piles de jetons, badges d'action, jetons qui volent ---- */
+const PK_JET = [[500,"#4a2d6b"],[100,"#2b2b33"],[25,"#1f6f4a"],[10,"#2456a6"],[5,"#a83232"],[1,"#e6dfcd"]];
+function pkJetons(m){
+  const out = [];
+  let r = Math.max(0, Math.round(m));
+  for(const [v,c] of PK_JET){
+    while(r>=v && out.length<6){ out.push(c); r -= v; }
+    if(out.length>=6) break;
+  }
+  if(!out.length && m>0) out.push("#e6dfcd");
+  return out;
+}
+function pkPile(m, gros){
+  if(!m) return "";
+  return `<span class="pk-pile${gros?" gros":""}">`+
+    pkJetons(m).map(c=>`<span class="pk-j" style="--c:${c}"></span>`).join("")+
+    `<span class="pk-v">${m}</span></span>`;
+}
+function pkBadge(i){
+  const a = (G.derAction||[])[i];
+  if(!a || !a.t) return "";
+  return `<span class="pk-act ${a.c||""}">${a.t}</span>`;
+}
+function pkNote(seat, t, c){ (G.derAction = G.derAction||[])[seat] = {t, c}; }
+/* couche fixe : les jetons en vol ne doivent pas disparaître au re-rendu du tapis */
+function fxLayer(){
+  let l = document.getElementById("fxLayer");
+  if(!l){ l = document.createElement("div"); l.id = "fxLayer"; document.body.appendChild(l); }
+  return l;
+}
+function volJetons(src, dst, n, col){
+  if(!src || !dst) return;
+  const a = src.getBoundingClientRect(), b = dst.getBoundingClientRect();
+  if(!a.width || !b.width) return;
+  const l = fxLayer();
+  const dx = (b.left+b.width/2) - (a.left+a.width/2);
+  const dy = (b.top+b.height/2) - (a.top+a.height/2);
+  for(let k=0;k<n;k++){
+    const d = document.createElement("span");
+    d.className = "pk-vol";
+    d.style.setProperty("--c", col||"#c8a24a");
+    d.style.setProperty("--dx", dx.toFixed(0)+"px");
+    d.style.setProperty("--dy", dy.toFixed(0)+"px");
+    d.style.left = (a.left+a.width/2-8 + (Math.random()*18-9)).toFixed(0)+"px";
+    d.style.top  = (a.top+a.height/2-8 + (Math.random()*10-5)).toFixed(0)+"px";
+    d.style.animationDelay = (k*55)+"ms";
+    l.appendChild(d);
+    setTimeout(()=>d.remove(), 720+k*55);
+  }
+}
+/* on compare l'état affiché au précédent : toute mise qui a grossi envoie ses
+   jetons au pot, et à l'abattage le pot part vers le(s) gagnant(s). */
+let pkVu = {main:-1, total:[], fin:false};
+function pkAnimeJetons(){
+  const pot = document.getElementById("pkPot");
+  if(!pot || !G.totalMise) return;
+  const siege = i=>document.querySelector(`#table [data-seat="${i}"]`);
+  if(G.numMain!==pkVu.main){ pkVu = {main:G.numMain, total:G.totalMise.slice(), fin:false}; return; }
+  let bouge = false;
+  G.totalMise.forEach((ap,i)=>{
+    const av = pkVu.total[i]||0;
+    if(ap<=av) return;
+    bouge = true;
+    volJetons(siege(i), pot, Math.min(5, 1+Math.floor((ap-av)/Math.max(1,G.gb))), pkJetons(ap-av)[0]);
+  });
+  pkVu.total = G.totalMise.slice();
+  if(G.phase!=="fin-manche") pkVu.fin = false;
+  else if(!pkVu.fin && (G.gagnants||[]).length){
+    pkVu.fin = true; bouge = true;
+    G.gagnants.forEach(i=>volJetons(pot, siege(i), 6, "#c8a24a"));
+  }
+  if(bouge){
+    pot.classList.add("bump");
+    setTimeout(()=>pot.classList.remove("bump"), 260);
+  }
+}
+/* montant de relance choisi par le joueur : mémorisé d'un rendu à l'autre —
+   l'hôte pousse l'état 2 fois par seconde et le curseur serait remis à zéro */
+let pkMise = null, pkMiseCle = "";
+function pkMontant(relMin, maxi, pot){
+  const cle = [G.numMain, G.phase, G.tour, G.miseMax].join("|");
+  if(cle!==pkMiseCle){ pkMiseCle = cle; pkMise = null; }
+  if(pkMise!=null && pkMise>=relMin && pkMise<=maxi) return pkMise;
+  const sug = G.miseMax + Math.max(G.gb, Math.round(pot*0.55/G.gb)*G.gb);
+  return Math.max(relMin, Math.min(maxi, sug));
+}
 
 function pkPot(){ return G.totalMise.reduce((s,v)=>s+v, 0); }
 function pkMiser(seat, montant){
@@ -3665,6 +3939,8 @@ function pkNouvelleMain(){
   G.aParle = players.map(()=>false);
   G.montre = [];
   G.resultat = "";
+  G.gagnants = [];
+  G.derAction = players.map(()=>null);
   G.statut = players.map((p,i)=> G.statut[i]==="out" ? "out" : "actif");
   do{ G.bouton = (G.bouton+1)%n; } while(G.statut[G.bouton]==="out");
   const ordre = [];
@@ -3674,6 +3950,8 @@ function pkNouvelleMain(){
   const bb = heads ? ordre[0] : ordre[1];
   pkMiser(sb, Math.min(G.pb, G.jetons[sb]));
   pkMiser(bb, Math.min(G.gb, G.jetons[bb]));
+  pkNote(sb, "🔹 Petite blinde", "b");
+  pkNote(bb, "🔸 Grosse blinde", "b");
   G.miseMax = G.gb;
   G.relanceMin = G.gb;
   G.phase = "preflop";
@@ -3691,6 +3969,9 @@ function pkAvance(){
 function pkPhaseSuivante(){
   G.mises = players.map(()=>0);
   G.aParle = players.map(()=>false);
+  /* les badges d'action ne valent que pour le tour d'enchères qui vient de finir,
+     sauf « couché » qui reste vrai jusqu'à la fin du coup */
+  G.derAction = players.map((p,i)=> G.statut[i]==="couche" ? {t:"❌ Couché", c:"c"} : null);
   G.miseMax = 0;
   G.relanceMin = G.gb;
   const suite = {preflop:"flop", flop:"turn", turn:"river", river:"showdown"};
@@ -3730,6 +4011,7 @@ function pkFinMain(){
     const g = enLice[0];
     const pot = pkPot();
     G.jetons[g] += pot;
+    G.gagnants = [g];
     G.resultat = `<b>${esc(nom(g))}</b> remporte ${pot} jetons (tout le monde s'est couché).`;
     log(`💰 ${nom(g)} remporte le pot (${pot}) — les autres se sont couchés.`);
     pkFinDeMain();
@@ -3759,6 +4041,7 @@ function pkFinMain(){
     detail.push(`${k===0?"Pot principal":"Pot secondaire "+k} (${pot.montant}) → ${ex.map(i=>esc(nom(i))).join(", ")} — ${pkNomMain(evals[best])}`);
   });
   gains.forEach((v,i)=>{ G.jetons[i] += v; });
+  G.gagnants = gains.map((v,i)=>v>0?i:-1).filter(i=>i>=0);
   G.resultat = enLice.map(i=>`${esc(nom(i))} : ${G.mains[i].map(libCourt).join(" ")} — <b>${pkNomMain(evals[i])}</b>`).join("<br>")+
     "<br>"+detail.join("<br>");
   log(`🏁 Abattage : ${enLice.map(i=>nom(i)+" ("+pkNomMain(evals[i])+")").join(", ")}. `+
@@ -4487,14 +4770,25 @@ function netApplySnapshot(s){
   if(s.vitesse) vitesseIA = s.vitesse;
   players = s.players.map(sp=>({name:sp.name,color:sp.color,symbol:sp.symbol,ai:sp.ai,side:sp.side,iaTemp:sp.iaTemp}));
   G = s.G || {};
+  /* L'hôte renvoie l'état toutes les 500 ms même quand rien n'a bougé. Re-rendre
+     à ce rythme remplace tout le DOM sous les doigts du joueur : le curseur de
+     mise du poker repartait à sa valeur par défaut et un bouton pouvait être
+     recréé pendant l'appui, donc jamais cliqué. On ne redessine que si l'état
+     a réellement changé. */
+  let neuf = false;
+  try{
+    const sig = JSON.stringify([s.G, s.players, s.vitesse, s.jeu]);
+    neuf = (sig !== NET.lastSig);
+    NET.lastSig = sig;
+  }catch(e){ neuf = true; }
   if(!NET.started){
-    NET.started = true;
+    NET.started = true; neuf = true;
     netShowCodeBadge();
     document.getElementById("netHome").style.display = "none";
     document.getElementById("setup").style.display = "none";
     document.getElementById("game").classList.add("active");
   }
-  render();
+  if(neuf) render();
   if(G.fini && G.finHtml) afficherVictoire(G.finHtml);
   const logEl = document.getElementById("log");
   const list = s.log || [];

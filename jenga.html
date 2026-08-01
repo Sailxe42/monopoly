@@ -317,7 +317,7 @@
       <div class="mcard" data-mode="chateau">
         <span class="mico">🏰</span>
         <div class="mname">Château fort</div>
-        <div class="mdesc">Chacun son château d'une cinquantaine de blocs. À votre tour, choisissez qui vous visez et tirez : chaque bloc arraché vous rapporte ses points… et les fait perdre à son propriétaire. Le dernier château debout gagne.</div>
+        <div class="mdesc">Chacun son château d'une cinquantaine de blocs. À votre tour, choisissez qui vous visez et tirez : chaque bloc arraché vous rapporte ses points… et les fait perdre à son propriétaire. Château rasé ou pas, on tire jusqu'au dernier boulet — c'est le meilleur score qui gagne.</div>
       </div>
     </div>
 
@@ -1508,6 +1508,16 @@ function linkCastles(){
   }
 }
 const castleAlive = k => !!G.castles[k] && !!G.players[k] && !G.players[k].out;
+/* Les châteaux qu'un joueur peut encore viser (tous sauf le sien). */
+function castleTargets(k){
+  const l = [];
+  for(let i=0;i<G.players.length;i++) if(i!==k && castleAlive(i)) l.push(i);
+  return l;
+}
+/* Un joueur reste en jeu tant qu'il lui reste un boulet ET un château à viser,
+   MÊME si le sien a déjà été rasé : la partie va jusqu'à épuisement des
+   munitions, elle ne s'arrête pas au premier château tombé. */
+const canFire = k => !!G.players[k] && (G.players[k].balls||0) > 0 && castleTargets(k).length > 0;
 function pickDefaultTarget(){
   const n = G.players.length;
   for(let i=1;i<=n;i++){
@@ -2239,6 +2249,9 @@ function scoreBlock(b){
 function scoreCastleBlock(b){
   const own = G.players[b.own];
   const att = G.players[G.cur];
+  /* château déjà rasé : il est hors jeu et plus personne ne peut le viser —
+     ses ruines qui continuent de s'effondrer ne comptent plus pour personne */
+  if(own && own.out) return;
   const pts = Math.abs(b.def.pts);
   if(own) own.score = (own.score||0) - pts;
   if(att && att!==own) att.score = (att.score||0) + pts;
@@ -2295,6 +2308,9 @@ function checkCastles(){
     } else {
       addLog(`🏰💥 ${esc(own.name)} a détruit son propre château…`);
     }
+    /* plus de murs, mais on tire jusqu'au dernier boulet */
+    if((own.balls||0) > 0 && castleTargets(c.owner).length)
+      addLog(`🎯 ${esc(own.name)} n'a plus de château mais garde ses ${own.balls} boulet${own.balls>1?"s":""} — la revanche est permise !`);
   }
 }
 
@@ -2453,15 +2469,20 @@ function resolveChateau(){
   checkFallen();
   checkCastles();
   const p = G.players[G.cur];
-  const debout = G.castles.filter(c=>castleAlive(c.owner));
-  if(debout.length<=1){ endGame("lastCastle"); return; }
-  const reste = G.players.reduce((s,x)=>s + (x.out?0:(x.balls||0)), 0);
-  if(reste<=0){ endGame("noballs"); return; }
   if(p) addLog(`🎯 ${esc(p.name)} : ${p.score||0} pts (${p.balls||0} boulet${(p.balls||0)>1?"s":""})`);
-  /* on saute les éliminés et ceux qui n'ont plus de munitions */
+  /* La partie ne s'arrête PAS au dernier château debout : on continue tant que
+     quelqu'un peut encore tirer (un boulet + une cible). Un joueur rasé garde
+     ses munitions et peut toujours aller chercher des points chez les autres. */
+  const encore = G.players.map((x,k)=>k).filter(canFire);
+  if(!encore.length){
+    endGame(G.castles.some(c=>castleAlive(c.owner)) ? "noballs" : "noCastle");
+    return;
+  }
+  /* on saute ceux qui n'ont plus de munitions ou plus aucun château à viser */
   let n = 0;
   do{ G.cur = (G.cur+1)%G.players.length; n++; }
-  while((G.players[G.cur].out || (G.players[G.cur].balls||0)<=0) && n<=G.players.length);
+  while(!canFire(G.cur) && n<=G.players.length);
+  if(!canFire(G.cur)) G.cur = encore[0];
   G.round++;
   pickDefaultTarget();
   startTurn();
@@ -2482,9 +2503,9 @@ function endGame(reason){
       if(a.crashed!==b.crashed) return a.crashed?1:-1;
       return (b.moves||0)-(a.moves||0);
     }
-    /* château fort : un château rasé passe derrière, quel que soit le score */
-    if(G.mode==="chateau" && !!a.out !== !!b.out) return a.out?1:-1;
-    return (b.score||0)-(a.score||0);
+    /* château fort : c'est le score qui tranche — perdre son château coûte déjà
+       tous ses blocs + la prime à l'assaillant, et la partie continue après */
+    return (b.score||0)-(a.score||0) || (a.out?1:0)-(b.out?1:0);
   });
   let title = "Partie terminée", sub = "";
   if(G.mode==="tour"){
@@ -2504,10 +2525,15 @@ function endGame(reason){
     }
   } else if(G.mode==="chateau"){
     const survivant = G.players.filter(p=>!p.out);
-    if(reason==="lastCastle" && survivant.length===1){
+    if(!survivant.length){
+      title = "🏰💥 Plus un seul château debout !";
+      sub = `Tout a été rasé — <b>${esc(rank[0].name)}</b> l'emporte avec ${rank[0].score||0} points.`;
+    } else if(survivant.length===1){
       title = "🏰 Dernier château debout !";
-      sub = `<b>${esc(survivant[0].name)}</b> est le seul à avoir encore des murs — ` +
-            `${rank[0].score||0} points pour ${esc(rank[0].name)}.`;
+      sub = (rank[0]===survivant[0])
+        ? `<b>${esc(survivant[0].name)}</b> garde ses murs <i>et</i> la victoire, avec ${rank[0].score||0} points.`
+        : `<b>${esc(survivant[0].name)}</b> est le seul à avoir encore des murs, mais c'est le score qui tranche : ` +
+          `<b>${esc(rank[0].name)}</b> l'emporte avec ${rank[0].score||0} points.`;
     } else {
       title = "🎯 Plus de munitions";
       sub = `<b>${esc(rank[0].name)}</b> l'emporte avec ${rank[0].score||0} points.`;
@@ -2865,9 +2891,13 @@ function updateHud(){
 
   el("scoreBox").innerHTML = G.players.map((x,i)=>{
     const v = G.mode==="tour" ? (x.moves||0) : (x.score||0);
-    return `<div class="sl ${i===G.cur&&!G.smash?"on":""} ${x.out?"dead":""}">`+
-      `<span class="sn"><span class="dot" style="background:${x.color}"></span>${esc(x.name)}${x.bot?"🤖":""}${x.conn===false?"🔌":""}</span>`+
-      `<span>${v}${G.mode==="demo"?` <span style="opacity:.6">·${x.balls||0}🎯</span>`:""}</span></div>`;
+    /* en château fort on ne barre le nom que quand le joueur ne peut PLUS tirer :
+       un château rasé continue de jouer tant qu'il lui reste des boulets */
+    const ko = G.mode==="chateau" ? (G.started && !canFire(i)) : !!x.out;
+    return `<div class="sl ${i===G.cur&&!G.smash?"on":""} ${ko?"dead":""}">`+
+      `<span class="sn"><span class="dot" style="background:${x.color}"></span>${esc(x.name)}${x.bot?"🤖":""}${x.conn===false?"🔌":""}`+
+      `${G.mode==="chateau"&&x.out?"💥":""}</span>`+
+      `<span>${v}${G.mode!=="tour"?` <span style="opacity:.6">·${x.balls||0}🎯</span>`:""}</span></div>`;
   }).join("");
 
   const gb = el("goalBox");
@@ -2877,9 +2907,13 @@ function updateHud(){
         const x = G.players[k]; if(!x) return "";
         const pc = Math.round(clamp(c.hp==null?1:c.hp,0,1)*100);
         const col = pc>60 ? "#7ed957" : (pc>30 ? "#ffc46b" : "#ff7a6e");
-        return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;${x.out?"opacity:.45":""}">`+
+        /* un château rasé mais qui a encore des boulets reste un joueur actif :
+           on l'affiche estompé, pas éteint, avec ses munitions restantes */
+        const tire = (x.balls||0) > 0;
+        return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;${x.out&&!tire?"opacity:.4":(x.out?"opacity:.7":"")}">`+
           `<span class="dot" style="background:${x.color}"></span>`+
           `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}${k===G.target&&!x.out?" 🎯":""}</span>`+
+          `<span style="opacity:.65;font-size:11.5px">${x.balls||0}🎯</span>`+
           `<b style="color:${x.out?"#ff7a6e":col}">${x.out?"💥":pc+"%"}</b></div>`;
       }).join("");
     gb.style.display = "block";
@@ -3318,7 +3352,8 @@ function majChateau(){
     `${n} joueurs × ${cfg.n} blocs = <b style="color:${tot>260?"#ffb36b":"#ffc46b"}">${tot} blocs</b> à simuler` +
     (tot>260 ? " — costaud pour un téléphone, passez la qualité en « Basse »." : ".") +
     `<br>Un bloc arraché = ses points pour l'attaquant, autant en moins pour le propriétaire. ` +
-    `Le trésor 💎 du donjon ou les ¾ du château détruits, et c'est fini pour lui (+${CASTLE_BONUS} à l'assaillant).` +
+    `Le trésor 💎 du donjon ou les ¾ du château détruits, et il tombe (+${CASTLE_BONUS} à l'assaillant) — ` +
+    `mais son propriétaire continue de tirer : la partie va jusqu'au dernier boulet.` +
     (cfg.tnt ? "<br>⚠️ Une des tours d'angle sert de poudrière…" : "");
 }
 el("inpCastle").onchange = majChateau;
